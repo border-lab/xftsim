@@ -324,6 +324,7 @@ The codebase follows a modular, extensible architecture:
 | `claude.md` | This file - AI assistant instructions and project documentation (symlinked to repo root) |
 | `bump_version.py` | Version management script. Usage: `python devtools/bump_version.py [dev|patch|minor|major|show]` |
 | `install_hooks.sh` | Installs git pre-commit hook for automatic dev version bumping |
+| `build_docs.sh` | Build documentation. Usage: `./devtools/build_docs.sh [build|clean|serve]` |
 | `CHANGELOG.dev.md` | Changelog for development workflow changes (testing, CI/CD, tooling) |
 
 ### Version Management
