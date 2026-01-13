@@ -3,11 +3,11 @@
 Version management script for xftsim.
 
 Usage:
-    python scripts/bump_version.py dev      # Increment dev version (0.2.0 -> 0.2.0.dev1)
-    python scripts/bump_version.py patch    # Bump patch version (0.2.0.dev3 -> 0.2.1)
-    python scripts/bump_version.py minor    # Bump minor version (0.2.1 -> 0.3.0)
-    python scripts/bump_version.py major    # Bump major version (0.3.0 -> 1.0.0)
-    python scripts/bump_version.py show     # Show current version
+    python devtools/bump_version.py dev      # Increment dev version (0.2.0 -> 0.2.0.dev1)
+    python devtools/bump_version.py patch    # Bump patch version (0.2.0.dev3 -> 0.2.1)
+    python devtools/bump_version.py minor    # Bump minor version (0.2.1 -> 0.3.0)
+    python devtools/bump_version.py major    # Bump major version (0.3.0 -> 1.0.0)
+    python devtools/bump_version.py show     # Show current version
 """
 import re
 import sys

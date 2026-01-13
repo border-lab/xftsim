@@ -1,24 +1,13 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to xftsim will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGELOG.dev.md](devtools/CHANGELOG.dev.md).
+
 ## [Unreleased]
-
-### Added
-- Test suite with pytest (`tests/` directory)
-- Demo testing framework (`tests/test_demos.py`) covering UGRM and BGRM demos
-- pytest configuration (`pytest.ini`)
-- `claude.md` with project documentation, roadmap, and AI assistant instructions
-- `CHANGELOG.md` for tracking changes
-- Version management system (`scripts/bump_version.py`)
-  - Pre-commit hook auto-increments dev version on each commit
-  - Manual script for release version bumps (patch/minor/major)
-
-### Changed
-- Updated `.gitignore` to exclude test virtual environments
 
 ## [0.2.0] - 2024
 

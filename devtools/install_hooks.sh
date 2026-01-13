@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install git hooks for xftsim development
 #
-# Usage: ./scripts/install_hooks.sh
+# Usage: ./devtools/install_hooks.sh
 
 set -e
 
@@ -23,7 +23,7 @@ cat > "$HOOKS_DIR/pre-commit" << 'EOF'
 
 set -e
 
-SCRIPT_DIR="$(git rev-parse --show-toplevel)/scripts"
+SCRIPT_DIR="$(git rev-parse --show-toplevel)/devtools"
 VERSION_FILE="$(git rev-parse --show-toplevel)/xftsim/__init__.py"
 
 # Check if bump_version.py exists
