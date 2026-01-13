@@ -9,6 +9,14 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-01-13
+
+### Fixed
+- API documentation now builds correctly on ReadTheDocs and locally
+
+### Changed
+- Documentation build script now uses xftsim-test environment for proper API autodoc
+
 ## [0.2.0] - 2024
 
 ### Added

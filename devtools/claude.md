@@ -11,7 +11,7 @@
 
 **Project Metadata:**
 - **Author:** Richard Border (rborder@cs.cmu.edu) and collaborators
-- **Version:** 0.2.0
+- **Version:** 0.3.0
 - **License:** GPL-3.0
 - **Python:** 3.9.6+ (tested on MacOS 13.4, Ubuntu 22.04/24.04, PopOS 22.04, RHEL 7)
 - **PyPI:** https://pypi.org/project/xftsim/
