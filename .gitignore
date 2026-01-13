@@ -5,6 +5,8 @@ xftsim/pgen.py
 __pycache__
 .env
 .venv
+.venv-*
+venv/
 
 # example caches from Hypothesis
 .hypothesis/
