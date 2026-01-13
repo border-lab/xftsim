@@ -324,8 +324,18 @@ The codebase follows a modular, extensible architecture:
 | `claude.md` | This file - AI assistant instructions and project documentation (symlinked to repo root) |
 | `bump_version.py` | Version management script. Usage: `python devtools/bump_version.py [dev|patch|minor|major|show]` |
 | `install_hooks.sh` | Installs git pre-commit hook for automatic dev version bumping |
-| `build_docs.sh` | Build documentation. Usage: `./devtools/build_docs.sh [build|clean|serve]` |
+| `build_docs.sh` | Build documentation (uses xftsim-test env for API autodoc) |
 | `CHANGELOG.dev.md` | Changelog for development workflow changes (testing, CI/CD, tooling) |
+
+### Building Documentation
+
+```bash
+./devtools/build_docs.sh          # Build docs
+./devtools/build_docs.sh clean    # Clean and rebuild
+./devtools/build_docs.sh serve    # Build and serve locally at http://localhost:8000
+```
+
+**Note:** The script automatically uses the `xftsim-test` micromamba environment for building, which is required for API autodoc to work (it needs to import xftsim and all its dependencies). If xftsim-test is not available, the build will fall back to the current environment but API docs may be incomplete.
 
 ### Version Management
 
@@ -381,7 +391,7 @@ To skip auto-versioning for a commit: `git commit --no-verify`
 
 ### High Priority - Documentation
 
-- [ ] **Fix API documentation**: Debug and fix broken API reference on ReadTheDocs
+- [x] **Fix API documentation**: Fixed - ReadTheDocs now installs xftsim, local builds use xftsim-test env
 - [ ] **Consistent docstrings**: Standardize docstring format across all modules (NumPy style)
 - [ ] **Remove unneeded docstrings**: Clean up placeholder or redundant documentation
 - [ ] **Verify docs compile**: Ensure `make html` succeeds without errors/warnings

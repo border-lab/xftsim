@@ -26,3 +26,6 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 - Removed references to non-existent `lsmate` module
 - Removed references to non-existent `extensions` page
 - Fixed `source_suffix` in Sphinx config to properly handle .md files
+- **Fixed API autodoc**: ReadTheDocs now installs xftsim package; local builds use xftsim-test environment
+- Updated `build_docs.sh` to automatically use xftsim-test environment for proper API generation
+- Updated `.readthedocs.yaml` to install xftsim package during docs build
