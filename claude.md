@@ -318,9 +318,10 @@ The codebase follows a modular, extensible architecture:
 
 - [x] **Demo testing system**: Create automated tests that run all demos and verify expected outputs
 - [ ] **Package test suite**: Implement comprehensive pytest-based testing for all modules
-- [ ] **Version management**: Implement semantic versioning with `.dev` tags for code in flux
+- [x] **Version management**: Implement semantic versioning with `.dev` tags for code in flux
   - Format: `X.Y.Z` for stable releases, `X.Y.Z.devN` for development
-  - Auto-increment on major changes
+  - Pre-commit hook auto-increments dev version
+  - `scripts/bump_version.py` for release bumps (patch/minor/major)
 - [ ] **Automated PyPI publishing**: Set up GitHub Actions for automatic PyPI releases on tags
 - [ ] **Automated conda-forge publishing**: Configure feedstock for conda-forge distribution
 

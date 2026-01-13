@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pytest configuration (`pytest.ini`)
 - `claude.md` with project documentation, roadmap, and AI assistant instructions
 - `CHANGELOG.md` for tracking changes
+- Version management system (`scripts/bump_version.py`)
+  - Pre-commit hook auto-increments dev version on each commit
+  - Manual script for release version bumps (patch/minor/major)
 
 ### Changed
 - Updated `.gitignore` to exclude test virtual environments
