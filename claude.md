@@ -307,6 +307,49 @@ The codebase follows a modular, extensible architecture:
 
 - **NEVER add "Co-Authored-By: Claude" or any similar AI attribution to commits, code, or documentation**
 - Do not add any co-author, contributor, or attribution lines referencing AI/Claude/LLM assistance
+- **Always update CHANGELOG.md** when making changes (create if it doesn't exist)
+- Use semantic versioning: `X.Y.Z` for releases, `X.Y.Z.devN` for development versions
+
+---
+
+## Roadmap / TODO
+
+### High Priority - Testing & CI/CD
+
+- [ ] **Demo testing system**: Create automated tests that run all demos and verify expected outputs
+- [ ] **Package test suite**: Implement comprehensive pytest-based testing for all modules
+- [ ] **Version management**: Implement semantic versioning with `.dev` tags for code in flux
+  - Format: `X.Y.Z` for stable releases, `X.Y.Z.devN` for development
+  - Auto-increment on major changes
+- [ ] **Automated PyPI publishing**: Set up GitHub Actions for automatic PyPI releases on tags
+- [ ] **Automated conda-forge publishing**: Configure feedstock for conda-forge distribution
+
+### High Priority - Installation & Dependencies
+
+- [ ] **Simplify installation**: Make it easier to install in different environments (conda, pip, from source)
+- [ ] **Simplify dependencies**: Audit and reduce listed dependencies to essential packages only
+- [ ] **Pin versions appropriately**: Balance reproducibility with flexibility
+
+### High Priority - Documentation
+
+- [ ] **Fix API documentation**: Debug and fix broken API reference on ReadTheDocs
+- [ ] **Consistent docstrings**: Standardize docstring format across all modules (NumPy style)
+- [ ] **Remove unneeded docstrings**: Clean up placeholder or redundant documentation
+- [ ] **Verify docs compile**: Ensure `make html` succeeds without errors/warnings
+
+### Medium Priority - Project Management
+
+- [ ] **Automated changelog**: Set up automatic changelog generation from commits/PRs
+- [ ] **CHANGELOG.md**: Create and maintain a changelog file
+
+### Long Term - Architecture (BLOCKED)
+
+- [ ] **Move away from xarray**: Replace xarray with alternative data structures
+  - **Owner:** Ajay (dev)
+  - **Status:** Do not start until Ajay requests assistance
+  - **Rationale:** TBD by Ajay
+
+---
 
 ## Data Format Support
 
