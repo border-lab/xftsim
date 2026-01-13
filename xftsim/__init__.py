@@ -1,5 +1,8 @@
 import numpy as np
 
+__version__="0.3.0"
+
+
 class Config:
     """
     A class to store configuration settings. Instantiated as xftsim.config when package is loaded

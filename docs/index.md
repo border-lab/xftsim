@@ -39,7 +39,6 @@ Mating regimes <userguide/mate>
 Statistics <userguide/stats>
 Post-processing <userguide/proc>
 Advanced genetic architectures <userguide/advgen>
-Extending `xftsim` <userguide/extensions>
 ```
 
 ```{toctree}
@@ -52,7 +51,6 @@ effect module <api_ref/effect>
 founders module <api_ref/founders>
 index module <api_ref/index>
 io module <api_ref/io>
-lsmate module <api_ref/lsmate>
 mate module <api_ref/mate>
 ped module <api_ref/ped>
 proc module <api_ref/proc>
