@@ -1505,10 +1505,10 @@ class Architecture:
         xr.DataArray
             Phenotype array with the merged component indexer and sample indexer.
         """
-        sample_indexer = haplotypes.xft.get_sample_indexer()
+        sample_indexer = haplotypes.samples.to_sample_index()
         return xft.struct.PhenotypeArray(component_indexer=self.merged_component_indexer,
-                                         sample_indexer=haplotypes.xft.get_sample_indexer(),
-                                         generation=haplotypes.attrs['generation'])
+                                         sample_indexer=sample_indexer,
+                                         generation=haplotypes.generation)
 
     def initialize_founder_phenotype_array(self,
                                            haplotypes: xr.DataArray,
@@ -1746,7 +1746,7 @@ class GCTA_Architecture(Architecture):
         if variant_indexer is None and haplotypes is None:
             raise ValueError('variant_indexer or haplotypes is required')
         elif variant_indexer is None:
-            variant_indexer = haplotypes.xft.get_variant_indexer()
+            variant_indexer = haplotypes.variants.to_variant_index(af=haplotypes.af_empirical)
 
         vg = np.array(h2).ravel()
         if np.any(vg > 1) or np.any(vg < 0):

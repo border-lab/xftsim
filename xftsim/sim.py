@@ -134,7 +134,7 @@ class Simulation():
         self.phenotype_store = dict()
         self.mating_store = dict()
         self.results_store = dict()
-        self.pedigree = xft.ped.Pedigree(founder_haplotypes.xft.get_sample_indexer())
+        self.pedigree = xft.ped.Pedigree(founder_haplotypes.samples)
 
         #### generation specific cached properties ####
         # computed once per generation, deleted next generation
@@ -538,7 +538,7 @@ class DemoSimulation(Simulation):
             founder_haplotypes = xft.founders.founder_haplotypes_uniform_AFs(n=n, m=m)
             architecture = xft.arch.GCTA_Architecture(h2=[.5], phenotype_name=['height'], 
                                                       haplotypes=founder_haplotypes)
-            recombination_map = xft.reproduce.RecombinationMap.constant_map_from_haplotypes(founder_haplotypes, 
+            recombination_map = xft.reproduce.RecombinationMap.from_haplotypes(founder_haplotypes, 
                                                                                             p =.1)
             mating_regime = xft.mate.RandomMatingRegime(mates_per_female=1,
                                                         offspring_per_pair=2)
@@ -546,7 +546,7 @@ class DemoSimulation(Simulation):
             founder_haplotypes = xft.founders.founder_haplotypes_uniform_AFs(n=n, m=m)
             architecture = xft.arch.GCTA_Architecture(h2=[.5,.4], phenotype_name=['height', 'BMD'], 
                                                       haplotypes=founder_haplotypes)
-            recombination_map = xft.reproduce.RecombinationMap.constant_map_from_haplotypes(founder_haplotypes, 
+            recombination_map = xft.reproduce.RecombinationMap.from_haplotypes(founder_haplotypes, 
                                                                                             p =.1)
             mating_regime = xft.mate.RandomMatingRegime(mates_per_female=1,
                                                         offspring_per_pair=2)

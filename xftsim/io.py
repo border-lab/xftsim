@@ -15,52 +15,275 @@ import xftsim as xft
 
 
 @nb.njit
-def _genotypes_to_pseudo_haplotypes(genotypes):
+def _genotypes_to_pseudo_haplotypes_3d(genotypes):
     """
-    Converts genotype data to pseudo-haplotype data using random permutations.
+    Converts genotype data to pseudo-haplotype 3D array.
 
     Parameters
     ----------
     genotypes : ndarray
-        An array of genotype data.
+        2D array of genotype data (n, m) with values 0, 1, 2.
 
     Returns
     -------
     ndarray
-        An array of pseudo-haplotype data.
+        3D array of pseudo-haplotype data (n, m, 2).
     """
-    haplotypes = np.zeros((genotypes.shape[0],genotypes.shape[1]*2), dtype=np.int8)
-    zero_one = np.array([0,1], dtype=np.int8)
-    one_one = np.array([1,1], dtype=np.int8)
-    zero_zero = np.array([1,1], dtype=np.int8)
-    for j in nb.prange(genotypes.shape[1]):
-        for i in range(genotypes.shape[0]):
-            if genotypes[i,j]==1:
-                haplotypes[i,(2*j):(2*j+2)] = np.random.permutation(zero_one)
-            elif genotypes[i,j]==2:
-                haplotypes[i,(2*j):(2*j+2)] = one_one
+    n, m = genotypes.shape
+    haplotypes = np.zeros((n, m, 2), dtype=np.int8)
+    for i in range(n):
+        for j in range(m):
+            g = genotypes[i, j]
+            if g == 0:
+                haplotypes[i, j, 0] = 0
+                haplotypes[i, j, 1] = 0
+            elif g == 1:
+                # Randomly assign which haplotype gets the 1
+                if np.random.random() < 0.5:
+                    haplotypes[i, j, 0] = 1
+                    haplotypes[i, j, 1] = 0
+                else:
+                    haplotypes[i, j, 0] = 0
+                    haplotypes[i, j, 1] = 1
+            elif g == 2:
+                haplotypes[i, j, 0] = 1
+                haplotypes[i, j, 1] = 1
     return haplotypes
 
 
-def genotypes_to_pseudo_haplotypes(x):
+def genotypes_to_pseudo_haplotypes(genotypes: np.ndarray) -> np.ndarray:
     """
-    Converts genotype data in an xarray DataArray to pseudo-haplotype data.
+    Converts genotype data to pseudo-haplotype 3D array.
 
     Parameters
     ----------
-    x : xr.DataArray
-        An xarray DataArray containing genotype data.
+    genotypes : np.ndarray
+        2D array of genotype data (n, m) with values 0, 1, 2.
 
     Returns
     -------
-    xr.DataArray
-        An xarray DataArray containing pseudo-haplotype data.
+    np.ndarray
+        3D array of pseudo-haplotype data (n, m, 2).
     """
-    out = x[:,np.repeat(np.arange(x.shape[1]),2)]
-    out.values = _genotypes_to_pseudo_haplotypes(x.values)
-    return out
+    return _genotypes_to_pseudo_haplotypes_3d(genotypes.astype(np.int8))
 
 
+def read_plink1_as_pseudohaplotypes(path: str,
+                                    generation: int = 0) -> xft.struct.NHaplotypeArray:
+    """
+    Reads in PLINK 1 binary genotype data and returns a NHaplotypeArray object containing pseudo-haplotypes by
+    randomly assigning haplotypes at heterozygous sites.
+
+    Parameters
+    ----------
+    path : str
+        The file path to the PLINK 1 binary genotype data.
+    generation : int, optional
+        Generation number. Default is 0.
+
+    Returns
+    -------
+    xft.struct.NHaplotypeArray
+        Pseudo-haplotype array. The "pseudo-" prefix refers to the fact that the
+        plink bfile format doesn't track phase.
+
+    Raises
+    ------
+    ValueError
+        If the specified file path does not exist or is not in the expected format.
+    """
+    # Read genotype data
+    bim, fam, bed = pp.read_plink(path)
+
+    # bed is (m, n) in dask, transpose to (n, m)
+    with ProgressBar():
+        genotypes = bed.T.compute().astype(np.int8)
+
+    n, m = genotypes.shape
+
+    # Convert to 3D pseudo-haplotypes
+    haplotypes_3d = genotypes_to_pseudo_haplotypes(genotypes)
+
+    # Create variant IDs
+    if np.all(bim.snp.values == '.'):
+        vid = np.char.add(
+            np.char.add(bim.chrom.values.astype(str), ':'),
+            bim.pos.values.astype(str)
+        )
+    else:
+        vid = bim.snp.values
+
+    # Create variant metadata
+    chrom = bim.chrom.values
+    pos_bp = bim.pos.values
+    pos_cM = bim.cm.values if not np.all(bim.cm.values == 0) else None
+    zero_allele = bim.a0.values
+    one_allele = bim.a1.values
+
+    variants = xft.struct.VariantMeta(
+        vid=vid,
+        chrom=chrom,
+        pos_bp=pos_bp,
+        pos_cM=pos_cM,
+        zero_allele=zero_allele,
+        one_allele=one_allele,
+    )
+
+    # Create sample metadata
+    iid = fam.iid.values.astype(str)
+    fid = fam.fid.values.astype(str)
+    # pandas_plink: gender 1=male, 2=female, 0=unknown
+    # xftsim: sex 0=female, 1=male
+    sex = (2 - fam.gender.values).astype(int)
+    sex[fam.gender.values == 0] = 0  # unknown -> default to female
+
+    samples = xft.struct.SampleMeta(iid=iid, fid=fid, sex=sex)
+
+    return xft.struct.NHaplotypeArray(
+        genotypes=haplotypes_3d,
+        generation=generation,
+        samples=samples,
+        variants=variants,
+    )
+
+
+def haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
+                                  generation: int = 0) -> xft.struct.NHaplotypeArray:
+    """Construct haplotype array from sgkit DataArray.
+    Useful in conjuction with sgkit.io.vcf.vcf_to_zarr() and sgkit.load_dataset()
+
+    Parameters
+    ----------
+    gdat : xr.Dataset
+        Dataset generated by sgkit.load_dataset()
+    generation : int, optional
+        Generation number. Default is 0.
+
+    Returns
+    -------
+    xft.struct.NHaplotypeArray
+        Haplotype array.
+    """
+    # Genotypes are already in 3D format (samples, variants, ploidy)
+    # sgkit uses (variants, samples, ploidy), so we need to transpose
+    genotypes = gdat.call_genotype.values.transpose(1, 0, 2).astype(np.int8)
+
+    # Create sample metadata
+    iid = gdat.sample_id.values.astype(str)
+    samples = xft.struct.SampleMeta(iid=iid)
+
+    # Create variant metadata
+    chrom = np.array(gdat.contigs)[gdat.variant_contig.values]
+    pos_bp = gdat.variant_position.values
+    vid = np.char.add(
+        np.char.add(chrom.astype(str), ':'),
+        pos_bp.astype(str)
+    )
+
+    # Get alleles if available
+    alleles = gdat.variant_allele.values if 'variant_allele' in gdat else None
+    zero_allele = alleles[:, 0].astype(str) if alleles is not None else None
+    one_allele = alleles[:, 1].astype(str) if alleles is not None else None
+
+    variants = xft.struct.VariantMeta(
+        vid=vid,
+        chrom=chrom,
+        pos_bp=pos_bp,
+        zero_allele=zero_allele,
+        one_allele=one_allele,
+    )
+
+    return xft.struct.NHaplotypeArray(
+        genotypes=genotypes,
+        generation=generation,
+        samples=samples,
+        variants=variants,
+    )
+
+
+def save_haplotypes_npz(haplotypes: xft.struct.NHaplotypeArray,
+                        path: str) -> None:
+    """
+    Save NHaplotypeArray to compressed numpy format.
+
+    Parameters
+    ----------
+    haplotypes : xft.struct.NHaplotypeArray
+        The haplotype data to save.
+    path : str
+        The path to save to (will add .npz extension if not present).
+    """
+    save_dict = {
+        'genotypes': haplotypes.genotypes,
+        'generation': np.array([haplotypes.generation]),
+        # Sample metadata
+        'sample_iid': haplotypes.samples.iid,
+        'sample_fid': haplotypes.samples.fid,
+        'sample_sex': haplotypes.samples.sex,
+        # Variant metadata
+        'variant_vid': haplotypes.variants.vid,
+    }
+
+    # Add optional variant metadata if present
+    if haplotypes.variants.chrom is not None:
+        save_dict['variant_chrom'] = haplotypes.variants.chrom
+    if haplotypes.variants.pos_bp is not None:
+        save_dict['variant_pos_bp'] = haplotypes.variants.pos_bp
+    if haplotypes.variants.pos_cM is not None:
+        save_dict['variant_pos_cM'] = haplotypes.variants.pos_cM
+    if haplotypes.variants.af is not None:
+        save_dict['variant_af'] = haplotypes.variants.af
+    if haplotypes.variants.zero_allele is not None:
+        save_dict['variant_zero_allele'] = haplotypes.variants.zero_allele
+    if haplotypes.variants.one_allele is not None:
+        save_dict['variant_one_allele'] = haplotypes.variants.one_allele
+
+    np.savez_compressed(path, **save_dict)
+
+
+def load_haplotypes_npz(path: str) -> xft.struct.NHaplotypeArray:
+    """
+    Load NHaplotypeArray from compressed numpy format.
+
+    Parameters
+    ----------
+    path : str
+        The path to load from.
+
+    Returns
+    -------
+    xft.struct.NHaplotypeArray
+        The loaded haplotype array.
+    """
+    data = np.load(path, allow_pickle=True)
+
+    # Load sample metadata
+    samples = xft.struct.SampleMeta(
+        iid=data['sample_iid'],
+        fid=data['sample_fid'],
+        sex=data['sample_sex'],
+    )
+
+    # Load variant metadata
+    variants = xft.struct.VariantMeta(
+        vid=data['variant_vid'],
+        chrom=data['variant_chrom'] if 'variant_chrom' in data else None,
+        pos_bp=data['variant_pos_bp'] if 'variant_pos_bp' in data else None,
+        pos_cM=data['variant_pos_cM'] if 'variant_pos_cM' in data else None,
+        af=data['variant_af'] if 'variant_af' in data else None,
+        zero_allele=data['variant_zero_allele'] if 'variant_zero_allele' in data else None,
+        one_allele=data['variant_one_allele'] if 'variant_one_allele' in data else None,
+    )
+
+    return xft.struct.NHaplotypeArray(
+        genotypes=data['genotypes'],
+        generation=int(data['generation'][0]),
+        samples=samples,
+        variants=variants,
+    )
+
+
+# Legacy functions for XarrayHaplotypeArray compatibility
 
 def plink1_variant_index(ppxr: xr.DataArray) -> xft.index.DiploidVariantIndex:
     """
@@ -76,24 +299,25 @@ def plink1_variant_index(ppxr: xr.DataArray) -> xft.index.DiploidVariantIndex:
     xft.index.DiploidVariantIndex
         A DiploidVariantIndex object.
     """
-    if np.all(ppxr.snp.values=='.'):
-        vid = np.char.add(np.char.add(ppxr.chrom.values.astype(str),':'), ppxr.pos.values.astype(str))
+    if np.all(ppxr.snp.values == '.'):
+        vid = np.char.add(np.char.add(ppxr.chrom.values.astype(str), ':'), ppxr.pos.values.astype(str))
     else:
         vid = ppxr.snp.values
-    if np.all(ppxr.cm.values==0):
+    if np.all(ppxr.cm.values == 0):
         cm = np.full(ppxr.cm.shape, fill_value=np.NaN)
     else:
         cm = ppxr.cm
     return xft.index.DiploidVariantIndex(
-                                         vid = vid,
-                                         chrom = ppxr.chrom.values,
-                                         zero_allele = ppxr.a0.values,
-                                         one_allele = ppxr.a1.values,
-                                         pos_bp = ppxr.pos,
-                                         pos_cM = cm,
-                                         )
+        vid=vid,
+        chrom=ppxr.chrom.values,
+        zero_allele=ppxr.a0.values,
+        one_allele=ppxr.a1.values,
+        pos_bp=ppxr.pos,
+        pos_cM=cm,
+    )
 
-def plink1_sample_index(ppxr: xr.DataArray, 
+
+def plink1_sample_index(ppxr: xr.DataArray,
                         generation: int = 0) -> xft.index.SampleIndex:
     """
     Create a SampleIndex object from a plink file DataArray generated by pandas_plink.
@@ -111,207 +335,8 @@ def plink1_sample_index(ppxr: xr.DataArray,
         A SampleIndex object.
     """
     return xft.index.SampleIndex(
-                                 iid = ppxr.iid.values.astype(str),
-                                 fid = ppxr.fid.values.astype(str),
-                                 sex = 2 - ppxr.gender.values.astype(int),
-                                 generation = generation,
-                                 )
-
-
-def read_plink1_as_pseudohaplotypes(path: str, generation: int = 0):
-    """
-    Reads in PLINK 1 binary genotype data and returns a HaplotypeArray object containing pseudo-haplotypes by
-    randomly assigning haplotypes at heterozygous sites.
-
-    Parameters
-    ----------
-    path : str
-        The file path to the PLINK 1 binary genotype data.
-    generation : int
-        Used to populate the generation attribute of xftsim.index.SampleIndex
-    
-    Returns
-    -------
-    xr.DataArray
-        Pseudo-haplotype array with samples indexed by an xftsim.index.SampleIndex object and variants indexed
-        by an xftsim.index.HaploidVariantIndex object. The "pseudo-" prefix refers to the fact that the
-        plink bfile format doesn't track phase.
-
-    Raises
-    ------
-    ValueError
-        If the specified file path does not exist or is not in the expected format.
-    """
-    delayed_plink = pp.read_plink1_bin(path).astype(np.int8)
-    delayed_plink_dask = pp.read_plink(path)
-    dip_variant_index = plink1_variant_index(delayed_plink)
-    sample_index = plink1_sample_index(delayed_plink)
-
-    hap_array_template = da.empty_like(delayed_plink_dask[2].T.astype(np.int8))
-    hap_array_template = hap_array_template[:,np.repeat(np.arange(hap_array_template.shape[1]),2)]
-    haploid = da.map_blocks(_genotypes_to_pseudo_haplotypes, 
-                            delayed_plink_dask[2].T,
-                            chunks = hap_array_template.chunks,
-                            dtype = np.int8)
-    haplotypes = xft.struct.HaplotypeArray(haplotypes= haploid, 
-                                       variant_indexer = dip_variant_index.to_haploid(),
-                                       sample_indexer = sample_index,
-                                       generation = generation)
-    return haplotypes
-
-
-
-
-def write_to_plink1(hh: xr.DataArray, path: str, verbose: bool = True):
-    """
-    Writes a DataArray to a PLINK 1 binary file. Breaks phasing.
-
-    Parameters
-    ----------
-    hh : xr.DataArray
-        A DataArray containing the genotype data to write.
-    path : str
-        The path to the output PLINK file. The '.bed' extension will be added automatically.
-    verbose : bool, optional
-        Whether to print verbose output during writing, by default True.
-
-    Returns
-    -------
-    None
-    """
-    vindex = hh.xft.get_variant_indexer().to_diploid()
-    sindex = hh.xft.get_sample_indexer()
-    data = da.asarray(hh.xft.to_diploid()).astype(np.float32)
-    data_array = xr.DataArray(data,
-                              dims=['sample','variant'],
-                              coords = dict(
-                                            sample  = ("sample", sindex.iid.astype(str)),
-                                            fid     = ("sample", sindex.fid.astype(str)),
-                                            gender  = ("sample", 2 - sindex.sex.astype(int)),
-                                            variant = ("variant", vindex.vid.astype(str)),
-                                            snp     = ("variant", vindex.vid.astype(str)),
-                                            chrom   = ("variant", vindex.chrom.astype(str)),
-                                            pos     = ("variant", vindex.pos_bp.astype(np.int32)),
-                                            cm     = ("variant", vindex.pos_cM.astype(np.float64)),
-                                            a0      = ("variant", vindex.zero_allele.astype(str)),
-                                            a1      = ("variant", vindex.one_allele.astype(str)),
-                                            )
-                              )
-    warnings.warn("Writing to the plink bfile format removes phase information")
-    pp.write_plink1_bin(data_array, path+'.bed', verbose=verbose)
-
-
-
-def load_haplotype_zarr(path: str, 
-                        compute: bool = True,
-                        slice_x = slice(None),
-                        slice_y = slice(None),
-                        **kwargs,
-                        ) -> xr.DataArray:
-    """
-    Load haplotype data from a Zarr store.
-
-    Parameters
-    ----------
-    path : str
-        The path to the Zarr store.
-    compute : bool, optional
-        Whether to compute the data immediately, by default True.
-    **kwargs : dict
-        Additional keyword arguments to pass to xr.open_dataset().
-
-    Returns
-    -------
-    xr.DataArray
-        The loaded haplotype data as a DataArray.
-    """
-    if compute:
-        with ProgressBar():
-            return xr.open_dataset(path,engine='zarr', **kwargs).HaplotypeArray[slice_x,slice_y].compute()
-    else:
-        return xr.open_dataset(path,engine='zarr', **kwargs).HaplotypeArray[slice_x,slice_y]
-
-def save_haplotype_zarr(haplotypes: xr.DataArray,
-                        path: str,
-                        **kwargs,
-                        ) -> None:
-    """
-    Save haplotype data to a Zarr store.
-
-    Parameters
-    ----------
-    haplotypes : xr.DataArray
-        The haplotype data to save.
-    path : str
-        The path to the Zarr store.
-    **kwargs : dict
-        Additional keyword arguments to pass to xr.Dataset.to_zarr().
-
-    Returns
-    -------
-    None
-    """
-    haplotypes.to_dataset().to_zarr(path, **kwargs)
-
-
-def haplotypes_from_sgkit_dataset(gdat: xr.Dataset, generation: int = 0) ->  xr.DataArray:
-    """Construct haplotype array from sgkit DataArray.
-    Useful in conjuction with sgkit.io.vcf.vcf_to_zarr() and sgkit.load_dataset()
-    
-    Parameters
-    ----------
-    gdat : xr.Dataset
-        Dataset generated by sgkit.load_dataset()
-    generation : int
-        Used to populate the generation attribute of xftsim.index.SampleIndex
-    
-    Returns
-    -------
-    xr.DataArray
-        Haplotype array with samples indexed by an xftsim.index.SampleIndex object and variants indexed
-        by an xftsim.index.HaploidVariantIndex object.
-    """
-    ## sample index
-    sind = xft.index.SampleIndex(iid=gdat.sample_id.values,generation=generation)
-    ## construct variant index
-    alleles = gdat.variant_allele.values
-    chrom = np.array(gdat.contigs)[gdat.variant_contig.values]
-    pos_bp = gdat.variant_position.values
-    variant_id = xft.utils.paste([chrom,pos_bp])
-    vind = xft.index.DiploidVariantIndex(vid = variant_id,
-                                         chrom = chrom,
-                                         zero_allele = alleles[:,0].astype(str),
-                                         one_allele = alleles[:,1].astype(str),
-                                         pos_bp=pos_bp
-                                        )
-    ## convert from 3d sgkit format to 2d xftsim format
-    calls0 = gdat.call_genotype[:,:,0]
-    calls1 = gdat.call_genotype[:,:,1]
-    out = np.empty((calls0.shape[1], calls0.shape[0]*2), dtype=np.int8)
-    out[:,0::2] = calls0.T
-    out[:,1::2] = calls1.T
-    haplotypes = xft.struct.HaplotypeArray(out, 
-                                           variant_indexer= vind.to_haploid(), 
-                                           sample_indexer=sind)
-    return haplotypes
-
-
-
-
-    # vindex = hh.xft.get_variant_indexer().to_diploid()
-    # sindex = hh.xft.get_sample_indexer()
-    # data = da.asarray(hh.xft.to_diploid()).astype(np.float32)
-    # data_array = xr.DataArray(data,
-    #                           dims=['sample','variant'],
-    #                           coords = dict(
-    #                                         sample  = ("sample", sindex.iid.astype(str)),
-    #                                         fid     = ("sample", sindex.fid.astype(str)),
-    #                                         gender  = ("sample", 2 - sindex.sex.astype(int)),
-    #                                         variant = ("variant", vindex.vid.astype(str)),
-    #                                         snp     = ("variant", vindex.vid.astype(str)),
-    #                                         chrom   = ("variant", vindex.chrom.astype(str)),
-    #                                         a0      = ("variant", vindex.zero_allele.astype(str)),
-    #                                         a1      = ("variant", vindex.one_allele.astype(str)),
-    #                                         )
-    #                           )
-    # pp.write_plink1_bin(data_array, path, verbose=verbose)
+        iid=ppxr.iid.values.astype(str),
+        fid=ppxr.fid.values.astype(str),
+        sex=2 - ppxr.gender.values.astype(int),
+        generation=generation,
+    )

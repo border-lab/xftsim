@@ -460,7 +460,7 @@ class MatingRegime:
         self._haplotypes = haplotypes
 
     def get_potential_mates(self,
-                            haplotypes: xr.DataArray = None, 
+                            haplotypes = None,
                             phenotypes: xr.DataArray = None,
                             ) -> (NDArray, NDArray):
         """
@@ -468,7 +468,7 @@ class MatingRegime:
 
         Parameters
         ----------
-        haplotypes: xr.DataArray
+        haplotypes: NHaplotypeArray
             The haplotypes to use for mating.
         phenotypes: xr.DataArray
             The phenotypes to use for mating.
@@ -478,14 +478,16 @@ class MatingRegime:
         (NDArray, NDArray)
             The potential female and male mating indices.
         """
-        self._sample_indexer = haplotypes.xft.get_sample_indexer()
+        # Get sample identifiers and sex from haplotypes
+        sample_ids = haplotypes.samples.unique_identifier
+        sex = haplotypes.sex
 
         if self.sex_aware:
-            female_indices = haplotypes.sample[haplotypes.sex==0]
-            male_indices = haplotypes.sample[haplotypes.sex==1]
+            female_indices = sample_ids[sex == 0]
+            male_indices = sample_ids[sex == 1]
             assert len(female_indices) == len(male_indices), "Unbalanced population"
-        elif not self.sex_aware:
-            permuted_indices = np.random.permutation(haplotypes.sample)
+        else:
+            permuted_indices = np.random.permutation(sample_ids)
             female_indices = np.sort(permuted_indices[0::2])
             male_indices = np.sort(permuted_indices[1::2])
 
@@ -939,7 +941,7 @@ class BatchedMatingRegime(MatingRegime):
             Number of batches.
 
         """
-        N = haplotypes.xft.n
+        N = haplotypes.n
         num_batches = math.ceil(N / self.max_batch_size)
         batches = [np.sort(x) for x in np.array_split(np.random.permutation(N), num_batches)]
         return (batches, num_batches)

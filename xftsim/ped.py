@@ -45,33 +45,30 @@ class Pedigree:
         TODO
     """
     def __init__(self,
-                 founder_sample_index: xft.index.SampleIndex,
+                 founder_samples: "xft.struct.SampleMeta",
                  ):
         """
         Initialize the Pedigree object with founder samples and their generation.
 
         Parameters
         ----------
-        founder_sample_index : xft.index.SampleIndex
-            The founder samples index.
-        founder_generation : int, optional
-            The generation of the founder samples (default is 0).
+        founder_samples : xft.struct.SampleMeta
+            The founder samples metadata.
         """
         self.G = nx.DiGraph()
         self._generation_dict = {}
         self._fid_dict = {}
-        self.founder_generation = founder_sample_index.generation
+        self.founder_generation = founder_samples.generation
         self.current_generation = self.founder_generation
 
-        self._add_nodes(founder_sample_index)
+        self._add_nodes(founder_samples)
 
-    def _add_nodes(self, sample_index:xft.index.SampleIndex):
-        uid = sample_index.unique_identifier
+    def _add_nodes(self, samples: "xft.struct.SampleMeta"):
+        uid = samples.unique_identifier
 
-        self.current_generation=max(self.current_generation, sample_index.generation)
-        self._generation_dict.update({node: sample_index.generation for node in uid})
-        self._fid_dict.update({node: fid for (node, fid) in zip(uid,
-                                                                sample_index.fid)})
+        self.current_generation = max(self.current_generation, samples.generation)
+        self._generation_dict.update({node: samples.generation for node in uid})
+        self._fid_dict.update({node: fid for (node, fid) in zip(uid, samples.fid)})
 
         self.G.add_nodes_from(uid)
 

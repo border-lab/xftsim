@@ -831,7 +831,7 @@ class GWAS_Estimator(Statistic):
 
         sum_stats = _mv_gwas_nb(G,Y, std_X=self.std_X, std_Y=self.std_Y)
         coord_dict = component_index.coord_dict.copy()
-        coord_dict.update(haplotypes.xft.get_variant_indexer().to_diploid().coord_dict)
+        coord_dict.update(haplotypes.variants.to_variant_index(af=haplotypes.af_empirical).coord_dict)
         if self.std_X and self.std_Y:
             coord_dict.update({'statistic':('statistic', ['std_beta', 'se', 't', 'p'])})
         else:
@@ -966,7 +966,7 @@ class Pop_GWAS_Estimator(Statistic):
 
         sum_stats = _mv_gwas_nb(G,Y, std_X=self.std_X, std_Y=self.std_Y)
         coord_dict = component_index.coord_dict.copy()
-        coord_dict.update(haplotypes.xft.get_variant_indexer().to_diploid().coord_dict)
+        coord_dict.update(haplotypes.variants.to_variant_index(af=haplotypes.af_empirical).coord_dict)
         if self.std_X and self.std_Y:
             coord_dict.update({'statistic':('statistic', ['std_beta', 'se', 't', 'p'])})
         else:
@@ -1085,7 +1085,7 @@ class Sib_GWAS_Estimator(Statistic):
 
         sum_stats = _mv_gwas_nb(G_train,Y, std_X=self.std_X, std_Y=self.std_Y)
         coord_dict = component_index.coord_dict.copy()
-        coord_dict.update(haplotypes.xft.get_variant_indexer().to_diploid().coord_dict)
+        coord_dict.update(haplotypes.variants.to_variant_index(af=haplotypes.af_empirical).coord_dict)
         # if self.std_X and self.std_Y:
             # coord_dict.update({'statistic':('statistic', ['beta', 'se', 't', 'p'])})
         # else:
