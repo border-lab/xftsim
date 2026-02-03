@@ -1,0 +1,929 @@
+
+╭─── Claude Code v2.1.30 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                Welcome back Richard!               │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ Recent activity         │
+│                        ▘▘ ▝▝                       │ No recent activity      │
+│                                                    │                         │
+│ Opus 4.5 · Claude Max · border.richard@gmail.com's │                         │
+│  Organization                                      │                         │
+│                  ~/Dropbox/xftsim                  │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+❯ continue from refactor-plan.txt 
+
+● Read 1 file (ctrl+o to expand)
+
+● I see you're in the middle of a comprehensive refactoring brainstorm session
+  for xftsim. The conversation ended at a discussion of the indexing interface
+  for HaplotypeOperator and SampleMeta/VariantMeta.
+
+  Let me pick up where you left off. First, let me check what's currently on the
+   ajay branch to see the starting point.
+
+● Bash(git diff main..ajay --stat)
+  ⎿   current_manu_draft.docx | Bin 0 -> 17875305 bytes
+      current_manu_draft.md   | 536 +++++++++++++++++++++++++++++
+      grant_app.pdf           | Bin 0 -> 1352863 bytes
+     … +14 lines (ctrl+o to expand)
+
+● Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+● I can see significant progress on the ajay branch. Let me summarize the
+  current state and identify what's done vs. what remains from the brainstorming
+   session.
+
+  ---
+  Current Implementation Status
+
+  Already implemented in struct.py:
+  Component: SampleMeta
+  Status: ✅ Done
+  Notes: Frozen dataclass with iid, fid, sex, generation
+  ────────────────────────────────────────
+  Component: VariantMeta
+  Status: ✅ Done
+  Notes: Frozen dataclass with vid, chrom, pos_bp, pos_cM, af, alleles
+  ────────────────────────────────────────
+  Component: NHaplotypeArray
+  Status: ✅ Partial
+  Notes: 3D numpy array (n, m, 2), matvec/rmatvec, basic subsetting
+  ────────────────────────────────────────
+  Component: .xft accessor
+  Status: ✅ Done
+  Notes: Compatibility shim for existing code
+  Missing from the brainstormed design:
+
+  1. extra dict for arbitrary metadata - Both SampleMeta and VariantMeta need
+  extra: dict[str, np.ndarray] for annotations, LD scores, ancestry PCs, etc.
+  2. Flexible boolean indexing - The user wanted:
+  H[samples.chrom == 22]
+  H[(variants.pos_bp > 1e6) & (variants.pos_bp < 2e6)]
+  H[samples.fid.isin(family_list), :]
+  3. isin() method on metadata classes
+
+  Let me check what changes have been made to the other files (founders,
+  reproduce, io) to understand the integration status.
+
+● Bash(git diff main..ajay -- xftsim/founders.py xftsim/reproduce.py | head
+      -200)
+  ⎿  diff --git a/xftsim/founders.py b/xftsim/founders.py
+     index 4c309ff..d28e124 100644
+     --- a/xftsim/founders.py
+     … +230 lines (ctrl+o to expand)
+
+● Bash(git diff main..ajay -- xftsim/reproduce.py | tail -300)
+  ⎿ -            offspring_haplotypes[i, m_meiosis_ii_inds[j]
+    -                                 ] = parental_haplotypes[maternal_inds
+    [i], m_meiosis_i_inds[j]]
+    … +351 lines (ctrl+o to expand)
+
+
+● Good progress on the ajay branch. The core data structures (NHaplotypeArray,
+  SampleMeta, VariantMeta) are implemented and founders.py/reproduce.py have
+  been updated.
+
+  ---
+  Continuing from the Brainstorm
+
+  The conversation ended with this design question about flexible indexing.
+  Based on what you agreed to:
+
+  Missing pieces from the brainstormed design:
+
+  1. extra dict for arbitrary metadata
+
+  @dataclass(frozen=True)
+  class SampleMeta:
+      iid: np.ndarray
+      fid: np.ndarray = None
+      sex: np.ndarray = None
+      generation: int = 0
+      extra: dict = field(default_factory=dict)  # ← MISSING
+
+  @dataclass(frozen=True)  
+  class VariantMeta:
+      vid: np.ndarray
+      chrom: np.ndarray = None
+      # ... other fields ...
+      extra: dict = field(default_factory=dict)  # ← MISSING
+
+  2. Flexible boolean indexing
+
+  The current __getitem__ only supports integer/slice indexing. You wanted:
+  # Variant subsetting
+  H[:, H.variants.chrom == 22]
+  H[:, (H.variants.pos_bp > 1e6) & (H.variants.pos_bp < 2e6)]
+
+  # Sample subsetting  
+  H[H.samples.fid.isin(family_list), :]
+  H[H.samples.generation == 2, :]
+
+  3. Formula-based Architecture (Phase 3 in the plan)
+
+  This is the big piece - the lavaan-style DSL for defining architectures.
+
+  ---
+  What would you like to focus on next?
+
+  1. Add extra dict and flexible indexing to
+  SampleMeta/VariantMeta/NHaplotypeArray
+  2. Continue integrating the new classes into remaining modules (io.py, sim.py,
+   arch.py)
+  3. Start designing the formula parser for the new Architecture system
+  4. Write tests for the new data structures before proceeding
+
+✻ Cogitated for 59s
+
+❯ lets continue with the brainstorm to make sure everything is well mapped  
+  out /superpowers:brainstorm                                               
+
+● Skill(superpowers:brainstorming)
+  ⎿  Successfully loaded skill
+
+● Using the brainstorming skill to continue refining the xftsim refactor design.
+
+  ---
+  I've reviewed the prior conversation and the current state of the ajay branch.
+   We've established:
+
+  - Core data structures: SampleMeta, VariantMeta, NHaplotypeArray (3D
+  numpy-backed)
+  - Goals: Move away from xarray, formula-based architecture definitions,
+  abstract linear operators, better usability/maintainability
+  - Phase plan: 4 phases from core abstractions → minimal simulation → full
+  architecture → integration
+
+  The conversation stopped at flexible indexing design. Let me continue
+  validating the remaining pieces.
+
+  ---
+  Brainstorming Question 7
+
+  We discussed flexible boolean indexing like H[samples.chrom == 22]. Before I
+  design that interface in detail, I want to clarify the query syntax you
+  prefer.
+
+  Option A: Attribute-based (numpy-style)
+  H[H.samples.fid == 'FAM001', H.variants.chrom == 22]
+  H[H.samples.sex == 1, (H.variants.pos_bp > 1e6) & (H.variants.pos_bp < 2e6)]
+  - Familiar to numpy/pandas users
+  - Verbose but explicit
+  - Easy to implement
+
+  Option B: String query (pandas-style)
+  H.query("fid == 'FAM001'", "chrom == 22")
+  H.query("sex == 1", "pos_bp > 1e6 and pos_bp < 2e6")
+  - Compact
+  - Requires a mini-parser
+  - Less IDE autocomplete support
+
+  Option C: Dict-based (current xarray-style)
+  H[dict(fid='FAM001', chrom=22)]
+  H[dict(sex=1, pos_bp=slice(1e6, 2e6))]
+  - Consistent with current xarray accessor
+  - Limited expressiveness for complex queries
+
+  Which style would you use most often in practice?
+
+❯ and for additional metadata stored in dict? for example if we define      
+  variant level annotations. how would this work for A?                     
+
+● Good question. For Option A with arbitrary metadata in the extra dict, there
+  are a few sub-options:
+
+  Option A1: Bracket access on the meta object
+  # Core fields via attribute
+  H[:, H.variants.chrom == 22]
+
+  # Extra fields via bracket
+  H[:, H.variants['coding'] == 1]
+  H[:, H.variants['ldsc_baselineLD'] > 0.5]
+
+  # Combined
+  H[H.samples['ancestry_PC1'] > 0, H.variants['enhancer'] == 1]
+  - __getitem__ on VariantMeta/SampleMeta checks core attrs first, then falls
+  back to extra
+  - Consistent syntax for both core and extra fields
+  - Core fields also accessible via attribute (variants.chrom) for
+  discoverability
+
+  Option A2: Explicit .extra access
+  # Core fields via attribute
+  H[:, H.variants.chrom == 22]
+
+  # Extra fields explicitly through .extra
+  H[:, H.variants.extra['coding'] == 1]
+  - Clear distinction between "official" fields and arbitrary metadata
+  - More verbose
+  - No ambiguity about where data lives
+
+  Option A3: Dynamic attributes via __getattr__
+  # Everything looks like an attribute
+  H[:, H.variants.coding == 1]
+  H[:, H.variants.ldsc_baselineLD > 0.5]
+  - Cleanest syntax
+  - Risk of name collisions with methods/properties
+  - Harder to debug typos (silent None or AttributeError?)
+
+  Which feels right for your use case?
+
+❯ A feels good, but also would this impact the lavaan style dsl for         
+  architecture specification?                                               
+
+● Great question - this connects two pieces of the design. Let me think through
+  how they interact.
+
+  The indexing syntax (Option A1) is for runtime querying:
+  # Subsetting data at runtime
+  founders = H[H.samples.generation == 0, :]
+  coding_variants = H[:, H.variants['coding'] == 1]
+
+  The lavaan DSL is for architecture specification:
+  arch = Architecture("""
+      height.G ~ additive(effects['height'])
+      height ~ height.G + noise(0.4)
+  """)
+
+  The question is: does the DSL need to reference variant subsets?
+
+  For example, you might want to say "this genetic component uses only coding
+  variants" or "enriched effects in enhancer regions":
+
+  Option 1: Named variant sets (defined outside, referenced in DSL)
+  variant_sets = {
+      'coding': variants['coding'] == 1,
+      'enhancers': variants['enhancer'] == 1,
+  }
+
+  arch = Architecture("""
+      height.G ~ additive(effects['height'], variants='coding')
+      height.G_enhancer ~ additive(effects['height_enh'], variants='enhancers')
+  """, variant_sets=variant_sets)
+
+  Option 2: Inline expressions in DSL
+  arch = Architecture("""
+      height.G ~ additive(effects['height'], variants=[coding == 1])
+  """)
+
+  Option 3: Keep them fully separate - variant selection happens in the
+  EffectSpec, not the DSL
+  height_effects = AdditiveEffects(
+      variants=variants['coding'] == 1,  # selection here
+      h2=0.6
+  )
+  arch = Architecture("""
+      height.G ~ genetic(height_effects)
+  """)
+
+  Which model matches how you think about defining architectures? Or is there a
+  use case I'm missing?
+
+❯ i think option 3 , but also keep in mind that we mind have multivariate   
+  effects so arch will have to accomodate multiple left hand sides (e.g.    
+  (height.G, bmi.G) ~ multivariateGenetic(mveffects) )                      
+
+● That's an important constraint. So the DSL needs to support:
+
+  # Univariate
+  height.G ~ genetic(height_effects)
+
+  # Multivariate - shared effect structure
+  (height.G, bmi.G) ~ multivariateGenetic(mv_effects)
+
+  This raises a follow-up question about other multivariate constructs in the
+  DSL:
+
+  Phenotype aggregation - can multiple components feed into multiple phenotypes
+  in one statement?
+
+  # Option A: Always one phenotype per line
+  height ~ height.G + height.VT + noise(0.2)
+  bmi ~ bmi.G + bmi.VT + noise(0.3)
+
+  # Option B: Allow multivariate aggregation too
+  (height, bmi) ~ (height.G, bmi.G) + (height.VT, bmi.VT) + noise([0.2, 0.3])
+
+  Correlated noise - do you need to specify cross-phenotype residual
+  correlations?
+
+  # Option A: Noise is always independent per phenotype
+  height ~ height.G + noise(0.2)
+  bmi ~ bmi.G + noise(0.3)
+
+  # Option B: Allow correlated residuals
+  (height, bmi) ~ ... + correlatedNoise(vars=[0.2, 0.3], cor=0.1)
+
+  My intuition is that Option A (one phenotype per line, independent noise)
+  covers 90% of use cases and keeps the DSL simpler. Correlated residuals could
+  be a future extension.
+
+  Does that match your sense, or do you have use cases requiring multivariate
+  aggregation / correlated noise from day one?
+
+❯ we will want correlated noise, but multivariate components specifed       
+  separately and sums always 1 pheno per line. e.g.   (height.G, bmi.G) ~   
+  multivariateGenetic(mv_effects); (height.E, bmi.E) ~                      
+  multivariateNoise(**kwargs); height ~ height.G + height.E;                
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ does that make sense or is it an arbitrary distinction 
+
+● No, that's a principled distinction, not arbitrary. Here's why it makes sense:
+
+  Multivariate component definition (where correlations live):
+  (height.G, bmi.G) ~ multivariateGenetic(mv_effects)    # rg specified here
+  (height.E, bmi.E) ~ multivariateNoise(cov=[[.2, .05], [.05, .3]])  # re 
+  specified here
+  - Cross-trait correlations are properties of the joint distribution
+  - You must define them together to specify the correlation structure
+  - This is where rg, re, covariance matrices live
+
+  Univariate aggregation (just arithmetic):
+  height ~ height.G + height.E
+  bmi ~ bmi.G + bmi.E
+  - Each phenotype is the sum of its own components
+  - No new cross-trait information needed
+  - Simpler to read and parse
+
+  The correlation structure is fully captured at the component definition level.
+   Aggregation is just phenotype = sum(components) - there's nothing bivariate
+  about addition.
+
+  ---
+  Revised DSL grammar summary:
+  Statement type: Univariate component
+  Syntax: height.G ~ genetic(eff)
+  Purpose: Single-trait genetic component
+  ────────────────────────────────────────
+  Statement type: Multivariate component
+  Syntax: (height.G, bmi.G) ~ mvGenetic(eff)
+  Purpose: Correlated components
+  ────────────────────────────────────────
+  Statement type: Univariate noise
+  Syntax: height.E ~ noise(0.2)
+  Purpose: Independent residual
+  ────────────────────────────────────────
+  Statement type: Multivariate noise
+  Syntax: (height.E, bmi.E) ~ mvNoise(cov=...)
+  Purpose: Correlated residuals
+  ────────────────────────────────────────
+  Statement type: Aggregation
+  Syntax: height ~ height.G + height.E
+  Purpose: Always univariate
+  ────────────────────────────────────────
+  Statement type: Vertical transmission
+  Syntax: height.VT ~ parent(height)
+  Purpose: From parent phenotypes
+  Does this grammar feel complete for your use cases?
+
+❯ yes that's good, though other things can happen at individual level       
+  besides sum. eg. height ~height.G*height.E. but that shouldn't be a       
+  problem                                                                   
+
+● Right - the aggregation expression is just arithmetic on components, so it
+  naturally supports:
+
+  height ~ height.G + height.E                      # additive
+  height ~ height.G + height.E + height.G * height.E  # GxE interaction
+  height ~ height.G * (1 + height.E)                # alternative 
+  parameterization
+
+  The parser just needs to handle standard arithmetic (+, *, -, /, parentheses)
+  on component references. No special cases needed.
+
+  ---
+  Brainstorming Question 8
+
+  Let's talk about vertical transmission syntax. The prior conversation
+  mentioned parent(), mother(), father() primitives.
+
+  In the current xftsim, vertical transmission uses vorigin_relative encoding
+  (-1=proband, 0=maternal, 1=paternal) and requires careful component ordering.
+
+  For the new DSL, how should parent references work?
+
+  Option A: Explicit mother/father
+  height.VT ~ 0.3 * mother(height) + 0.3 * father(height)
+  - Clear which parent contributes
+  - Allows asymmetric transmission (e.g., maternal effects)
+
+  Option B: Combined parent() that averages
+  height.VT ~ 0.3 * parent(height)  # implicitly (mother + father) / 2
+  - Simpler for symmetric case
+  - Could support parent(height, weights=[0.6, 0.4]) for asymmetric
+
+  Option C: Both available
+  height.VT ~ 0.3 * parent(height)           # symmetric
+  height.VT ~ 0.5 * mother(height)           # maternal-only effect
+  height.VT ~ 0.2 * mother(height) + 0.4 * father(height)  # asymmetric
+
+  I'd recommend Option C - it's the most flexible without adding complexity.
+  Does that work?
+
+❯ we want both available. Also want to be able to do simulations of         
+  indirect genetic effects so will need to figure out how to reference      
+  non-transmitted stuff. this is tricky. we'll also want sibling effects at 
+   somepoint, don't need to implement that right away but should be         
+  possible at some point                                                    
+
+● This adds important complexity. Let me make sure I understand the indirect
+  genetic effects case.
+
+  Indirect genetic effects (genetic nurture):
+
+  A child's phenotype is influenced by:
+  - Their own genotype (direct effect)
+  - Parental genotypes that weren't transmitted (indirect/nurturing effect)
+
+  So you need to reference the non-transmitted parental haplotype. The tricky
+  part is that "non-transmitted" is defined relative to each offspring - it's
+  not a static property of the parent.
+
+  Possible syntax approaches:
+
+  Option A: Explicit non-transmitted primitive
+  child.G_direct ~ genetic(effects)                    # child's own genotype
+  child.G_nurture ~ nontransmitted_mother(effects) +
+  nontransmitted_father(effects)
+  child ~ child.G_direct + 0.3 * child.G_nurture + noise(0.2)
+
+  Option B: Parent genetic components with transmission flag
+  child.G ~ genetic(effects)
+  child.nurture ~ mother(G, transmitted=False) + father(G, transmitted=False)
+
+  Option C: Compute at the haplotype level
+  # In effect spec, not DSL - compute non-transmitted PGS separately
+  nurture_effects = NonTransmittedEffects(effects, parent='both')
+  child.nurture ~ genetic(nurture_effects)
+
+  Which mental model matches how you think about specifying these? And for
+  sibling effects - would those reference sibling phenotypes or sibling
+  genotypes (or both)?
+
+❯ im not sure, make some arguments for each. an alternative option is to    
+  just do something like height.indirect ~ mother(height.G) -               
+  height.G.maternal or something. want to take advantage of the fact that   
+  one haplotype is inherited from one parent and can just substract  mother 
+   diploid G @ effects - offspring maternally inherited G @ effects to get  
+  indirect piece                                                            
+
+● That's a clever approach. Let me lay out the arguments:
+
+  ---
+  Option A: Explicit nontransmitted_mother() primitive
+
+  Pros:
+  - Intent is crystal clear in the DSL
+  - Readable: height.indirect ~ nontransmitted_mother(effects)
+
+  Cons:
+  - Requires tracking non-transmitted haplotypes explicitly
+  (storage/bookkeeping)
+  - New primitive to implement and maintain
+  - Less flexible for novel models
+
+  ---
+  Option B: Arithmetic on existing components (your suggestion)
+
+  height.G_maternal ~ maternalHaplotype(effects)  # child's maternal haplotype @
+   effects
+  height.G_paternal ~ paternalHaplotype(effects)  # child's paternal haplotype @
+   effects
+  height.G ~ height.G_maternal + height.G_paternal  # total direct effect
+
+  height.indirect_m ~ mother(height.G) - height.G_maternal
+  height.indirect_p ~ father(height.G) - height.G_paternal
+  height.indirect ~ height.indirect_m + height.indirect_p
+
+  Pros:
+  - Composable - built from existing primitives
+  - No new storage - just arithmetic on computed components
+  - Mathematically transparent - the model is explicit
+  - Flexible - can easily do maternal-only, asymmetric weights, etc.
+
+  Cons:
+  - Need to expose haplotype-specific genetic values (G_maternal, G_paternal)
+  - More lines for the common case
+  - User must understand the decomposition
+
+  ---
+  My recommendation: Option B
+
+  The arithmetic approach is more powerful and requires less special-casing. The
+   key requirement is that genetic components can be computed per-haplotype:
+
+  # Haplotype-specific genetic values
+  height.G_mat ~ haplotypeGenetic(effects, haplotype='maternal')
+  height.G_pat ~ haplotypeGenetic(effects, haplotype='paternal')
+  height.G ~ height.G_mat + height.G_pat
+
+  # Indirect effects via subtraction
+  height.indirect ~ (mother(height.G) - height.G_mat) + (father(height.G) -
+  height.G_pat)
+
+  This also sets you up for sibling effects later - siblings share height.G_mat
+  and height.G_pat components (partially), so you can express shared environment
+   through the haplotype structure.
+
+  Does this feel right? One question: should maternal/paternal refer to which 
+  parent transmitted or which haplotype copy in the child's array (0 vs 1)?
+
+❯ B is greated. haplotype copy should just be maternal or paternal instead  
+  0 vs 1, this only needs to be a dimensional label. eg in an N x M x 2     
+  array the first slice are maternal haplotypes and the second are paternal 
+   haplotypes and we don't allow mixing                                     
+
+● Good. So the convention is:
+
+  # NHaplotypeArray.genotypes shape: (n, m, 2)
+  genotypes[:, :, 0]  # maternal haplotypes (inherited from mother)
+  genotypes[:, :, 1]  # paternal haplotypes (inherited from father)
+
+  This makes the indirect effects calculation clean:
+
+  child.G_maternal = genotypes[:, :, 0] @ effects
+  child.G_paternal = genotypes[:, :, 1] @ effects
+  mother.G = mother_diploid @ effects
+  indirect_maternal = mother.G - child.G_maternal
+
+  ---
+  Brainstorming Question 9
+
+  Let's move to Effect specification. You mentioned earlier that effect
+  distributions should be defined separately from the DSL and referenced by
+  name.
+
+  The current xftsim has AdditiveEffects, DominanceEffects, etc. For the
+  refactor, what effect types do you need?
+
+  Core effect types:
+  Type: AdditiveEffects
+  Description: Standard GWAS-style
+  Key parameters: h2, variants, af
+  ────────────────────────────────────────
+  Type: MultivariateEffects
+  Description: Correlated effects across traits
+  Key parameters: cov, rg, h2 per trait
+  ────────────────────────────────────────
+  Type: AnnotationEnrichedEffects
+  Description: LDSC-style enrichment
+  Key parameters: annotations, enrichments, h2
+  ────────────────────────────────────────
+  Type: SparseEffects
+  Description: Only k causal variants
+  Key parameters: k_causal, h2
+  Questions:
+
+  1. Should effects be sampled once at architecture creation, or resampled each
+  simulation run?
+  2. For MultivariateEffects, do you want to specify the full covariance matrix,
+   or derive it from marginal h2 values and a correlation matrix (rg)?
+
+  # Option A: Full covariance
+  mv_effects = MultivariateEffects(cov=[[0.5, 0.1], [0.1, 0.3]], variants=...)
+
+  # Option B: h2 + correlation
+  mv_effects = MultivariateEffects(h2=[0.5, 0.3], rg=0.2, variants=...)
+
+  Which parameterization do you prefer?
+
+❯ yes re  NHaplotype but keep in mind that could also be different          
+  datastructure, we'll just need to make sure HaplotypeOperator is always   
+  compatible with this. add a method to the base class if needs be. 1:      
+  effects sampled once at arch creation. also allow for manually defined    
+  effects (i.e. just provide a matrix of diploid effects) need to account   
+  for whether or not effects are specified for standardized or non          
+  standardized SNPs. re 2: either specify h2, rg or covg. also need sparse  
+  effects to have option for overlap                                        
+
+● Good clarifications. Let me capture these:
+
+  HaplotypeOperator base class - The maternal/paternal convention lives at the
+  protocol level:
+
+  class HaplotypeOperator(ABC):
+      @abstractmethod
+      def matvec_maternal(self, effects) -> np.ndarray: ...  # hap[:,0] @ 
+  effects
+
+      @abstractmethod
+      def matvec_paternal(self, effects) -> np.ndarray: ...  # hap[:,1] @ 
+  effects
+
+      def matvec(self, effects) -> np.ndarray:              # diploid: sum of 
+  both
+          return self.matvec_maternal(effects) + self.matvec_paternal(effects)
+
+  Any backing structure (numpy, grapp/glink) implements this interface.
+
+  ---
+  Revised EffectSpec design:
+
+  class EffectSpec:
+      effects: np.ndarray          # (m,) or (m, k) matrix - computed once
+      standardized: bool           # True = effects for standardized genotypes
+      variant_mask: np.ndarray     # boolean, which variants have non-zero 
+  effects
+
+  class AdditiveEffects(EffectSpec):
+      @classmethod
+      def from_h2(cls, h2, variants, standardized=True): ...
+
+      @classmethod
+      def from_matrix(cls, effects, standardized=True): ...  # manual 
+  specification
+
+  class MultivariateEffects(EffectSpec):
+      # Option A: h2 + rg
+      @classmethod
+      def from_h2_rg(cls, h2: list, rg: np.ndarray, variants, ...): ...
+
+      # Option B: full covariance
+      @classmethod
+      def from_covg(cls, covg: np.ndarray, variants, ...): ...
+
+  class SparseEffects(EffectSpec):
+      @classmethod
+      def from_h2(cls, h2, k_causal, variants, overlap='independent'): ...
+      # overlap options: 'independent', 'complete', 'partial' (specify 
+  proportion?)
+
+  For sparse effects overlap, what options do you need?
+  overlap: 'independent'
+  Meaning: Each trait has its own causal variants (no overlap)
+  ────────────────────────────────────────
+  overlap: 'complete'
+  Meaning: All traits share exact same causal variants
+  ────────────────────────────────────────
+  overlap: 'partial'
+  Meaning: Specify proportion of overlap, or explicit overlap structure?
+  How should partial overlap be parameterized?
+
+❯ i think for partial overlapping effects you need separate rg cov for      
+  shared vs trait-specific effects for all groups. honestly probably better 
+   to handle separate and aggregate effects. eg (a.Gab, b.Gab)~mvab,        
+  (a.Gac, c.Gac) ~ mvac, etch                                               
+
+● That's the right approach - composition over complex parameterization.
+
+  Instead of a complex overlap parameter, you decompose into explicit shared and
+   trait-specific components:
+
+  # Shared genetic effects (variants causal for both a and b)
+  (a.Gab, b.Gab) ~ mvEffects(effects_ab, rg=0.8)
+
+  # Shared genetic effects (variants causal for both a and c)
+  (a.Gac, c.Gac) ~ mvEffects(effects_ac, rg=0.3)
+
+  # Trait-specific effects (variants causal for only one trait)
+  a.Ga ~ additiveEffects(effects_a)
+  b.Gb ~ additiveEffects(effects_b)
+  c.Gc ~ additiveEffects(effects_c)
+
+  # Aggregate
+  a.G ~ a.Gab + a.Gac + a.Ga
+  b.G ~ b.Gab + b.Gb
+  c.G ~ c.Gac + c.Gc
+
+  Each effect group has:
+  - Its own causal variant set
+  - Its own covariance/correlation structure
+  - Its own h2 contribution
+
+  The total h2 for trait a is the sum of variance contributions from a.Gab,
+  a.Gac, and a.Ga.
+
+  This follows the same principle as indirect effects - simple primitives, 
+  complex models through arithmetic.
+
+  ---
+  Brainstorming Question 10
+
+  We've covered the core DSL constructs. Let's discuss execution order and the 
+  dependency graph.
+
+  The current xftsim requires users to manually order components. The new system
+   should infer order automatically.
+
+  Given a formula like:
+  """
+  height.G ~ genetic(eff)
+  height.VT ~ 0.3 * parent(height)
+  height ~ height.G + height.VT + noise(0.2)
+  """
+
+  The system needs to:
+  1. Parse into a dependency graph
+  2. Topological sort to determine execution order
+  3. Handle the parent() reference (requires previous generation's height)
+
+  Question: How should founder generation be handled for parent() references?
+
+  Option A: Explicit founder initialization in DSL
+  """
+  height.G ~ genetic(eff)
+  height.VT ~ 0.3 * parent(height) | founders: 0.0
+  height ~ height.G + height.VT + noise(0.2)
+  """
+
+  Option B: Separate founder spec
+  arch = Architecture(formula, founders={'height.VT': 0.0})
+
+  Option C: Auto-zero for founders (implicit)
+  - parent(X) returns 0 for generation 0
+  - Document the convention
+
+  Which approach?
+
+❯ exactly, make sure to take notes of these examples, they're quite         
+  helpful. on to Q10: i think option C is good default, but A should work   
+  and be a little more specific e.g height.VT ~ 0.3 * parent(height) ||     
+  noise(.3) ## would implement gaussian noise for founders. and raise a     
+  warning on definition if not specified                                    
+
+● Nice syntax. So || is a founder fallback operator:
+
+  height.VT ~ 0.3 * parent(height) || noise(0.3)
+  #                                 ↑
+  #            "if no parent (gen 0), sample from N(0, 0.3) instead"
+
+  This is clean because:
+  - Inline with the component definition
+  - Can be any expression: || 0.0, || noise(0.3), || constant(5.0)
+  - Clear semantics: "use parent if available, else fallback"
+
+  Behavior summary:
+  ┌───────────────────────────────────┬──────────────────────────┐
+  │             Situation             │         Behavior         │
+  ├───────────────────────────────────┼──────────────────────────┤
+  │ parent(X) with no fallback, gen 0 │ Warning + default to 0.0 │
+  ├───────────────────────────────────┼──────────────────────────┤
+  │ parent(X) || expr, gen 0          │ Use expr, no warning     │
+  ├───────────────────────────────────┼──────────────────────────┤
+  │ parent(X), gen > 0                │ Use parent value         │
+  └───────────────────────────────────┴──────────────────────────┘
+  ---
+  Brainstorming Question 11
+
+  Let's talk about mating specification. The prior conversation said mating
+  should be separate from the architecture DSL.
+
+  Current xftsim has MatingRegime classes: RandomMating,
+  LinearAssortativeMating, OrdinalAssortativeMating, etc.
+
+  Question: Should mating be:
+
+  Option A: Completely separate object
+  arch = Architecture(formula)
+  mating = LinearAssortativeMating(phenotypes=['height', 'bmi'], weights=[1.0,
+  0.5])
+
+  sim = Simulation(arch, mating, founders)
+  sim.evolve(generations=10)
+
+  Option B: Specified in Architecture but separate section
+  arch = Architecture("""
+      # Components
+      height.G ~ genetic(eff)
+      height ~ height.G + noise(0.2)
+      
+      # Mating (separate block)
+      @mating: linear_assortative(height + 0.5 * bmi)
+  """)
+
+  Option C: Mating references Architecture phenotypes but defined separately
+  arch = Architecture(formula)
+  mating = LinearAssortativeMating.from_architecture(arch, 'height + 0.5 * bmi')
+
+  I lean toward Option A - mating and architecture are orthogonal concerns. You
+  might want to run the same architecture with different mating regimes. What's
+  your preference?
+
+❯ first before Q11, did we think about the sibling effects? those will be   
+  especially complicated.                                                   
+
+● You're right - sibling effects are substantially more complex than parent
+  effects. Let me think through the challenges:
+
+  Why sibling effects are hard:
+  Challenge: Direction
+  Parent effects: Cross-generational (clear)
+  Sibling effects: Within-generation (ambiguous)
+  ────────────────────────────────────────
+  Challenge: Count
+  Parent effects: Always 2 parents
+  Sibling effects: Variable (0 to many siblings)
+  ────────────────────────────────────────
+  Challenge: Causality
+  Parent effects: Parent → child (clear)
+  Sibling effects: Sibling ↔ sibling (potentially cyclic)
+  ────────────────────────────────────────
+  Challenge: Timing
+  Parent effects: Parents computed first
+  Sibling effects: Siblings computed simultaneously?
+  Key design questions:
+
+  1. How to reference siblings?
+  # Average across all siblings
+  edu.sib ~ sibling_mean(edu)
+
+  # Any sibling with condition
+  health.sib ~ sibling_any(disease)
+
+  # Count of siblings with trait
+  risk.sib ~ sibling_count(smoker)
+
+  # Weighted by birth order?
+  outcome.sib ~ sibling_weighted(outcome, weights='birth_order')
+
+  2. How to handle cycles?
+
+  If Alice's edu depends on Bob's edu, and Bob's edu depends on Alice's edu, you
+   have a cycle.
+
+  Options:
+  - A: Only allow sibling effects on components, not phenotypes - sibling's G
+  affects my outcome, not sibling's final phenotype
+  - B: Birth order breaks ties - older siblings computed first
+  - C: Equilibrium computation - iterate until convergence
+  - D: Lag - use sibling values from previous "time step" (within-generation
+  iteration)
+
+  3. What about sibling shared genetics?
+
+  Siblings share ~50% of haplotypes. You might want:
+  # Genetic material shared with sibling (IBD)
+  height.sib_G ~ sibling_shared_genetic(effects)
+
+  This requires tracking IBD segments, which is a different data structure
+  challenge.
+
+  ---
+  Should sibling effects be a Phase 5 feature (after core refactor works), or do
+   we need to design the core abstractions now to accommodate them later?
+
+❯ 1. all look great. 2. A is sufficient for equilib and lag as you could    
+  just define multiple components. birthorder you reference as an accessor  
+  via 1. eg sibling_eldest(). should also accommodate correlated componets  
+  across siblings. e.g. pheno.sharedSib ~ (cnoise | FID) or something like  
+  that. 3. lets not worry about this for now, there will be work arounds    
+
+● Got it. Let me capture the sibling effects design:
+
+  Sibling reference functions:
+  sibling_mean(X)      # Average of siblings' X
+  sibling_sum(X)       # Sum of siblings' X
+  sibling_any(X)       # 1 if any sibling has X > 0
+  sibling_count(X)     # Count of siblings with X > 0
+  sibling_eldest(X)    # Eldest sibling's X
+  sibling_youngest(X)  # Youngest sibling's X
+
+  Cycles handled by Option A - reference sibling components, not final
+  phenotypes. User can explicitly model equilibrium/lag via multiple components
+  if needed.
+
+  Correlated sibling environment (shared family effect):
+  pheno.sharedSib ~ cnoise(0.2) | FID   # correlated noise grouped by family
+
+  The | FID syntax (like R's random effects) means "this component is shared
+  across individuals with the same FID". So siblings get the same draw.
+
+  Generalized grouping syntax:
+  component ~ expr | grouping_var
+
+  # Examples:
+  height.famEnv ~ cnoise(0.1) | FID          # shared within family
+  height.schoolEnv ~ cnoise(0.05) | school   # shared within school (if tracked)
+
+  This requires SampleMeta to have access to grouping variables (via extra
+  dict).
+
+  Sibling IBD genetics - deferred to later phase, workarounds exist.
+
+  ---
+  Back to Question 11: Mating Specification
+
+  Should mating be:
+
+  Option A: Completely separate object
+  arch = Architecture(formula)
+  mating = LinearAssortativeMating(phenotypes=['height', 'bmi'], weights=[1.0,
+  0.5])
+  sim = Simulation(arch, mating, founders)
+
+  Option B: In Architecture DSL as separate block
+  arch = Architecture("""
+      height.G ~ genetic(eff)
+      height ~ height.G + noise(0.2)
+      
+      @mating: linear_assortative(height + 0.5 * bmi)
+  """)
+
+  Option C: Mating defined separately but references arch
+  arch = Architecture(formula)
+  mating = LinearAssortativeMating.from_formula('height + 0.5 * bmi', arch)
+
+  Your preference?
