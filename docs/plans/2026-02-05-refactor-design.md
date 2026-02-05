@@ -519,6 +519,31 @@ height.E ~ noise(0.3)
 height ~ height.G + height.famEnv + height.E
 ```
 
+### Grouping operator `|` (general)
+
+`|` is a general grouping operator, not noise-specific. The right-hand variable resolves from:
+- SampleMeta core fields (FID, sex, generation)
+- SampleMeta extras (school, batch, etc.)
+- Relational references (mother, father — resolved via pedigree)
+
+```
+# Grouped noise
+height.famEnv ~ cnoise(0.1) | FID            # shared within nuclear family
+height.matEnv ~ cnoise(0.1) | mother         # shared among maternal half-sibs
+height.patEnv ~ cnoise(0.1) | father         # shared among paternal half-sibs
+height.school ~ cnoise(0.1) | school         # from SampleMeta.extra
+
+# Grouped means (sibling references)
+edu.sib ~ sibling_mean(edu) | mother         # mean among maternal half-sibs
+edu.sib ~ sibling_mean(edu) | FID            # mean among full sibs
+
+# General grouped aggregation
+height.familyMean ~ mean(height) | FID
+```
+
+For `| mother` and `| father`, grouping resolves via pedigree — all offspring sharing
+the same `maternal_idx` or `paternal_idx` are grouped together.
+
 ### GxE interaction
 ```
 income.G ~ genetic(eff)
@@ -538,9 +563,14 @@ income ~ income.G + income.E + income.GxE + noise(0.1)
 4. **Offspring SampleMeta** — Mating regime creates offspring metadata in MateAssignment.
 5. **Filtering** — Named filters computed once per gen, shared across stats. Support structured relational subsets (trios, sib pairs).
 
-### In Progress (continuing critique)
-6. `| FID` grouping — execution engine needs SampleMeta access
-7. Siblings — same-FID-same-generation definition
-8. Multivariate node execution — multi-output nodes in DAG
-9. Post-processors → callbacks
-10. No backwards compatibility shim (clean break)
+### Resolved (continued, 2026-02-05 session 2)
+6. **`|` grouping operator** — General grouping, not just noise. Resolves from SampleMeta fields, extras, or relational refs (mother/father via pedigree). SampleMeta already accessible for VT, so no design change needed.
+7. **Sibling identity** — Scoped via `|` operator: `sibling_mean(X) | FID` (full sibs), `sibling_mean(X) | mother` (maternal half-sibs). No hardcoded sibling definition.
+
+### Remaining Critiques (to resume)
+8. Multivariate node execution — multi-output nodes in DAG (recommendation drafted, needs confirmation)
+9. Post-processors → callbacks (recommendation: simple `list[Callable]`)
+10. No backwards compatibility shim (recommendation: clean break)
+
+### Additional Notes
+- **Testing/CI framework needed:** Write a detailed spec upfront so agents can write tests against it. Periodically reassess spec as implementation reveals surprises. This is critical for the agent-driven development workflow.
