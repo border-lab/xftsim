@@ -6,6 +6,7 @@ import xarray as xr
 import dask.array as da
 from dataclasses import dataclass, field
 from nptyping import NDArray, Int8, Int64, Float64, Bool, Shape, Float, Int
+from abc import ABC, abstractmethod
 from typing import Any, Hashable, List, Iterable, Callable, Union, Dict, Tuple, Optional
 from functools import cached_property
 from scipy import interpolate
@@ -1286,7 +1287,7 @@ class XftAccessor:
 
 class HaplotypeArray:
     """
-    Base class for haplotype arrays.
+    Base class for haplotype arrays (legacy).
 
     This is a minimal base class that defines the common interface for all
     haplotype array implementations. Subclasses should implement the abstract
@@ -1663,6 +1664,8 @@ class SampleMeta:
         Biological sex (0=female, 1=male). Defaults to alternating 0,1.
     generation : int, optional
         Generation number. Default is 0.
+    extra : dict, optional
+        Arbitrary metadata arrays (ancestry PCs, batch IDs, etc.).
 
     Attributes
     ----------
@@ -1679,6 +1682,7 @@ class SampleMeta:
     fid: np.ndarray = None
     sex: np.ndarray = None
     generation: int = 0
+    extra: dict = field(default_factory=dict)
 
     def __post_init__(self):
         # Use object.__setattr__ since dataclass is frozen
@@ -1696,6 +1700,18 @@ class SampleMeta:
             object.__setattr__(self, 'sex', sex)
         else:
             object.__setattr__(self, 'sex', np.asarray(self.sex))
+
+        # Validate and convert extra arrays
+        n = len(iid)
+        validated = {}
+        for k, v in self.extra.items():
+            arr = np.asarray(v)
+            if len(arr) != n:
+                raise ValueError(
+                    f"extra['{k}'] has length {len(arr)}, expected {n}"
+                )
+            validated[k] = arr
+        object.__setattr__(self, 'extra', validated)
 
     @property
     def n(self) -> int:
@@ -1735,6 +1751,7 @@ class SampleMeta:
             fid=self.fid[idx].copy(),
             sex=self.sex[idx].copy(),
             generation=self.generation,
+            extra={k: v[idx].copy() for k, v in self.extra.items()},
         )
 
     def with_generation(self, generation: int) -> "SampleMeta":
@@ -1744,6 +1761,7 @@ class SampleMeta:
             fid=self.fid,
             sex=self.sex,
             generation=generation,
+            extra=self.extra,
         )
 
     def to_sample_index(self) -> "xft.index.SampleIndex":
@@ -1789,6 +1807,8 @@ class VariantMeta:
         Reference allele (e.g., 'A').
     one_allele : np.ndarray, optional
         Alternate allele (e.g., 'G').
+    extra : dict, optional
+        Arbitrary metadata arrays (annotation flags, etc.).
 
     Attributes
     ----------
@@ -1802,6 +1822,7 @@ class VariantMeta:
     af: np.ndarray = None
     zero_allele: np.ndarray = None
     one_allele: np.ndarray = None
+    extra: dict = field(default_factory=dict)
 
     def __post_init__(self):
         # Use object.__setattr__ since dataclass is frozen
@@ -1822,6 +1843,27 @@ class VariantMeta:
         if self.one_allele is not None:
             object.__setattr__(self, 'one_allele', np.asarray(self.one_allele))
 
+        # Validate and convert extra arrays
+        validated = {}
+        for k, v in self.extra.items():
+            arr = np.asarray(v)
+            if len(arr) != m:
+                raise ValueError(
+                    f"extra['{k}'] has length {len(arr)}, expected {m}"
+                )
+            validated[k] = arr
+        object.__setattr__(self, 'extra', validated)
+
+    def __getitem__(self, key: str) -> np.ndarray:
+        """Access core fields or extras by name: variants['coding']."""
+        core = {'vid', 'chrom', 'pos_bp', 'pos_cM', 'af', 'zero_allele', 'one_allele'}
+        if key in core:
+            val = getattr(self, key)
+            if val is None:
+                raise KeyError(f"Field '{key}' is None")
+            return val
+        return self.extra[key]
+
     @property
     def m(self) -> int:
         """Number of variants."""
@@ -1837,6 +1879,7 @@ class VariantMeta:
             af=self.af[idx].copy() if self.af is not None else None,
             zero_allele=self.zero_allele[idx].copy() if self.zero_allele is not None else None,
             one_allele=self.one_allele[idx].copy() if self.one_allele is not None else None,
+            extra={k: v[idx].copy() for k, v in self.extra.items()},
         )
 
     def to_variant_index(self, af: np.ndarray = None) -> "xft.index.DiploidVariantIndex":
@@ -1873,12 +1916,81 @@ class VariantMeta:
         return f"VariantMeta({', '.join(fields)})"
 
 
-class NHaplotypeArray(HaplotypeArray):
+# ---------------------------------------------------------------------------
+# HaplotypeOperator ABC (new — typed against by Architecture, EffectSpec, etc.)
+# ---------------------------------------------------------------------------
+
+class HaplotypeOperator(ABC):
     """
-    Haplotype array backed by numpy 3D array.
+    Abstract base class for all genotype representations.
+
+    Concrete implementations:
+    - DenseHaplotypeArray — NumPy-backed (n, m, 2) array
+    - GraphHaplotypeOperator — GRG wrapper (Phase 4)
+    """
+
+    # samples: SampleMeta  — set by concrete implementations
+    # variants: VariantMeta — set by concrete implementations
+
+    @property
+    @abstractmethod
+    def n(self) -> int:
+        ...
+
+    @property
+    @abstractmethod
+    def m(self) -> int:
+        ...
+
+    @abstractmethod
+    def matvec(self, v: np.ndarray) -> np.ndarray:
+        """Diploid G @ v."""
+        ...
+
+    @abstractmethod
+    def rmatvec(self, v: np.ndarray) -> np.ndarray:
+        """G.T @ v."""
+        ...
+
+    @abstractmethod
+    def matvec_maternal(self, v: np.ndarray) -> np.ndarray:
+        """hap[:,:,0] @ v."""
+        ...
+
+    @abstractmethod
+    def matvec_paternal(self, v: np.ndarray) -> np.ndarray:
+        """hap[:,:,1] @ v."""
+        ...
+
+    @abstractmethod
+    def standardized_matvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
+        """Standardized diploid matvec."""
+        ...
+
+    @abstractmethod
+    def recompute_af(self) -> np.ndarray:
+        """Recompute empirical allele frequencies from current data."""
+        ...
+
+    @abstractmethod
+    def to_dense(self) -> "DenseHaplotypeArray":
+        """Materialize as a DenseHaplotypeArray."""
+        ...
+
+    @abstractmethod
+    def __getitem__(self, key) -> "HaplotypeOperator":
+        """Subset by sample/variant indices."""
+        ...
+
+
+class DenseHaplotypeArray(HaplotypeArray, HaplotypeOperator):
+    """
+    Dense numpy-backed haplotype array implementing both old HaplotypeArray
+    interface and new HaplotypeOperator ABC.
 
     Stores haplotypes as a 3D array with shape (n_samples, m_variants, 2)
     where the last dimension represents the two haplotype copies.
+    Convention: genotypes[:,:,0] = maternal, genotypes[:,:,1] = paternal.
 
     Parameters
     ----------
@@ -2043,7 +2155,7 @@ class NHaplotypeArray(HaplotypeArray):
         sample_idx=None,
         variant_idx=None,
         copy: bool = True,
-    ) -> "NHaplotypeArray":
+    ) -> "DenseHaplotypeArray":
         """
         Return a new NHaplotypeArray with a subset of samples and/or variants.
 
@@ -2073,14 +2185,14 @@ class NHaplotypeArray(HaplotypeArray):
         new_samples = self.samples.subset(sample_idx)
         new_variants = self.variants.subset(variant_idx)
 
-        return NHaplotypeArray(
+        return DenseHaplotypeArray(
             genotypes=new_genotypes,
             generation=self.generation,
             samples=new_samples,
             variants=new_variants,
         )
 
-    def __getitem__(self, key) -> "NHaplotypeArray":
+    def __getitem__(self, key) -> "DenseHaplotypeArray":
         """
         Support numpy/xarray-style indexing: haplotypes[sample_idx] or haplotypes[sample_idx, variant_idx].
 
@@ -2108,7 +2220,7 @@ class NHaplotypeArray(HaplotypeArray):
 
         return self.subset(sample_idx=sample_idx, variant_idx=variant_idx, copy=False)
 
-    def drop_isel(self, sample=None, variant=None) -> "NHaplotypeArray":
+    def drop_isel(self, sample=None, variant=None) -> "DenseHaplotypeArray":
         """
         Drop samples or variants by index (xarray-style compatibility).
 
@@ -2255,6 +2367,24 @@ class NHaplotypeArray(HaplotypeArray):
             one_allele=self.variants.one_allele,
         )
 
+    # --- HaplotypeOperator ABC implementation ---
+
+    def matvec_maternal(self, v: np.ndarray) -> np.ndarray:
+        """Maternal haplotype matvec: hap[:,:,0] @ v."""
+        return self.genotypes[:, :, 0] @ v
+
+    def matvec_paternal(self, v: np.ndarray) -> np.ndarray:
+        """Paternal haplotype matvec: hap[:,:,1] @ v."""
+        return self.genotypes[:, :, 1] @ v
+
+    def recompute_af(self) -> np.ndarray:
+        """Recompute and return empirical allele frequencies."""
+        return self.af_empirical
+
+    def to_dense(self) -> "DenseHaplotypeArray":
+        """Return self (already dense)."""
+        return self
+
     @property
     def xft(self) -> "NHaplotypeArrayAccessor":
         """Return accessor object for compatibility with xarray .xft interface."""
@@ -2264,16 +2394,16 @@ class NHaplotypeArray(HaplotypeArray):
         parts = [f"n={self.n}", f"m={self.m}", f"generation={self.generation}"]
         if self.samples.n_fam != self.n:
             parts.append(f"n_fam={self.n_fam}")
-        return f"NHaplotypeArray({', '.join(parts)})"
+        return f"DenseHaplotypeArray({', '.join(parts)})"
 
 
 class NHaplotypeArrayAccessor:
     """
-    Accessor class that mimics the xarray .xft interface for NHaplotypeArray.
+    Accessor class that mimics the xarray .xft interface for DenseHaplotypeArray.
     Provides compatibility with code expecting xarray-style access.
     """
 
-    def __init__(self, haplotypes: NHaplotypeArray):
+    def __init__(self, haplotypes: "DenseHaplotypeArray"):
         self._haplotypes = haplotypes
 
     @property
@@ -2321,3 +2451,117 @@ class NHaplotypeArrayAccessor:
     def to_diploid_standardized(self, af: np.ndarray = None, scale: bool = False) -> np.ndarray:
         """Return standardized diploid genotypes."""
         return self._haplotypes.to_diploid_standardized(af=af, scale=scale)
+
+
+# Backward-compatible alias
+NHaplotypeArray = DenseHaplotypeArray
+
+
+
+# ---------------------------------------------------------------------------
+# NPhenotypeArray — new numpy-backed phenotype container
+# ---------------------------------------------------------------------------
+
+class NPhenotypeArray:
+    """
+    Thin wrapper around a flat dict of named 1-D arrays.
+
+    Each key is a component/phenotype name (e.g. 'height.G', 'height').
+    The dot is purely a human convention — not parsed.
+
+    Parameters
+    ----------
+    samples : SampleMeta
+        Sample metadata that travels with the data.
+    values : dict, optional
+        Initial name → (n,) array mapping.
+    """
+
+    def __init__(self, samples: SampleMeta, values: Optional[Dict[str, np.ndarray]] = None):
+        self.samples = samples
+        self._values: Dict[str, np.ndarray] = {}
+        if values is not None:
+            for k, v in values.items():
+                self[k] = v
+
+    def __getitem__(self, key: str) -> np.ndarray:
+        return self._values[key]
+
+    def __setitem__(self, key: str, val: np.ndarray):
+        val = np.asarray(val, dtype=np.float64)
+        if val.shape != (self.samples.n,):
+            raise ValueError(
+                f"Value for '{key}' has shape {val.shape}, expected ({self.samples.n},)"
+            )
+        if key in self._values:
+            warnings.warn(f"Overwriting existing key '{key}' in NPhenotypeArray")
+        self._values[key] = val
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._values
+
+    @property
+    def keys(self):
+        """Return the names of all stored components."""
+        return self._values.keys()
+
+    def subset(self, idx) -> "NPhenotypeArray":
+        """Return a new NPhenotypeArray with a subset of samples."""
+        new_samples = self.samples.subset(idx)
+        new_values = {k: v[idx].copy() for k, v in self._values.items()}
+        return NPhenotypeArray(samples=new_samples, values=new_values)
+
+    def __repr__(self) -> str:
+        return (f"NPhenotypeArray(n={self.samples.n}, "
+                f"keys={list(self._values.keys())})")
+
+
+# ---------------------------------------------------------------------------
+# PedigreeArray
+# ---------------------------------------------------------------------------
+
+@dataclass
+class PedigreeArray:
+    """
+    Integer index arrays linking offspring to parents.
+
+    Produced at reproduction time; consumed by parent/mother/father references
+    and by filters (TrioFilter, SibPairFilter).
+
+    Parameters
+    ----------
+    offspring_samples : SampleMeta
+        Metadata for the offspring generation.
+    maternal_idx : np.ndarray
+        (n,) indices into the *parent* generation's SampleMeta for each offspring's mother.
+    paternal_idx : np.ndarray
+        (n,) indices into the *parent* generation's SampleMeta for each offspring's father.
+    parent_n : int
+        Number of individuals in the parent generation (for bounds checking).
+    """
+    offspring_samples: SampleMeta
+    maternal_idx: np.ndarray
+    paternal_idx: np.ndarray
+    parent_n: int
+
+    def __post_init__(self):
+        self.maternal_idx = np.asarray(self.maternal_idx, dtype=np.intp)
+        self.paternal_idx = np.asarray(self.paternal_idx, dtype=np.intp)
+        n = self.offspring_samples.n
+        if len(self.maternal_idx) != n:
+            raise ValueError(
+                f"maternal_idx length {len(self.maternal_idx)} != offspring n {n}"
+            )
+        if len(self.paternal_idx) != n:
+            raise ValueError(
+                f"paternal_idx length {len(self.paternal_idx)} != offspring n {n}"
+            )
+        if n > 0:
+            if np.any(self.maternal_idx < 0) or np.any(self.maternal_idx >= self.parent_n):
+                raise ValueError(
+                    f"maternal_idx out of bounds [0, {self.parent_n})"
+                )
+            if np.any(self.paternal_idx < 0) or np.any(self.paternal_idx >= self.parent_n):
+                raise ValueError(
+                    f"paternal_idx out of bounds [0, {self.parent_n})"
+                )
