@@ -219,6 +219,38 @@ height.G ~ height.G_mat + height.G_pat
 height.indirect ~ (mother(height.G, founder=0) - height.G_mat) + (father(height.G, founder=0) - height.G_pat)
 ```
 
+### ArchNode (internal representation)
+
+The parser and programmatic API both produce the same internal representation:
+
+```python
+@dataclass
+class ArchNode:
+    outputs: list[str]           # names written to PhenotypeArray
+    component: ArchComponent     # the computation (Genetic, Noise, etc.)
+    inputs: list[str]            # names read from PhenotypeArray or histories
+    grouping: str | None         # | variable, or None (implicit | IID)
+```
+
+**Programmatic API:**
+```python
+arch = Architecture()
+arch.add('height.G', Genetic(effects=eff))
+arch.add('height.E', Noise(variance=0.2))
+arch.add('height', Aggregation('height.G + height.E'))
+arch.add(['height.G', 'bmi.G'], MvGenetic(effects=mv_eff))  # multi-output
+arch.add('height.famEnv', Noise(variance=0.1), grouping='FID')
+```
+
+**Parsed (syntactic sugar over same representation):**
+```python
+arch = Architecture("""
+    height.G ~ genetic(eff)
+    height.E ~ noise(0.2)
+    height ~ height.G + height.E
+""", effects={'eff': eff})
+```
+
 ### ArchComponent Registry
 
 DSL functions are organized via a base class registry:
@@ -479,28 +511,36 @@ xftsim/
 ## Phased Implementation Plan
 
 ### Phase 1: Core abstractions
-- HaplotypeOperator protocol + DenseHaplotypeArray
 - SampleMeta, VariantMeta, PhenotypeArray, PedigreeArray
+- HaplotypeOperator protocol + DenseHaplotypeArray
 - EffectSpec classes
-- Basic formula parser (subset of full spec)
-- Unit tests for data structures
+- ArchNode + ArchComponent base class + programmatic API (`arch.add(...)`)
+- Minimal formula parser (univariate components, noise, aggregation — no `|`, no `founder=`, no tuple LHS)
+- Unit tests: data structures, effects, parser (minimal grammar), architecture execution
 
 ### Phase 2: Minimal simulation
 - Port meiosis to work with HaplotypeOperator
 - Random mating only
-- Single additive genetic component
-- Prove end-to-end works
+- Single additive genetic component + noise
+- Dense format I/O (round-trip)
+- Prove end-to-end works: founder → phenotypes → mates → offspring → repeat
+- **Tests:** simple sim, pedigree integrity, I/O round-trip, basic covariance
 - **Checkpoint:** minimal simulation runs correctly
 
 ### Phase 3: Full architecture
-- Complete formula syntax (multivariate, VT, indirect, sibling refs)
-- Dependency graph + topological sort
+- Extend parser: `|` grouping, `founder=` kwarg, tuple LHS, sibling refs, `cnoise`
+- Multi-output DAG nodes
 - Assortative mating
-- Statistics and filters
-- Port remaining architecture components
+- SampleStatistics (within-sample covariance of all components/phenotypes)
+- Filters (TrioFilter, SibPairFilter)
+- Callbacks
+- **Tests:** extended parser, grouping operator, multi-output nodes, VT, IGE, multivariate, callbacks, filters, numerical covariance/mating
+- Performance baselines
+- **Other statistics** (HasemanElston, parent-offspring regression, etc.) deferred — implement and test as needed
 
 ### Phase 4: Integration
 - GraphHaplotypeOperator (grapp/glink wrapper)
+- GRG I/O + round-trip
 - Additional I/O formats
 - Migration guide
 - Performance benchmarks
@@ -648,6 +688,10 @@ income ~ income.G + income.E + income.GxE + noise(0.1)
 - **Generation 0**: Founder gen skips reproduction, uses `founder=` fallbacks. Future: optionally generate synthetic parent genotypes.
 - **Filter signature**: `filter.apply(generation, phenotype_history, pedigree_history)` — accommodates cross-gen (trios) and within-gen (sib pairs) filters.
 
+### Open details (to resolve during implementation)
+- **`(A, B) ~ cnoise(cov) | FID` resolution**: How does multivariate correlated noise interact with sample-level grouping? Presumably: draw one multivariate sample per unique FID, broadcast to all members. But the exact covariance parameterization (cross-trait within group? cross-group?) needs specification.
+- Other DSL edge cases will likely surface during parser implementation. These should be resolved as they arise rather than blocking the design.
+
 ### Additional Notes
 - **Testing/CI framework needed:** Write a detailed spec upfront so agents can write tests against it. Periodically reassess spec as implementation reveals surprises. This is critical for the agent-driven development workflow.
-- **All 10 critiques resolved.** Design is complete. Next: testing spec, then implementation.
+- **Core design decisions complete.** Remaining open details are implementation-level. Next: testing spec, then implementation.
