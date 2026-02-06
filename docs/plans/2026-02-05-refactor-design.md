@@ -147,32 +147,29 @@ height.E ~ noise(0.2)
 
 # Multivariate components (correlated across traits)
 (height.G, bmi.G) ~ mvGenetic(mv_effects)
-(height.E, bmi.E) ~ mvNoise(cov=[[0.2, 0.05], [0.05, 0.3]])
+(height.E, bmi.E) ~ cnoise(cov=[[0.2, 0.05], [0.05, 0.3]])
 
 # Aggregation (always univariate, supports +, *, -, /)
 height ~ height.G + height.E
 height ~ height.G + height.E + height.G * height.E   # GxE
 
-# Vertical transmission
-height.VT ~ 0.3 * parent(height)
-height.VT ~ 0.3 * mother(height) + 0.3 * father(height)
-
-# Founder fallback (|| operator)
-height.VT ~ 0.3 * parent(height) || noise(0.3)
-# "if no parent (gen 0), sample from N(0, 0.3) instead"
+# Vertical transmission — founder fallback via keyword arg
+height.VT ~ 0.3 * parent(height, founder=noise(0.3))
+height.VT ~ 0.3 * mother(height, founder=noise(0.3)) + 0.3 * father(height, founder=noise(0.3))
 # No fallback specified → warning + default to 0.0
 
 # Haplotype-specific genetic components
 height.G_mat ~ haplotypeGenetic(eff, haplotype='maternal')
 height.G_pat ~ haplotypeGenetic(eff, haplotype='paternal')
 
-# Grouped/correlated noise (shared environment)
-height.famEnv ~ cnoise(0.1) | FID
-# "correlated noise grouped by family — siblings get same draw"
-# | grouping_var syntax — resolves from SampleMeta
+# Noise
+height.E ~ noise(0.2)                        # univariate, per-individual (implicit | IID)
+height.E ~ noise(0.2) | FID                  # univariate, shared within family
+(height.E, bmi.E) ~ cnoise(cov=[[...]]) | FID  # multivariate correlated, per-family
 
-# Sibling reference functions
+# Sibling reference functions (default grouping: | FID)
 edu.sib ~ sibling_mean(edu)
+edu.sib ~ sibling_mean(edu) | mother         # scoped to maternal half-sibs
 risk.sib ~ sibling_count(smoker)
 outcome.sib ~ sibling_eldest(outcome)
 ```
@@ -180,11 +177,14 @@ outcome.sib ~ sibling_eldest(outcome)
 ### Parent/Sibling Reference Primitives
 
 **Parent references** (cross-generational):
-- `parent(X)` — average of mother and father
+- `parent(X)` — midparent value (average of mother and father)
 - `mother(X)` — mother's value
 - `father(X)` — father's value
+- All accept `founder=` keyword for generation 0 fallback: `parent(X, founder=noise(0.3))`
 
 Always reference `phenotype_history[gen - 1]` + pedigree lookup. Never recompute.
+
+**Founder fallback:** Previously `||` operator; now a keyword arg on parent/mother/father. This eliminates the `||` operator from the grammar entirely, avoiding precedence ambiguity with `|`. No fallback specified → warning + default to 0.0.
 
 **Sibling references** (within-generation):
 - `sibling_mean(X)` — average of siblings' X
@@ -194,9 +194,16 @@ Always reference `phenotype_history[gen - 1]` + pedigree lookup. Never recompute
 - `sibling_eldest(X)` — eldest sibling's X
 - `sibling_youngest(X)` — youngest sibling's X
 
-Siblings defined as same-FID-same-generation.
+Default sibling grouping: `| FID` (same FID, same generation). Override with explicit `|`: `sibling_mean(X) | mother` for maternal half-sibs.
 
 Cycles avoided by Option A: only reference sibling *components*, not final phenotypes.
+
+### Noise Functions
+
+- `noise(v)` — univariate independent noise, variance `v`. Implicitly `| IID`.
+- `cnoise(cov=...)` — multivariate correlated noise across features (tuple LHS required). Correlated across *traits*, not *samples*.
+- `| group` modifies sample-level grouping orthogonally: `noise(0.1) | FID`, `cnoise(cov) | FID`
+- Bare expressions without `|` are implicitly `| IID` (individual-specific).
 
 ### Indirect Genetic Effects
 
@@ -209,15 +216,46 @@ height.G_pat ~ haplotypeGenetic(eff, haplotype='paternal')
 height.G ~ height.G_mat + height.G_pat
 
 # Indirect = parent's diploid G minus what was transmitted
-height.indirect ~ (mother(height.G) - height.G_mat) + (father(height.G) - height.G_pat)
+height.indirect ~ (mother(height.G, founder=0) - height.G_mat) + (father(height.G, founder=0) - height.G_pat)
 ```
+
+### ArchComponent Registry
+
+DSL functions are organized via a base class registry:
+
+```python
+class ArchComponent(ABC):
+    name: str
+    kind: Literal['generative', 'aggregating', 'genetic', 'reference']
+    accepts_grouping: bool  # can use |
+
+BUILTINS = {
+    'genetic': GeneticComponent,            # genetic, no |
+    'haplotypeGenetic': HaplotypeGeneticComponent,  # genetic, no |
+    'mvGenetic': MvGeneticComponent,        # genetic, no |
+    'noise': NoiseComponent,                # generative, accepts |
+    'cnoise': CnoiseComponent,              # generative (multivariate), accepts |
+    'mean': MeanComponent,                  # aggregating, accepts |
+    'sibling_mean': SiblingMeanComponent,   # aggregating, accepts | (default: FID)
+    'sibling_sum': SiblingSumComponent,     # aggregating, accepts |
+    'sibling_any': SiblingAnyComponent,     # aggregating, accepts |
+    'sibling_count': SiblingCountComponent, # aggregating, accepts |
+    'sibling_eldest': SiblingEldestComponent, # aggregating, accepts |
+    'sibling_youngest': SiblingYoungestComponent, # aggregating, accepts |
+    'parent': ParentComponent,              # reference (cross-gen), accepts founder=
+    'mother': MotherComponent,              # reference (cross-gen), accepts founder=
+    'father': FatherComponent,              # reference (cross-gen), accepts founder=
+}
+```
+
+Formula function arguments that aren't literals are resolved from the `effects` dict passed to `Architecture(formula, effects={...})`.
 
 ### Execution Model
 
 - Parse formula at `Architecture.__init__()` → build DAG → topological sort
 - Store sorted execution plan (flat list of operations)
 - Each generation: replay the sorted list
-- Multivariate nodes `(a.G, b.G) ~ mvEffects(...)` fire once, produce multiple outputs
+- Multivariate nodes `(a.G, b.G) ~ mvEffects(...)` fire once, produce multiple outputs — single DAG node registers multiple output names
 - Downstream nodes depend on output names, not node identity
 
 ---
@@ -329,14 +367,24 @@ sim.run(n_generations=10)
 ### Generation Loop
 
 ```
-1. Reproduce: haplotypes.meiosis(assignment, recomb_map) → offspring haplotypes
-2. Compute phenotypes: architecture.compute(gen, haplotype_history, phenotype_history, pedigree_history)
-3. Assign mates: mating.mate(phenotypes) → MateAssignment
-4. Compute filters: {name: filter.apply(phenotypes, pedigree_history) for each filter}
-5. Estimate statistics: stat.estimate(sim_state, filtered_views)
-6. Run callbacks
-7. Enforce retention (set old history entries to None)
+Generation 0 (founders):
+  1. Load founder haplotypes into haplotype_history[0]
+  2. Compute phenotypes (founder fallback via founder= kicks in for parent/mother/father refs)
+  3. Assign mates → MateAssignment (stored for next gen's reproduction)
+  4. Compute filters, statistics, callbacks
+  5. Enforce retention
+
+Generation t > 0:
+  1. Reproduce: haplotypes.meiosis(prev_assignment, recomb_map) → offspring haplotypes
+  2. Compute phenotypes: architecture.compute(gen, haplotype_history, phenotype_history, pedigree_history)
+  3. Assign mates: mating.mate(phenotypes) → MateAssignment (consumed next gen)
+  4. Compute filters: {name: filter.apply(gen, phenotype_history, pedigree_history) for each filter}
+  5. Estimate statistics: stat.estimate(sim_state, filtered_views)
+  6. Run callbacks(sim) — callbacks receive Simulation object, can set sim.stop = True for early stopping
+  7. Enforce retention (set old history entries to None)
 ```
+
+Note: MateAssignment produced at gen t is consumed by reproduction at gen t+1.
 
 ### History (not "stores")
 
@@ -388,9 +436,22 @@ sim = Simulation(
 
 Filters produce structured relational subsets (trios, sib pairs, within-family groups) — more than simple boolean masks.
 
+```python
+class Filter(ABC):
+    def apply(self, generation, phenotype_history, pedigree_history) -> FilteredView: ...
+```
+
+TrioFilter pulls parent-gen phenotypes + current-gen phenotypes + pedigree. SibPairFilter only needs current gen + pedigree. The signature accommodates both cross-generational and within-generation filters.
+
 ### Callbacks
 
-Simple `list[Callable]` replacing the formal `PostProcessor` system. For custom per-generation hooks (saving snapshots, logging, etc.).
+Simple `list[Callable]` replacing the formal `PostProcessor` system. Callbacks receive the `Simulation` object, giving full access to histories, current state, and results. Early stopping via `sim.stop = True`.
+
+```python
+def my_callback(sim):
+    if sim.results[-1]['h2_height'] < 0.01:
+        sim.stop = True  # early stopping
+```
 
 ---
 
@@ -474,7 +535,7 @@ mating = LinearAssortativeMating(phenotypes=['height', 'bmi'], weights=[1.0, 0.5
 ```python
 arch = Architecture("""
     height.G ~ genetic(eff)
-    height.VT ~ 0.3 * parent(height) || noise(0.3)
+    height.VT ~ 0.3 * parent(height, founder=noise(0.3))
     height.E ~ noise(0.2)
     height ~ height.G + height.VT + height.E
 """, effects={'eff': eff})
@@ -514,24 +575,28 @@ arch = Architecture("""
 ### Shared family environment
 ```
 height.G ~ genetic(eff)
-height.famEnv ~ cnoise(0.1) | FID
+height.famEnv ~ noise(0.1) | FID
 height.E ~ noise(0.3)
 height ~ height.G + height.famEnv + height.E
 ```
 
 ### Grouping operator `|` (general)
 
-`|` is a general grouping operator, not noise-specific. The right-hand variable resolves from:
+`|` is a general grouping operator that controls sample-level grouping. The right-hand variable resolves from:
 - SampleMeta core fields (FID, sex, generation)
 - SampleMeta extras (school, batch, etc.)
 - Relational references (mother, father — resolved via pedigree)
+- Implicit default: `| IID` (individual-specific) when omitted
 
 ```
-# Grouped noise
-height.famEnv ~ cnoise(0.1) | FID            # shared within nuclear family
-height.matEnv ~ cnoise(0.1) | mother         # shared among maternal half-sibs
-height.patEnv ~ cnoise(0.1) | father         # shared among paternal half-sibs
-height.school ~ cnoise(0.1) | school         # from SampleMeta.extra
+# Grouped noise (univariate)
+height.famEnv ~ noise(0.1) | FID             # shared within nuclear family
+height.matEnv ~ noise(0.1) | mother          # shared among maternal half-sibs
+height.patEnv ~ noise(0.1) | father          # shared among paternal half-sibs
+height.school ~ noise(0.1) | school          # from SampleMeta.extra
+
+# Grouped noise (multivariate correlated across traits)
+(height.E, bmi.E) ~ cnoise(cov=[[...]]) | FID  # correlated across traits, shared within family
 
 # Grouped means (sibling references)
 edu.sib ~ sibling_mean(edu) | mother         # mean among maternal half-sibs
@@ -543,6 +608,8 @@ height.familyMean ~ mean(height) | FID
 
 For `| mother` and `| father`, grouping resolves via pedigree — all offspring sharing
 the same `maternal_idx` or `paternal_idx` are grouped together.
+
+`|` is orthogonal to the LHS function — it works with generative expressions (`noise`, `cnoise`) and aggregating expressions (`mean`, `sibling_mean`, etc.).
 
 ### GxE interaction
 ```
@@ -567,10 +634,20 @@ income ~ income.G + income.E + income.GxE + noise(0.1)
 6. **`|` grouping operator** — General grouping, not just noise. Resolves from SampleMeta fields, extras, or relational refs (mother/father via pedigree). SampleMeta already accessible for VT, so no design change needed.
 7. **Sibling identity** — Scoped via `|` operator: `sibling_mean(X) | FID` (full sibs), `sibling_mean(X) | mother` (maternal half-sibs). No hardcoded sibling definition.
 
-### Remaining Critiques (to resume)
-8. Multivariate node execution — multi-output nodes in DAG (recommendation drafted, needs confirmation)
-9. Post-processors → callbacks (recommendation: simple `list[Callable]`)
-10. No backwards compatibility shim (recommendation: clean break)
+### Resolved (continued, 2026-02-06 session 3)
+8. **Multivariate DAG nodes** — Single DAG node registers multiple output names, fires once. Downstream depends on output names, not node identity.
+9. **Callbacks** — `list[Callable]` taking the Simulation object. Early stopping via `sim.stop = True`. Full access to histories and state.
+10. **No backwards compat** — Clean break. No shim, no re-exports. Old code uses old package.
+
+### Consistency refinements (2026-02-06)
+- **Founder fallback**: `||` operator removed. Replaced with `founder=` keyword arg on `parent()`, `mother()`, `father()`. Eliminates parser precedence ambiguity with `|`.
+- **`noise` vs `cnoise`**: `noise` = univariate, `cnoise` = multivariate (correlated across features, tuple LHS). `|` controls sample-level grouping orthogonally. Bare expressions implicitly `| IID`.
+- **Sibling default scope**: `sibling_mean(X)` defaults to `| FID`. Explicit `|` overrides.
+- **ArchComponent registry**: DSL built-in functions organized via base class with `kind` and `accepts_grouping` metadata.
+- **Effect name resolution**: Formula function arguments that aren't literals are resolved from the `effects` dict passed to Architecture.
+- **Generation 0**: Founder gen skips reproduction, uses `founder=` fallbacks. Future: optionally generate synthetic parent genotypes.
+- **Filter signature**: `filter.apply(generation, phenotype_history, pedigree_history)` — accommodates cross-gen (trios) and within-gen (sib pairs) filters.
 
 ### Additional Notes
 - **Testing/CI framework needed:** Write a detailed spec upfront so agents can write tests against it. Periodically reassess spec as implementation reveals surprises. This is critical for the agent-driven development workflow.
+- **All 10 critiques resolved.** Design is complete. Next: testing spec, then implementation.
