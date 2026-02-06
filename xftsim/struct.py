@@ -1978,6 +1978,25 @@ class HaplotypeOperator(ABC):
         ...
 
     @abstractmethod
+    def meiosis(self, assignment, recombination_map) -> "HaplotypeOperator":
+        """
+        Perform meiosis to produce offspring haplotypes.
+
+        Parameters
+        ----------
+        assignment : NMateAssignment
+            Mate assignment with maternal/paternal indices and offspring metadata.
+        recombination_map : RecombinationMap
+            Recombination probabilities between loci.
+
+        Returns
+        -------
+        HaplotypeOperator
+            Offspring haplotypes.
+        """
+        ...
+
+    @abstractmethod
     def __getitem__(self, key) -> "HaplotypeOperator":
         """Subset by sample/variant indices."""
         ...
@@ -2384,6 +2403,40 @@ class DenseHaplotypeArray(HaplotypeArray, HaplotypeOperator):
     def to_dense(self) -> "DenseHaplotypeArray":
         """Return self (already dense)."""
         return self
+
+    def meiosis(self, assignment, recombination_map) -> "DenseHaplotypeArray":
+        """
+        Perform meiosis to produce offspring haplotypes.
+
+        Delegates to the existing numba-jitted _meiosis_3d kernel in reproduce.py.
+
+        Parameters
+        ----------
+        assignment : NMateAssignment
+            Mate assignment with maternal/paternal indices and offspring metadata.
+        recombination_map : RecombinationMap
+            Recombination probabilities between loci.
+
+        Returns
+        -------
+        DenseHaplotypeArray
+            Offspring haplotypes with inherited VariantMeta.
+        """
+        from xftsim.reproduce import meiosis as _meiosis_fn
+
+        offspring_genotypes = _meiosis_fn(
+            self,
+            recombination_map,
+            assignment.maternal_idx,
+            assignment.paternal_idx,
+        )
+
+        return DenseHaplotypeArray(
+            genotypes=offspring_genotypes,
+            generation=assignment.offspring_samples.generation,
+            samples=assignment.offspring_samples,
+            variants=self.variants,
+        )
 
     @property
     def xft(self) -> "NHaplotypeArrayAccessor":

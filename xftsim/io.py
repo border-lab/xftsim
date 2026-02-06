@@ -275,7 +275,7 @@ def load_haplotypes_npz(path: str) -> xft.struct.NHaplotypeArray:
         one_allele=data['variant_one_allele'] if 'variant_one_allele' in data else None,
     )
 
-    return xft.struct.NHaplotypeArray(
+    return xft.struct.DenseHaplotypeArray(
         genotypes=data['genotypes'],
         generation=int(data['generation'][0]),
         samples=samples,

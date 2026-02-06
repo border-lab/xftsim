@@ -68,4 +68,6 @@ from . import io          ## input/output
 from . import neffect     ## new effect specs
 from . import narch       ## new architecture system
 from . import parser      ## formula parser
+from . import nmate       ## new mate assignment
+from . import nsim        ## new simulation loop
 

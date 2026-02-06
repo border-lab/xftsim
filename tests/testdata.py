@@ -7,6 +7,9 @@ Usable both inside pytest (via conftest fixtures) and standalone.
 import numpy as np
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
 from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.nmate import RandomMating
+from xftsim.reproduce import RecombinationMap
 
 
 class TestGenomes:
@@ -92,3 +95,41 @@ class TestMeta:
         if len(chrom) < m:
             chrom = np.concatenate([chrom, np.full(m - len(chrom), n_chrom)])
         return VariantMeta(vid=vid, chrom=chrom[:m])
+
+
+class TestSimulation:
+    """Factory for simulation test fixtures."""
+
+    @staticmethod
+    def founder_haplotypes(n=500, m=50, seed=42) -> DenseHaplotypeArray:
+        """Founder haplotypes with balanced sex and known AFs."""
+        rng = np.random.RandomState(seed)
+        af = rng.uniform(0.1, 0.9, size=m)
+        geno = np.zeros((n, m, 2), dtype=np.int8)
+        for j in range(m):
+            geno[:, j, 0] = rng.binomial(1, af[j], size=n)
+            geno[:, j, 1] = rng.binomial(1, af[j], size=n)
+        sex = np.tile([0, 1], (n + 1) // 2)[:n]
+        samples = SampleMeta(iid=np.arange(n), sex=sex)
+        variants = VariantMeta(vid=np.arange(m), af=af)
+        return DenseHaplotypeArray(genotypes=geno, samples=samples, variants=variants)
+
+    @staticmethod
+    def simple_architecture(m=50, h2=0.5, seed=123) -> Architecture:
+        """Single-trait architecture: Y = G + E, Var(G)~h2, Var(E)~(1-h2)."""
+        effects = AdditiveEffects.from_h2(h2=h2, m=m, seed=seed)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(effects))
+        arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+        return arch
+
+    @staticmethod
+    def recombination_map(m=50, p=0.5) -> RecombinationMap:
+        """Constant recombination map."""
+        return RecombinationMap.constant_map(m=m, p=p)
+
+    @staticmethod
+    def mating_regime(offspring_per_pair=2) -> RandomMating:
+        """Default random mating."""
+        return RandomMating(offspring_per_pair=offspring_per_pair)
