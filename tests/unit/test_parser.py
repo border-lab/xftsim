@@ -303,3 +303,118 @@ class TestCircularDependency:
         # but since Y hasn't been defined, this should fail
         with pytest.raises(ValueError):
             Architecture.from_formula("Y ~ Y + noise(0.5)")
+
+
+# ── Parser robustness / edge cases ────────────────────────────────────────
+
+class TestParserRobustness:
+    """Robustness tests for malformed and edge-case formulas."""
+
+    def test_empty_formula(self):
+        """Empty formula should produce no nodes."""
+        nodes = parse_formula("")
+        assert len(nodes) == 0
+
+    def test_whitespace_only(self):
+        """Whitespace-only formula should produce no nodes."""
+        nodes = parse_formula("   \n  \n   ")
+        assert len(nodes) == 0
+
+    def test_comments_only(self):
+        """Formula with only comments should produce no nodes."""
+        nodes = parse_formula("""
+            # comment 1
+            # comment 2
+        """)
+        assert len(nodes) == 0
+
+    def test_trailing_whitespace(self):
+        """Trailing whitespace should not affect parsing."""
+        nodes = parse_formula("x ~ noise(0.5)   ")
+        assert len(nodes) == 1
+
+    def test_dotted_names(self):
+        """Deeply dotted names should work."""
+        nodes = parse_formula("""
+            a.b.c ~ noise(1.0)
+            d.e.f ~ noise(1.0)
+            g.h ~ a.b.c + d.e.f
+        """)
+        assert len(nodes) == 3
+        assert nodes[0].outputs == ['a.b.c']
+
+    def test_scientific_notation_variance(self):
+        """Scientific notation in noise variance should work."""
+        nodes = parse_formula("x ~ noise(1.5e-3)")
+        assert nodes[0].component.variance == pytest.approx(0.0015)
+
+    def test_zero_variance_noise(self):
+        """noise(0) should parse fine (deterministic zero)."""
+        nodes = parse_formula("x ~ noise(0)")
+        assert nodes[0].component.variance == 0.0
+
+    def test_large_variance(self):
+        """Very large variance should parse."""
+        nodes = parse_formula("x ~ noise(1e6)")
+        assert nodes[0].component.variance == 1e6
+
+    def test_cnoise_no_cov_prefix(self):
+        """cnoise without cov= prefix should still work."""
+        nodes = parse_formula("(a, b) ~ cnoise([[1,0],[0,1]])")
+        assert isinstance(nodes[0].component, CNoiseComponent)
+
+    def test_negative_expression(self):
+        """Negation in aggregation should work."""
+        nodes = parse_formula("""
+            a ~ noise(1.0)
+            b ~ -1.0 * a
+        """)
+        assert len(nodes) == 2
+
+    def test_parenthesized_expression(self):
+        """Parentheses in aggregation should work."""
+        nodes = parse_formula("""
+            a ~ noise(1.0)
+            b ~ noise(1.0)
+            c ~ (a + b) * 0.5
+        """)
+        assert len(nodes) == 3
+        assert set(nodes[2].inputs) == {'a', 'b'}
+
+    def test_all_sibling_functions(self):
+        """All sibling function names should parse."""
+        for func in ['sibling_mean', 'sibling_sum', 'sibling_any',
+                     'sibling_count', 'sibling_eldest', 'sibling_youngest']:
+            nodes = parse_formula(f"x ~ {func}(Y)")
+            assert len(nodes) == 1
+
+    def test_mother_father_parent_all_parse(self):
+        """All parental functions should parse without effects."""
+        for func in ['mother', 'father', 'parent']:
+            nodes = parse_formula(f"x ~ {func}(Y)")
+            assert len(nodes) == 1
+
+    def test_genetic_empty_args_raises(self):
+        """genetic() with no args should raise."""
+        with pytest.raises(ValueError, match="requires an effect name"):
+            parse_formula("x ~ genetic()")
+
+    def test_mvgenetic_empty_args_raises(self):
+        """mvGenetic() with no args should raise."""
+        with pytest.raises(ValueError, match="requires an effect name"):
+            parse_formula("(a, b) ~ mvGenetic()")
+
+    def test_parent_empty_args_raises(self):
+        """parent() with no args should raise."""
+        with pytest.raises(ValueError, match="requires a phenotype name"):
+            parse_formula("x ~ parent()")
+
+    def test_cnoise_bad_matrix_raises(self):
+        """cnoise with non-matrix should raise."""
+        with pytest.raises(ValueError, match="matrix literal"):
+            parse_formula("(a, b) ~ cnoise(not_a_matrix)")
+
+    def test_noise_negative(self):
+        """Negative variance should parse (NoiseComponent accepts it)."""
+        nodes = parse_formula("x ~ noise(-0.5)")
+        assert nodes[0].component.variance == -0.5

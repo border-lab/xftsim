@@ -233,3 +233,156 @@ class TestPedigreeArray:
             parent_n=10,
         )
         assert len(ped.maternal_idx) == 0
+
+
+# ── Additional edge case tests ─────────────────────────────────────────────
+
+class TestSampleMetaEdgeCases:
+    """Edge case tests for SampleMeta."""
+
+    def test_single_individual(self):
+        sm = SampleMeta(iid=np.array([0]))
+        assert sm.n == 1
+        assert sm.n_fam == 1
+
+    def test_odd_n_sex_default(self):
+        """Odd n should still get alternating sex with correct length."""
+        sm = SampleMeta(iid=np.arange(7))
+        assert len(sm.sex) == 7
+        assert sm.sex[0] == 0 and sm.sex[1] == 1
+
+    def test_all_same_fid(self):
+        """All individuals in same family."""
+        sm = SampleMeta(iid=np.arange(5), fid=np.zeros(5, dtype=np.int64))
+        assert sm.n_fam == 1
+
+    def test_large_extras(self):
+        """Many extra fields should work."""
+        n = 10
+        extras = {f'pc{i}': np.random.randn(n) for i in range(10)}
+        sm = SampleMeta(iid=np.arange(n), extra=extras)
+        assert len(sm.extra) == 10
+        for k, v in sm.extra.items():
+            assert len(v) == n
+
+    def test_subset_integer_array(self):
+        """Subset with integer array indices."""
+        sm = SampleMeta(iid=np.arange(10), fid=np.repeat(np.arange(5), 2))
+        sub = sm.subset(np.array([0, 2, 4]))
+        assert sub.n == 3
+        np.testing.assert_array_equal(sub.iid, [0, 2, 4])
+
+    def test_repr(self):
+        sm = SampleMeta(iid=np.arange(10))
+        r = repr(sm)
+        assert 'SampleMeta' in r
+        assert 'n=10' in r
+
+
+class TestVariantMetaEdgeCases:
+    """Edge case tests for VariantMeta."""
+
+    def test_single_variant(self):
+        vm = VariantMeta(vid=np.array([0]))
+        assert vm.m == 1
+
+    def test_all_optional_fields(self):
+        """Construct with all optional fields."""
+        vm = VariantMeta(
+            vid=np.arange(3),
+            chrom=np.array([1, 1, 2]),
+            pos_bp=np.array([100, 200, 300]),
+            pos_cM=np.array([0.1, 0.2, 0.3]),
+            af=np.array([0.1, 0.5, 0.9]),
+            zero_allele=np.array(['A', 'C', 'G']),
+            one_allele=np.array(['T', 'A', 'C']),
+        )
+        assert vm.m == 3
+        np.testing.assert_array_equal(vm['chrom'], [1, 1, 2])
+        np.testing.assert_array_equal(vm['pos_bp'], [100, 200, 300])
+
+    def test_subset_preserves_af(self):
+        vm = VariantMeta(vid=np.arange(5), af=np.array([0.1, 0.2, 0.3, 0.4, 0.5]))
+        sub = vm.subset(np.array([1, 3]))
+        np.testing.assert_array_equal(sub.af, [0.2, 0.4])
+
+    def test_repr(self):
+        vm = VariantMeta(vid=np.arange(10), chrom=np.array([1]*5 + [2]*5))
+        r = repr(vm)
+        assert 'VariantMeta' in r
+        assert 'm=10' in r
+
+
+class TestNPhenotypeArrayEdgeCases:
+    """Edge case tests for NPhenotypeArray."""
+
+    def test_initial_values(self):
+        """Passing values dict at construction should populate immediately."""
+        sm = SampleMeta(iid=np.arange(3))
+        vals = {'x': np.array([1.0, 2.0, 3.0]), 'y': np.array([4.0, 5.0, 6.0])}
+        pa = NPhenotypeArray(samples=sm, values=vals)
+        assert 'x' in pa
+        assert 'y' in pa
+        np.testing.assert_array_equal(pa['x'], [1.0, 2.0, 3.0])
+
+    def test_missing_key_raises(self):
+        sm = SampleMeta(iid=np.arange(3))
+        pa = NPhenotypeArray(samples=sm)
+        with pytest.raises(KeyError):
+            pa['nonexistent']
+
+    def test_wrong_dtype_coerced(self):
+        """Integer values should be coerced to float64."""
+        sm = SampleMeta(iid=np.arange(3))
+        pa = NPhenotypeArray(samples=sm)
+        pa['x'] = np.array([1, 2, 3])  # int
+        assert pa['x'].dtype == np.float64
+
+    def test_repr(self):
+        sm = SampleMeta(iid=np.arange(3))
+        pa = NPhenotypeArray(samples=sm, values={'a': np.zeros(3)})
+        r = repr(pa)
+        assert 'NPhenotypeArray' in r
+        assert 'n=3' in r
+
+    def test_empty_keys(self):
+        sm = SampleMeta(iid=np.arange(5))
+        pa = NPhenotypeArray(samples=sm)
+        assert len(list(pa.keys)) == 0
+
+
+class TestPedigreeArrayEdgeCases:
+    """Edge case tests for PedigreeArray."""
+
+    def test_negative_maternal_idx(self):
+        offspring = SampleMeta(iid=np.arange(2))
+        with pytest.raises(ValueError, match="maternal_idx out of bounds"):
+            PedigreeArray(
+                offspring_samples=offspring,
+                maternal_idx=np.array([-1, 0]),
+                paternal_idx=np.array([1, 1]),
+                parent_n=5,
+            )
+
+    def test_large_parent_n(self):
+        """parent_n can be larger than actual indices — that's fine."""
+        offspring = SampleMeta(iid=np.arange(2))
+        ped = PedigreeArray(
+            offspring_samples=offspring,
+            maternal_idx=np.array([0, 1]),
+            paternal_idx=np.array([2, 3]),
+            parent_n=1000,
+        )
+        assert ped.parent_n == 1000
+
+    def test_same_parent_multiple_offspring(self):
+        """Same parent can appear for multiple offspring."""
+        offspring = SampleMeta(iid=np.arange(4))
+        ped = PedigreeArray(
+            offspring_samples=offspring,
+            maternal_idx=np.array([0, 0, 0, 0]),
+            paternal_idx=np.array([1, 1, 1, 1]),
+            parent_n=2,
+        )
+        assert len(ped.maternal_idx) == 4
+        assert np.all(ped.maternal_idx == 0)
