@@ -84,9 +84,75 @@ class GeneticComponent(ArchComponent):
         return f"GeneticComponent(effects={self.effects})"
 
 
+class MVGeneticComponent(GeneticComponent):
+    """
+    Multivariate genetic component: computes G @ effects for k traits.
+
+    effects should be an EffectSpec with shape (m, k).
+    Returns (n, k) array. Inherits compute() from GeneticComponent
+    since numpy matvec handles both 1D and 2D effect arrays.
+    """
+    name = "mvGenetic"
+
+    def __repr__(self):
+        return f"MVGeneticComponent(effects={self.effects})"
+
+
+def _resolve_grouping(grouping, haplotypes, **kwargs):
+    """
+    Resolve a grouping variable to an (n,) label array.
+
+    Parameters
+    ----------
+    grouping : str or None
+        Grouping variable name. Special values: 'FID', 'sex', 'mother', 'father'.
+        None means per-individual (IID).
+    haplotypes : HaplotypeOperator
+        Current generation's haplotype data.
+    **kwargs
+        Context: pedigree_history, generation, etc.
+
+    Returns
+    -------
+    np.ndarray or None
+        Label array of shape (n,), or None if no grouping (per-individual).
+    """
+    if grouping is None:
+        return None
+
+    generation = kwargs.get('generation', 0)
+    pedigree_history = kwargs.get('pedigree_history', {})
+
+    if grouping == 'FID':
+        return haplotypes.samples.fid
+    elif grouping == 'sex':
+        return haplotypes.samples.sex
+    elif grouping in ('mother', 'father'):
+        if generation == 0 or generation not in pedigree_history:
+            warnings.warn(
+                f"Grouping by '{grouping}' at generation {generation} has no pedigree; "
+                f"falling back to IID grouping."
+            )
+            return None
+        ped = pedigree_history[generation]
+        if grouping == 'mother':
+            return ped.maternal_idx
+        else:
+            return ped.paternal_idx
+    else:
+        # Try extra fields on SampleMeta
+        if grouping in haplotypes.samples.extra:
+            return haplotypes.samples.extra[grouping]
+        raise ValueError(
+            f"Unknown grouping variable '{grouping}'. "
+            f"Available: FID, sex, mother, father, or extra fields."
+        )
+
+
 class NoiseComponent(ArchComponent):
     """
-    Noise component: draws iid N(0, variance) per individual.
+    Noise component: draws iid N(0, variance) per individual,
+    or one value per group when grouping is set.
     """
     name = "noise"
     kind = "generative"
@@ -98,10 +164,52 @@ class NoiseComponent(ArchComponent):
     def compute(self, node, haplotypes, phenotypes, **kwargs):
         n = haplotypes.n
         rng = kwargs.get('rng', np.random.RandomState())
-        return rng.normal(0, np.sqrt(self.variance), size=n)
+        labels = _resolve_grouping(node.grouping, haplotypes, **kwargs)
+        if labels is None:
+            return rng.normal(0, np.sqrt(self.variance), size=n)
+        # Grouped: draw one value per unique group, broadcast
+        unique_labels, inverse = np.unique(labels, return_inverse=True)
+        group_values = rng.normal(0, np.sqrt(self.variance), size=len(unique_labels))
+        return group_values[inverse]
 
     def __repr__(self):
         return f"NoiseComponent(variance={self.variance})"
+
+
+class CNoiseComponent(ArchComponent):
+    """
+    Correlated multivariate noise: draws N(0, cov) per individual or group.
+
+    Returns (n, k) array.
+    """
+    name = "cnoise"
+    kind = "generative"
+    accepts_grouping = True
+
+    def __init__(self, cov: np.ndarray):
+        self.cov = np.asarray(cov, dtype=np.float64)
+        if self.cov.ndim != 2 or self.cov.shape[0] != self.cov.shape[1]:
+            raise ValueError(f"cov must be a square matrix, got shape {self.cov.shape}")
+
+    @property
+    def k(self) -> int:
+        return self.cov.shape[0]
+
+    def compute(self, node, haplotypes, phenotypes, **kwargs):
+        n = haplotypes.n
+        rng = kwargs.get('rng', np.random.RandomState())
+        labels = _resolve_grouping(node.grouping, haplotypes, **kwargs)
+        if labels is None:
+            return rng.multivariate_normal(np.zeros(self.k), self.cov, size=n)
+        # Grouped: draw one vector per unique group, broadcast
+        unique_labels, inverse = np.unique(labels, return_inverse=True)
+        group_values = rng.multivariate_normal(
+            np.zeros(self.k), self.cov, size=len(unique_labels)
+        )
+        return group_values[inverse]
+
+    def __repr__(self):
+        return f"CNoiseComponent(cov={self.cov.shape})"
 
 
 class AggregationComponent(ArchComponent):
@@ -260,6 +368,86 @@ def _evaluate_expression(expr: str, phenotypes: NPhenotypeArray, n: int) -> np.n
 # ArchNode
 # ---------------------------------------------------------------------------
 
+class _ParentalComponent(ArchComponent):
+    """
+    Base class for vertical transmission components.
+
+    Handles gen-0 founder fallback and phenotype_history lookup.
+    Subclasses implement _extract_values() to select the parent index(es).
+    """
+    kind = "reference"
+    accepts_grouping = False
+
+    def __init__(self, phenotype_name: str, founder_component=None):
+        self.phenotype_name = phenotype_name
+        self.founder_component = founder_component
+
+    def compute(self, node, haplotypes, phenotypes, **kwargs):
+        generation = kwargs.get('generation', 0)
+        phenotype_history = kwargs.get('phenotype_history', {})
+        pedigree_history = kwargs.get('pedigree_history', {})
+        n = haplotypes.n
+
+        if generation == 0 or generation not in pedigree_history:
+            if self.founder_component is not None:
+                return self.founder_component.compute(node, haplotypes, phenotypes, **kwargs)
+            warnings.warn(
+                f"{type(self).__name__}('{self.phenotype_name}'): no pedigree at "
+                f"generation {generation}, returning zeros."
+            )
+            return np.zeros(n, dtype=np.float64)
+
+        prev_gen = generation - 1
+        if prev_gen not in phenotype_history:
+            warnings.warn(
+                f"{type(self).__name__}('{self.phenotype_name}'): generation {prev_gen} "
+                f"not in phenotype_history (may be pruned by retention policy), "
+                f"returning zeros."
+            )
+            return np.zeros(n, dtype=np.float64)
+
+        prev_pheno = phenotype_history[prev_gen]
+        if self.phenotype_name not in prev_pheno:
+            raise ValueError(
+                f"{type(self).__name__}: phenotype '{self.phenotype_name}' not found "
+                f"in generation {prev_gen}. Available: {list(prev_pheno.keys)}"
+            )
+        ped = pedigree_history[generation]
+        return self._extract_values(prev_pheno[self.phenotype_name], ped)
+
+    @abstractmethod
+    def _extract_values(self, parent_values: np.ndarray, ped) -> np.ndarray:
+        """Select parent values using pedigree indices."""
+        ...
+
+    def __repr__(self):
+        return f"{type(self).__name__}('{self.phenotype_name}')"
+
+
+class MotherComponent(_ParentalComponent):
+    """Vertical transmission: mother's phenotype from previous generation."""
+    name = "mother"
+
+    def _extract_values(self, parent_values, ped):
+        return parent_values[ped.maternal_idx]
+
+
+class FatherComponent(_ParentalComponent):
+    """Vertical transmission: father's phenotype from previous generation."""
+    name = "father"
+
+    def _extract_values(self, parent_values, ped):
+        return parent_values[ped.paternal_idx]
+
+
+class ParentComponent(_ParentalComponent):
+    """Vertical transmission: midparent (average of mother and father)."""
+    name = "parent"
+
+    def _extract_values(self, parent_values, ped):
+        return 0.5 * (parent_values[ped.maternal_idx] + parent_values[ped.paternal_idx])
+
+
 @dataclass
 class ArchNode:
     """
@@ -292,7 +480,12 @@ class ArchNode:
 
 BUILTINS = {
     'genetic': GeneticComponent,
+    'mvGenetic': MVGeneticComponent,
     'noise': NoiseComponent,
+    'cnoise': CNoiseComponent,
+    'parent': ParentComponent,
+    'mother': MotherComponent,
+    'father': FatherComponent,
 }
 
 

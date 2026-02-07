@@ -12,6 +12,7 @@ from xftsim.struct import (
 from xftsim.narch import Architecture
 from xftsim.nmate import NMateAssignment, RandomMating
 from xftsim.reproduce import RecombinationMap
+from xftsim.nstats import GenerationResult
 
 
 class NSimulation:
@@ -35,6 +36,10 @@ class NSimulation:
     callbacks : list[callable], optional
         Functions called after each generation with ``callback(sim)``.
         Set ``sim.stop = True`` inside a callback for early stopping.
+    filters : dict[str, Filter], optional
+        Named filters to run after each generation's phenotype computation.
+    statistics : list[Statistic], optional
+        Statistics to compute after each generation.
     seed : int, optional
         Random seed for reproducibility.
     """
@@ -48,6 +53,8 @@ class NSimulation:
         retain_haplotypes: int = 1,
         retain_phenotypes: int = 2,
         callbacks=None,
+        filters=None,
+        statistics=None,
         seed=None,
     ):
         self.architecture = architecture
@@ -56,6 +63,8 @@ class NSimulation:
         self.retain_haplotypes = retain_haplotypes
         self.retain_phenotypes = retain_phenotypes
         self.callbacks = callbacks or []
+        self.filters = filters or {}
+        self.statistics = statistics or []
         self.rng = np.random.RandomState(seed)
         self.stop = False
 
@@ -66,6 +75,9 @@ class NSimulation:
         self.phenotype_history: dict[int, NPhenotypeArray] = {}
         self.pedigree_history: dict[int, PedigreeArray] = {}
         self._mate_assignments: dict[int, NMateAssignment] = {}
+
+        # Results from statistics
+        self.results: list[GenerationResult] = []
 
         self.generation = 0
 
@@ -93,8 +105,15 @@ class NSimulation:
         """
         # --- Generation 0: founders ---
         hap = self.haplotype_history[0]
-        pheno = self.architecture.compute(hap, rng=self.rng)
+        pheno = self.architecture.compute(
+            hap, rng=self.rng,
+            phenotype_history=self.phenotype_history,
+            pedigree_history=self.pedigree_history,
+            generation=0,
+        )
         self.phenotype_history[0] = pheno
+
+        self._run_filters_and_stats(0)
 
         if n_generations > 1:
             assignment = self.mating_regime.mate(hap.samples, rng=self.rng)
@@ -126,8 +145,15 @@ class NSimulation:
             self.pedigree_history[gen] = ped
 
             # Compute phenotypes
-            pheno = self.architecture.compute(offspring_hap, rng=self.rng)
+            pheno = self.architecture.compute(
+                offspring_hap, rng=self.rng,
+                phenotype_history=self.phenotype_history,
+                pedigree_history=self.pedigree_history,
+                generation=gen,
+            )
             self.phenotype_history[gen] = pheno
+
+            self._run_filters_and_stats(gen)
 
             # Assign mates for next generation (unless this is the last gen)
             if gen < n_generations - 1:
@@ -142,6 +168,30 @@ class NSimulation:
             self._run_callbacks()
             if self.stop:
                 return
+
+    def _run_filters_and_stats(self, gen: int):
+        """Run filters and statistics for the given generation."""
+        # Run filters
+        filtered_views = {}
+        for name, filt in self.filters.items():
+            view = filt.apply(gen, self.phenotype_history, self.pedigree_history)
+            if view is not None:
+                filtered_views[name] = view
+
+        # Run statistics
+        if self.statistics:
+            stats = {}
+            name_counts = {}
+            for stat in self.statistics:
+                result = stat.estimate(
+                    self.phenotype_history, filtered_views, gen
+                )
+                base_key = type(stat).__name__
+                count = name_counts.get(base_key, 0)
+                name_counts[base_key] = count + 1
+                key = base_key if count == 0 else f"{base_key}_{count}"
+                stats[key] = result
+            self.results.append(GenerationResult(generation=gen, statistics=stats))
 
     def _enforce_retention(self, current_gen: int):
         """Drop old generations from history dicts per retention policy."""

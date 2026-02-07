@@ -69,5 +69,7 @@ from . import neffect     ## new effect specs
 from . import narch       ## new architecture system
 from . import parser      ## formula parser
 from . import nmate       ## new mate assignment
+from . import nfilter     ## new filters (trio, sib-pair)
+from . import nstats      ## new statistics
 from . import nsim        ## new simulation loop
 

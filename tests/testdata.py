@@ -7,7 +7,10 @@ Usable both inside pytest (via conftest fixtures) and standalone.
 import numpy as np
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
 from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.narch import (
+    Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent,
+    AggregationComponent, ParentComponent,
+)
 from xftsim.nmate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -133,3 +136,44 @@ class TestSimulation:
     def mating_regime(offspring_per_pair=2) -> RandomMating:
         """Default random mating."""
         return RandomMating(offspring_per_pair=offspring_per_pair)
+
+    @staticmethod
+    def bivariate_architecture(m=50, h2=None, rg=0.2, seed=123) -> Architecture:
+        """
+        Bivariate architecture: two correlated traits with shared genetic + noise.
+
+        (trait1.G, trait2.G) ~ mvGenetic(eff)
+        trait1.E ~ noise(1 - h2[0])
+        trait2.E ~ noise(1 - h2[1])
+        trait1 ~ trait1.G + trait1.E
+        trait2 ~ trait2.G + trait2.E
+        """
+        if h2 is None:
+            h2 = [0.5, 0.3]
+        effects = MultivariateEffects.from_h2_rg(h2=h2, rg=rg, m=m, seed=seed)
+        arch = Architecture()
+        arch.add(['trait1.G', 'trait2.G'], MVGeneticComponent(effects))
+        arch.add('trait1.E', NoiseComponent(variance=1.0 - h2[0]))
+        arch.add('trait2.E', NoiseComponent(variance=1.0 - h2[1]))
+        arch.add('trait1', AggregationComponent('trait1.G + trait1.E'))
+        arch.add('trait2', AggregationComponent('trait2.G + trait2.E'))
+        return arch
+
+    @staticmethod
+    def vt_architecture(m=50, h2=0.5, vt_weight=0.3, seed=123) -> Architecture:
+        """
+        Architecture with vertical transmission (VT).
+
+        Y.G ~ genetic(eff)
+        Y.VT ~ parent(Y)  with founder fallback noise
+        Y.E ~ noise(residual_var)
+        Y ~ Y.G + vt_weight * Y.VT + Y.E
+        """
+        effects = AdditiveEffects.from_h2(h2=h2, m=m, seed=seed)
+        residual_var = 1.0 - h2
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(effects))
+        arch.add('Y.VT', ParentComponent('Y', founder_component=NoiseComponent(variance=0.5)))
+        arch.add('Y.E', NoiseComponent(variance=residual_var))
+        arch.add('Y', AggregationComponent(f'Y.G + {vt_weight} * Y.VT + Y.E'))
+        return arch
