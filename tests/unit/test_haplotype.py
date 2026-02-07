@@ -254,3 +254,67 @@ class TestOperatorIdentities:
         h = DenseHaplotypeArray(genotypes=geno, generation=5, samples=sm)
         assert h.generation == 5
         assert h.samples.generation == 5
+
+
+class TestDenseHaplotypeArrayMeiosis:
+    """Tests for the meiosis() method on DenseHaplotypeArray."""
+
+    def _make_parents(self, n=100, m=50, seed=42):
+        rng = np.random.RandomState(seed)
+        geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
+        sm = SampleMeta(iid=np.arange(n))
+        return DenseHaplotypeArray(genotypes=geno, samples=sm)
+
+    def test_returns_dense_haplotype_array(self):
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+        hap = self._make_parents()
+        rmap = RecombinationMap.constant_map(m=50, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        assignment = mate.mate(hap.samples, rng=np.random.RandomState(42))
+        offspring = hap.meiosis(assignment, rmap)
+        assert isinstance(offspring, DenseHaplotypeArray)
+
+    def test_offspring_shape(self):
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+        hap = self._make_parents()
+        rmap = RecombinationMap.constant_map(m=50, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        assignment = mate.mate(hap.samples, rng=np.random.RandomState(42))
+        offspring = hap.meiosis(assignment, rmap)
+        assert offspring.n == assignment.n_offspring
+        assert offspring.m == 50
+        assert offspring.genotypes.shape[2] == 2
+
+    def test_generation_incremented(self):
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+        hap = self._make_parents()
+        rmap = RecombinationMap.constant_map(m=50, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        assignment = mate.mate(hap.samples, rng=np.random.RandomState(42))
+        offspring = hap.meiosis(assignment, rmap)
+        assert offspring.generation == 1
+
+    def test_variants_inherited(self):
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+        vm = VariantMeta(vid=np.arange(50), chrom=np.array([1]*25 + [2]*25))
+        hap = self._make_parents()
+        hap = DenseHaplotypeArray(genotypes=hap.genotypes, samples=hap.samples, variants=vm)
+        rmap = RecombinationMap.constant_map(m=50, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        assignment = mate.mate(hap.samples, rng=np.random.RandomState(42))
+        offspring = hap.meiosis(assignment, rmap)
+        np.testing.assert_array_equal(offspring.vid, hap.vid)
+
+    def test_alleles_binary(self):
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+        hap = self._make_parents()
+        rmap = RecombinationMap.constant_map(m=50, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        assignment = mate.mate(hap.samples, rng=np.random.RandomState(42))
+        offspring = hap.meiosis(assignment, rmap)
+        assert set(np.unique(offspring.genotypes)).issubset({0, 1})
