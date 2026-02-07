@@ -228,3 +228,102 @@ class TestExecution:
         arch.add('d', AggregationComponent('c * 2.0'))
         result = arch.compute(haplotypes, rng=np.random.RandomState(42))
         np.testing.assert_allclose(result['d'], 2.0 * (result['a'] + result['b']))
+
+
+# ── Error handling ─────────────────────────────────────────────────────────
+
+class TestErrorHandling:
+    """Tests for architecture error conditions."""
+
+    def test_undefined_aggregation_reference_at_compute(self, haplotypes):
+        """Referencing a nonexistent variable in aggregation should raise at compute."""
+        arch = Architecture()
+        arch.add('a', NoiseComponent(variance=1.0))
+        # 'missing' is not defined by any node → toposort should catch it
+        arch.add('c', AggregationComponent('a + missing'))
+        with pytest.raises(ValueError, match="Undefined reference"):
+            arch.nodes
+
+    def test_cnoise_non_square_cov(self):
+        """CNoiseComponent with non-square cov should raise."""
+        from xftsim.narch import CNoiseComponent
+        with pytest.raises(ValueError, match="square matrix"):
+            CNoiseComponent(cov=np.ones((2, 3)))
+
+    def test_haplotype_genetic_invalid_haplotype(self):
+        """HaplotypeGeneticComponent with invalid haplotype arg should raise."""
+        from xftsim.narch import HaplotypeGeneticComponent
+        eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
+        with pytest.raises(ValueError, match="maternal.*paternal"):
+            HaplotypeGeneticComponent(effects=eff, haplotype='both')
+
+    def test_assortative_r_out_of_range(self):
+        """LinearAssortativeMating with |r| >= 1 should raise."""
+        from xftsim.nmate import LinearAssortativeMating
+        with pytest.raises(ValueError, match="r must be"):
+            LinearAssortativeMating(component_names=['Y'], r=1.0)
+        with pytest.raises(ValueError, match="r must be"):
+            LinearAssortativeMating(component_names=['Y'], r=-1.0)
+
+    def test_aggregation_empty_expression(self, haplotypes):
+        """Empty expression should raise during compute or tokenization."""
+        arch = Architecture()
+        arch.add('a', NoiseComponent(variance=1.0))
+        arch.add('b', AggregationComponent(''))
+        # Empty expression → empty token list → stack has 0 values
+        with pytest.raises(ValueError, match="stack has 0 values"):
+            arch.compute(haplotypes, rng=np.random.RandomState(0))
+
+    def test_aggregation_unbalanced_parens(self):
+        """Unbalanced parentheses in expression should raise."""
+        arch = Architecture()
+        arch.add('a', NoiseComponent(variance=1.0))
+        arch.add('b', AggregationComponent('(a + a'))
+        with pytest.raises(ValueError, match="parentheses"):
+            arch.compute(
+                DenseHaplotypeArray(genotypes=np.zeros((2, 1, 2), dtype=np.int8)),
+                rng=np.random.RandomState(0),
+            )
+
+    def test_repr_all_components(self, effects, haplotypes):
+        """repr() should not crash for any component type."""
+        from xftsim.narch import (
+            GeneticComponent, MVGeneticComponent, NoiseComponent,
+            CNoiseComponent, AggregationComponent, MotherComponent,
+            FatherComponent, ParentComponent, SiblingMeanComponent,
+        )
+        components = [
+            GeneticComponent(effects),
+            NoiseComponent(variance=1.0),
+            CNoiseComponent(cov=np.eye(2)),
+            AggregationComponent('a + b'),
+            MotherComponent('Y'),
+            FatherComponent('Y'),
+            ParentComponent('Y'),
+            SiblingMeanComponent('Y'),
+        ]
+        for comp in components:
+            r = repr(comp)
+            assert isinstance(r, str) and len(r) > 0
+
+    def test_architecture_repr(self, effects):
+        """Architecture repr should work."""
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(effects))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+        r = repr(arch)
+        assert "Architecture" in r
+        assert "nodes=3" in r
+
+    def test_archnode_repr(self, effects):
+        """ArchNode repr should work."""
+        from xftsim.narch import ArchNode
+        node = ArchNode(
+            outputs=['Y.G'],
+            component=GeneticComponent(effects),
+            inputs=[],
+        )
+        r = repr(node)
+        assert "ArchNode" in r
+        assert "Y.G" in r
