@@ -1,0 +1,861 @@
+
+ ▐▛███▜▌   Claude Code v2.1.34
+▝▜█████▛▘  Opus 4.6 · Claude Max
+  ▘▘ ▝▝    ~/Dropbox/xftsim
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Plan to implement                                                            │
+│                                                                              │
+│ Phase 4: GRG Integration                                                     │
+│                                                                              │
+│ Context                                                                      │
+│                                                                              │
+│ Phases 1-3b are complete (277 tests passing). The simulator supports dense   │
+│ numpy-backed haplotypes via DenseHaplotypeArray. GRG (Genotype               │
+│ Representation Graph) is a compressed genotype format that enables           │
+│ memory-efficient storage and O(nodes)-per-variant matvec via graph           │
+│ traversal. This phase adds GraphHaplotypeOperator — a second concrete        │
+│ implementation of the HaplotypeOperator ABC — so simulations can start from  │
+│ GRG-backed founder genotypes. After meiosis, offspring revert to dense (GRG  │
+│ has no native recombination).                                                │
+│                                                                              │
+│ Verified pygrgl API                                                          │
+│                                                                              │
+│ import pygrgl                                                                │
+│ grg = pygrgl.load_immutable_grg(path)          # NOT load_immutable          │
+│ grg.num_samples       # haploid (2*n)                                        │
+│ grg.num_individuals   # diploid (n)                                          │
+│ grg.num_mutations     # variants (m)                                         │
+│ grg.has_individual_ids  # bool attribute                                     │
+│ grg.get_individual_id(i)  # str                                              │
+│ mut = grg.get_mutation_by_id(i)                                              │
+│   mut.position, mut.allele, mut.ref_allele     # no chrom                    │
+│                                                                              │
+│ # matmul: input/output always 2-D                                            │
+│ pygrgl.matmul(grg, inp_2d, pygrgl.TraversalDirection.DOWN,                   │
+│ by_individual=True)                                                          │
+│   # (K, m) → (K, n)  diploid                                                 │
+│ pygrgl.matmul(grg, inp_2d, pygrgl.TraversalDirection.DOWN,                   │
+│ by_individual=False)                                                         │
+│   # (K, m) → (K, 2n)  haploid; even=maternal, odd=paternal                   │
+│ pygrgl.matmul(grg, inp_2d, pygrgl.TraversalDirection.UP, by_individual=True) │
+│   # (K, n) → (K, m)  G.T @ v                                                 │
+│                                                                              │
+│ Confirmed: maternal + paternal == diploid, test fixtures at                  │
+│ glink/tests/fixtures/datasets/.                                              │
+│                                                                              │
+│ Key Constraints                                                              │
+│                                                                              │
+│ - reproduce.meiosis() (reproduce.py:220) accesses .genotypes directly → must │
+│  materialize to dense first                                                  │
+│ - nsim.py and narch.py only use HaplotypeOperator ABC methods — no           │
+│ .genotypes access → GRG works as drop-in                                     │
+│ - pygrgl is not a required dep; lazy import everywhere, tests use            │
+│ pytest.importorskip                                                          │
+│ - BIM files exist alongside GRG test fixtures (for chromosome info)          │
+│                                                                              │
+│ Step 1: GraphHaplotypeOperator + helper (~200 LOC)                           │
+│                                                                              │
+│ File: xftsim/struct.py — Insert after DenseHaplotypeArray class (around line │
+│  2451)                                                                       │
+│                                                                              │
+│ _extract_variant_meta_from_grg(grg) → VariantMeta                            │
+│                                                                              │
+│ - Loop over grg.get_mutation_by_id(i) for positions, alleles                 │
+│ - Construct VIDs as "{pos}:{ref}:{alt}"                                      │
+│ - No chromosome (not in GRG metadata)                                        │
+│                                                                              │
+│ GraphHaplotypeOperator(HaplotypeOperator)                                    │
+│                                                                              │
+│ Constructor: __init__(grg, generation=0, samples=None, variants=None)        │
+│ - If samples is None: extract IIDs from grg.get_individual_id(), create      │
+│ SampleMeta                                                                   │
+│ - If variants is None: call _extract_variant_meta_from_grg()                 │
+│ - Validate dimension match; cache _cached_af = None                          │
+│                                                                              │
+│ Properties: n → grg.num_individuals, m → grg.num_mutations, generation       │
+│                                                                              │
+│ Methods (all use lazy import pygrgl):                                        │
+│ Method: matvec(v)                                                            │
+│ Implementation: reshape to (K,m), matmul(DOWN, by_individual=True), reshape  │
+│   back                                                                       │
+│ ────────────────────────────────────────                                     │
+│ Method: rmatvec(v)                                                           │
+│ Implementation: reshape to (K,n), matmul(UP, by_individual=True), reshape    │
+│ back                                                                         │
+│ ────────────────────────────────────────                                     │
+│ Method: matvec_maternal(v)                                                   │
+│ Implementation: matmul(DOWN, by_individual=False), take [0::2]               │
+│ ────────────────────────────────────────                                     │
+│ Method: matvec_paternal(v)                                                   │
+│ Implementation: matmul(DOWN, by_individual=False), take [1::2]               │
+│ ────────────────────────────────────────                                     │
+│ Method: standardized_matvec(v, af)                                           │
+│ Implementation: matvec(v) - 2*af@v (no materialization, centering trick)     │
+│ ────────────────────────────────────────                                     │
+│ Method: recompute_af()                                                       │
+│ Implementation: matmul(UP, ones) → counts/2n, cached                         │
+│ ────────────────────────────────────────                                     │
+│ Method: to_dense()                                                           │
+│ Implementation: identity matrix (m,m) through DOWN haploid → reshape to      │
+│   (n,m,2), return DenseHaplotypeArray                                        │
+│ ────────────────────────────────────────                                     │
+│ Method: meiosis(assignment, rmap)                                            │
+│ Implementation: self.to_dense().meiosis(assignment, rmap)                    │
+│ ────────────────────────────────────────                                     │
+│ Method: __getitem__(key)                                                     │
+│ Implementation: self.to_dense()[key]                                         │
+│ Step 2: GRG I/O (~40 LOC)                                                    │
+│                                                                              │
+│ File: xftsim/io.py — Add load_grg(path, generation=0, bim_path=None) at end  │
+│                                                                              │
+│ - pygrgl.load_immutable_grg(path)                                            │
+│ - Optional BIM parsing (tab-separated: chrom, vid, cm, pos_bp, a1, a0) →     │
+│ VariantMeta with chrom                                                       │
+│ - Extract IIDs from GRG → SampleMeta                                         │
+│ - Return GraphHaplotypeOperator(grg, generation, samples, variants)          │
+│                                                                              │
+│ Step 3: Test Data Factory (~15 LOC)                                          │
+│                                                                              │
+│ File: tests/testdata.py — Add TestGRG class                                  │
+│                                                                              │
+│ TINY_GRG_PATH  = ".../tiny_clean/genotypes.grg"   # 20 individuals, 100      │
+│ mutations                                                                    │
+│ TINY_BIM_PATH  = ".../tiny_clean/genotypes.bim"                              │
+│ SMALL_GRG_PATH = ".../small_clean/genotypes.grg"   # 100 individuals, 1000   │
+│ mutations                                                                    │
+│ SMALL_BIM_PATH = ".../small_clean/genotypes.bim"                             │
+│                                                                              │
+│ Static methods: tiny_grg(), small_grg(), tiny_grg_no_bim()                   │
+│                                                                              │
+│ Step 4: Unit Tests (~30 tests)                                               │
+│                                                                              │
+│ File: tests/unit/test_grg.py (new)                                           │
+│                                                                              │
+│ All guarded by pytest.importorskip("pygrgl")                                 │
+│ Test Class: TestConstruction                                                 │
+│ Tests: 7                                                                     │
+│ What: isinstance, n/m, samples from GRG, variants with/without BIM, custom   │
+│   samples, mismatch errors                                                   │
+│ ────────────────────────────────────────                                     │
+│ Test Class: TestMatvec                                                       │
+│ Tests: 8                                                                     │
+│ What: matvec/rmatvec/maternal/paternal/standardized vs dense reference (1-D  │
+│ +                                                                            │
+│   2-D), mat+pat=diploid                                                      │
+│ ────────────────────────────────────────                                     │
+│ Test Class: TestAF                                                           │
+│ Tests: 4                                                                     │
+│ What: matches dense, shape, range, caching                                   │
+│ ────────────────────────────────────────                                     │
+│ Test Class: TestMaterialization                                              │
+│ Tests: 4                                                                     │
+│ What: to_dense type/shape/metadata/binary values                             │
+│ ────────────────────────────────────────                                     │
+│ Test Class: TestSubsetting                                                   │
+│ Tests: 2                                                                     │
+│ What: getitem 1-D, 2-D returns DenseHaplotypeArray                           │
+│ ────────────────────────────────────────                                     │
+│ Test Class: TestMeiosis                                                      │
+│ Tests: 1                                                                     │
+│ What: returns DenseHaplotypeArray with correct dims                          │
+│ File: tests/unit/test_grg_io.py (new, ~5 tests)                              │
+│                                                                              │
+│ - load with/without BIM, small fixture, individual IDs, nonexistent path     │
+│ raises                                                                       │
+│                                                                              │
+│ Step 5: Integration Tests (~4 tests)                                         │
+│                                                                              │
+│ File: tests/integration/test_grg_sim.py (new)                                │
+│                                                                              │
+│ - Gen-0 phenotypes from GRG founders are finite                              │
+│ - Multi-gen simulation (gen 1+ uses dense after meiosis)                     │
+│ - Gen-0 Y.G matches dense equivalent (same seed)                             │
+│ - Small GRG (100 individuals) runs 2 generations                             │
+│                                                                              │
+│ Files Summary                                                                │
+│ File: xftsim/struct.py                                                       │
+│ Action: Modify (GraphHaplotypeOperator + helper)                             │
+│ Step: 1                                                                      │
+│ ────────────────────────────────────────                                     │
+│ File: xftsim/io.py                                                           │
+│ Action: Modify (load_grg)                                                    │
+│ Step: 2                                                                      │
+│ ────────────────────────────────────────                                     │
+│ File: tests/testdata.py                                                      │
+│ Action: Modify (TestGRG)                                                     │
+│ Step: 3                                                                      │
+│ ────────────────────────────────────────                                     │
+│ File: tests/unit/test_grg.py                                                 │
+│ Action: Create                                                               │
+│ Step: 4                                                                      │
+│ ────────────────────────────────────────                                     │
+│ File: tests/unit/test_grg_io.py                                              │
+│ Action: Create                                                               │
+│ Step: 4                                                                      │
+│ ────────────────────────────────────────                                     │
+│ File: tests/integration/test_grg_sim.py                                      │
+│ Action: Create                                                               │
+│ Step: 5                                                                      │
+│ Expected Test Counts                                                         │
+│ ┌─────────────────┬───────────┬───────────────┐                              │
+│ │      Step       │ New Tests │ Running Total │                              │
+│ ├─────────────────┼───────────┼───────────────┤                              │
+│ │ 1-3 (code only) │ 0         │ 277           │                              │
+│ ├─────────────────┼───────────┼───────────────┤                              │
+│ │ 4 (unit tests)  │ ~31       │ ~308          │                              │
+│ ├─────────────────┼───────────┼───────────────┤                              │
+│ │ 5 (integration) │ ~4        │ ~312          │                              │
+│ └─────────────────┴───────────┴───────────────┘                              │
+│ Verification                                                                 │
+│                                                                              │
+│ # After each step                                                            │
+│ pytest tests/unit/test_grg.py tests/unit/test_grg_io.py -v                   │
+│                                                                              │
+│ # After step 5                                                               │
+│ pytest tests/integration/test_grg_sim.py -v                                  │
+│                                                                              │
+│ # Full suite (excluding pre-existing test_demos failures)                    │
+│ pytest tests/ -v --ignore=tests/test_demos.py                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+● I'll start by reading the key files I need to modify, then implement each
+  step. Let me begin by reading the current state of the codebase in parallel.
+
+● Read 3 files (ctrl+o to expand)
+
+● 2 agents finished (ctrl+o to expand)
+   ├─ Bash (Find GRG test fixtures) · 4 tool uses · 7.0k tokens
+   │  ⎿  Done
+   └─ Explore (Find HaplotypeOperator ABC) · 7 tool uses · 52.2k tokens
+      ⎿  Done
+
+● Now let me read the critical sections of struct.py — the HaplotypeOperator ABC
+   and the end of DenseHaplotypeArray.
+
+● Read 4 files (ctrl+o to expand)
+
+● Now let me read the DenseHaplotypeArray's standardized_matvec and __getitem__
+  implementations to understand the patterns.
+
+● Read 2 files (ctrl+o to expand)
+
+● Good — 20 individuals / 100 variants for tiny, 100 individuals / 1000 variants
+   for small. Now let me read the remaining DenseHaplotypeArray methods I need
+  to understand (matvec, standardized_matvec, etc.).
+
+● Read 1 file (ctrl+o to expand)
+
+● Now I need to see the matvec, rmatvec, and standardized_matvec implementations
+   on DenseHaplotypeArray. Let me also check how generation is stored on the
+  base HaplotypeArray.
+
+● Searched for 2 patterns (ctrl+o to expand)
+
+● Now let me see lines 1318–1395 for the matvec/rmatvec/standardized_matvec
+  implementations on HaplotypeArray.
+
+● Read 1 file (ctrl+o to expand)
+
+● Now I have a thorough understanding of the codebase. Let me also quickly
+  verify that nsim.py uses the Simulation class properly, so I know the
+  integration test patterns.
+
+● Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+● Good. Now let me look at one existing test file for patterns and then check
+  the test directory structure.
+
+● Read 3 files (ctrl+o to expand)
+
+● I now have all the context I need. Let me create the task list and start
+  implementing.
+
+● Now let me implement Step 1: GraphHaplotypeOperator in struct.py. I'll insert
+  it after line 2451 (end of DenseHaplotypeArray).
+
+● Update(xftsim/struct.py)
+  ⎿  Added 203 lines
+      2450          return f"DenseHaplotypeArray({', '.join(parts)})"
+      2451 
+      2452 
+      2453 +def _extract_variant_meta_from_grg(grg) -> VariantMeta:
+      2454 +    """Extract VariantMeta from a pygrgl GRG object.
+      2455 +
+      2456 +    Constructs variant IDs as "{position}:{ref}:{alt}".
+      2457 +    Chromosome information is not available from GRG metadata
+           +.
+      2458 +    """
+      2459 +    m = grg.num_mutations
+      2460 +    positions = np.empty(m, dtype=np.int64)
+      2461 +    ref_alleles = np.empty(m, dtype=object)
+      2462 +    alt_alleles = np.empty(m, dtype=object)
+      2463 +    vids = np.empty(m, dtype=object)
+      2464 +
+      2465 +    for i in range(m):
+      2466 +        mut = grg.get_mutation_by_id(i)
+      2467 +        positions[i] = int(mut.position)
+      2468 +        ref_alleles[i] = str(mut.ref_allele)
+      2469 +        alt_alleles[i] = str(mut.allele)
+      2470 +        vids[i] = f"{int(mut.position)}:{mut.ref_allele}:{mut
+           +.allele}"
+      2471 +
+      2472 +    return VariantMeta(
+      2473 +        vid=vids,
+      2474 +        pos_bp=positions,
+      2475 +        zero_allele=ref_alleles,
+      2476 +        one_allele=alt_alleles,
+      2477 +    )
+      2478 +
+      2479 +
+      2480 +class GraphHaplotypeOperator(HaplotypeOperator):
+      2481 +    """GRG-backed haplotype operator using pygrgl graph trave
+           +rsal.
+      2482 +
+      2483 +    Provides O(nodes)-per-variant matvec without materializin
+           +g the full
+      2484 +    genotype matrix.  After meiosis, offspring revert to Dens
+           +eHaplotypeArray
+      2485 +    since GRG has no native recombination support.
+      2486 +
+      2487 +    Parameters
+      2488 +    ----------
+      2489 +    grg : pygrgl.GRG
+      2490 +        Loaded GRG object (via ``pygrgl.load_immutable_grg``)
+           +.
+      2491 +    generation : int
+      2492 +        Generation number (default 0).
+      2493 +    samples : SampleMeta, optional
+      2494 +        Sample metadata.  If None, extracted from GRG individ
+           +ual IDs.
+      2495 +    variants : VariantMeta, optional
+      2496 +        Variant metadata.  If None, extracted from GRG mutati
+           +on data.
+      2497 +    """
+      2498 +
+      2499 +    def __init__(self, grg, generation: int = 0,
+      2500 +                 samples: Optional[SampleMeta] = None,
+      2501 +                 variants: Optional[VariantMeta] = None):
+      2502 +        self._grg = grg
+      2503 +        self._generation = generation
+      2504 +        self._cached_af = None
+      2505 +
+      2506 +        # --- Samples ---
+      2507 +        if samples is None:
+      2508 +            n = grg.num_individuals
+      2509 +            if grg.has_individual_ids:
+      2510 +                iid = np.array([grg.get_individual_id(i) for
+           +i in range(n)])
+      2511 +            else:
+      2512 +                iid = np.arange(n, dtype=np.int64)
+      2513 +            self.samples = SampleMeta(iid=iid, generation=gen
+           +eration)
+      2514 +        else:
+      2515 +            if samples.n != grg.num_individuals:
+      2516 +                raise ValueError(
+      2517 +                    f"samples.n ({samples.n}) != grg.num_indi
+           +viduals ({grg.num_individuals})"
+      2518 +                )
+      2519 +            if samples.generation != generation:
+      2520 +                self.samples = samples.with_generation(genera
+           +tion)
+      2521 +            else:
+      2522 +                self.samples = samples
+      2523 +
+      2524 +        # --- Variants ---
+      2525 +        if variants is None:
+      2526 +            self.variants = _extract_variant_meta_from_grg(gr
+           +g)
+      2527 +        else:
+      2528 +            if variants.m != grg.num_mutations:
+      2529 +                raise ValueError(
+      2530 +                    f"variants.m ({variants.m}) != grg.num_mu
+           +tations ({grg.num_mutations})"
+      2531 +                )
+      2532 +            self.variants = variants
+      2533 +
+      2534 +    # --- properties ---
+      2535 +
+      2536 +    @property
+      2537 +    def n(self) -> int:
+      2538 +        return self._grg.num_individuals
+      2539 +
+      2540 +    @property
+      2541 +    def m(self) -> int:
+      2542 +        return self._grg.num_mutations
+      2543 +
+      2544 +    @property
+      2545 +    def generation(self) -> int:
+      2546 +        return self._generation
+      2547 +
+      2548 +    @generation.setter
+      2549 +    def generation(self, value: int):
+      2550 +        self._generation = value
+      2551 +
+      2552 +    # --- matrix-vector operations ---
+      2553 +
+      2554 +    def matvec(self, v: np.ndarray) -> np.ndarray:
+      2555 +        """Diploid G @ v via GRG DOWN traversal (by_individua
+           +l=True)."""
+      2556 +        import pygrgl
+      2557 +        v = np.asarray(v, dtype=np.float64)
+      2558 +        inp = np.atleast_2d(v.T)  # (K, m)
+      2559 +        out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalD
+           +irection.DOWN,
+      2560 +                            by_individual=True)  # (K, n)
+      2561 +        result = out.T  # (n, K)
+      2562 +        if v.ndim == 1:
+      2563 +            return result.ravel()
+      2564 +        return result
+      2565 +
+      2566 +    def rmatvec(self, v: np.ndarray) -> np.ndarray:
+      2567 +        """G.T @ v via GRG UP traversal (by_individual=True).
+           +"""
+      2568 +        import pygrgl
+      2569 +        v = np.asarray(v, dtype=np.float64)
+      2570 +        inp = np.atleast_2d(v.T)  # (K, n)
+      2571 +        out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalD
+           +irection.UP,
+      2572 +                            by_individual=True)  # (K, m)
+      2573 +        result = out.T  # (m, K)
+      2574 +        if v.ndim == 1:
+      2575 +            return result.ravel()
+      2576 +        return result
+      2577 +
+      2578 +    def matvec_maternal(self, v: np.ndarray) -> np.ndarray:
+      2579 +        """Maternal haplotype matvec via GRG DOWN haploid, ev
+           +en indices."""
+      2580 +        import pygrgl
+      2581 +        v = np.asarray(v, dtype=np.float64)
+      2582 +        inp = np.atleast_2d(v.T)  # (K, m)
+      2583 +        out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalD
+           +irection.DOWN,
+      2584 +                            by_individual=False)  # (K, 2n)
+      2585 +        maternal = out[:, 0::2]  # even = maternal
+      2586 +        result = maternal.T  # (n, K)
+      2587 +        if v.ndim == 1:
+      2588 +            return result.ravel()
+      2589 +        return result
+      2590 +
+      2591 +    def matvec_paternal(self, v: np.ndarray) -> np.ndarray:
+      2592 +        """Paternal haplotype matvec via GRG DOWN haploid, od
+           +d indices."""
+      2593 +        import pygrgl
+      2594 +        v = np.asarray(v, dtype=np.float64)
+      2595 +        inp = np.atleast_2d(v.T)  # (K, m)
+      2596 +        out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalD
+           +irection.DOWN,
+      2597 +                            by_individual=False)  # (K, 2n)
+      2598 +        paternal = out[:, 1::2]  # odd = paternal
+      2599 +        result = paternal.T  # (n, K)
+      2600 +        if v.ndim == 1:
+      2601 +            return result.ravel()
+      2602 +        return result
+      2603 +
+      2604 +    def standardized_matvec(self, v: np.ndarray, af: np.ndarr
+           +ay = None) -> np.ndarray:
+      2605 +        """Centered diploid matvec: G@v - 2*af@v (no material
+           +ization)."""
+      2606 +        v = np.asarray(v, dtype=np.float64)
+      2607 +        if af is None:
+      2608 +            af = self.recompute_af()
+      2609 +        raw = self.matvec(v)
+      2610 +        # centering: E[G_ij] = 2*af_j, so (G - 2p)@v = G@v - 
+           +2p@v
+      2611 +        correction = 2.0 * (af @ v)
+      2612 +        return raw - correction
+      2613 +
+      2614 +    def recompute_af(self) -> np.ndarray:
+      2615 +        """Compute allele frequencies via GRG UP traversal: G
+           +.T @ 1 / (2n)."""
+      2616 +        import pygrgl
+      2617 +        if self._cached_af is not None:
+      2618 +            return self._cached_af
+      2619 +        ones = np.ones((1, self.n), dtype=np.float64)
+      2620 +        counts = pygrgl.matmul(self._grg, ones, pygrgl.Traver
+           +salDirection.UP,
+      2621 +                               by_individual=True)  # (1, m)
+      2622 +        self._cached_af = (counts.ravel() / (2.0 * self.n))
+      2623 +        return self._cached_af
+      2624 +
+      2625 +    def to_dense(self) -> DenseHaplotypeArray:
+      2626 +        """Materialize full genotype matrix via identity matv
+           +ec."""
+      2627 +        import pygrgl
+      2628 +        eye = np.eye(self.m, dtype=np.float64)  # (m, m)
+      2629 +        # DOWN haploid: (m, m) -> (m, 2n)
+      2630 +        haploid = pygrgl.matmul(self._grg, eye, pygrgl.Traver
+           +salDirection.DOWN,
+      2631 +                                by_individual=False)  # (m, 2
+           +n)
+      2632 +        # Reshape to (n, m, 2): maternal=even, paternal=odd
+      2633 +        maternal = haploid[:, 0::2].T  # (n, m)
+      2634 +        paternal = haploid[:, 1::2].T  # (n, m)
+      2635 +        genotypes = np.stack([maternal, paternal], axis=2).as
+           +type(np.int8)
+      2636 +        return DenseHaplotypeArray(
+      2637 +            genotypes=genotypes,
+      2638 +            generation=self._generation,
+      2639 +            samples=self.samples,
+      2640 +            variants=self.variants,
+      2641 +        )
+      2642 +
+      2643 +    def meiosis(self, assignment, recombination_map) -> Dense
+           +HaplotypeArray:
+      2644 +        """Materialize to dense, then perform meiosis."""
+      2645 +        return self.to_dense().meiosis(assignment, recombinat
+           +ion_map)
+      2646 +
+      2647 +    def __getitem__(self, key) -> DenseHaplotypeArray:
+      2648 +        """Materialize to dense and subset."""
+      2649 +        return self.to_dense()[key]
+      2650 +
+      2651 +    def __repr__(self) -> str:
+      2652 +        return (f"GraphHaplotypeOperator(n={self.n}, m={self.
+           +m}, "
+      2653 +                f"generation={self.generation})")
+      2654 +
+      2655 +
+      2656  class NHaplotypeArrayAccessor:
+      2657      """
+      2658      Accessor class that mimics the xarray .xft interface for 
+            DenseHaplotypeArray.
+
+● Now Step 2: Add load_grg to io.py.
+
+● Read 1 file (ctrl+o to expand)
+
+● Update(xftsim/io.py)
+  ⎿  Added 58 lines
+      283      )
+      284 
+      285 
+      286 +def load_grg(path: str, generation: int = 0,
+      287 +             bim_path: str = None) -> "xft.struct.GraphHaploty
+          +peOperator":
+      288 +    """
+      289 +    Load a GRG file and return a GraphHaplotypeOperator.
+      290 +
+      291 +    Parameters
+      292 +    ----------
+      293 +    path : str
+      294 +        Path to the .grg file.
+      295 +    generation : int, optional
+      296 +        Generation number. Default 0.
+      297 +    bim_path : str, optional
+      298 +        Path to a PLINK .bim file for chromosome/allele metada
+          +ta.
+      299 +        If None, variant metadata is extracted from the GRG it
+          +self.
+      300 +
+      301 +    Returns
+      302 +    -------
+      303 +    xft.struct.GraphHaplotypeOperator
+      304 +    """
+      305 +    import pygrgl
+      306 +    grg = pygrgl.load_immutable_grg(path)
+      307 +
+      308 +    # Extract sample metadata from GRG
+      309 +    n = grg.num_individuals
+      310 +    if grg.has_individual_ids:
+      311 +        iid = np.array([grg.get_individual_id(i) for i in rang
+          +e(n)])
+      312 +    else:
+      313 +        iid = np.arange(n, dtype=np.int64)
+      314 +    samples = xft.struct.SampleMeta(iid=iid, generation=genera
+          +tion)
+      315 +
+      316 +    # Variant metadata: from BIM if provided, else from GRG
+      317 +    variants = None
+      318 +    if bim_path is not None:
+      319 +        bim = pd.read_csv(bim_path, sep='\t', header=None,
+      320 +                          names=['chrom', 'vid', 'cm', 'pos_bp
+          +', 'a1', 'a0'])
+      321 +        m_bim = len(bim)
+      322 +        m_grg = grg.num_mutations
+      323 +        if m_bim != m_grg:
+      324 +            raise ValueError(
+      325 +                f"BIM has {m_bim} variants but GRG has {m_grg}
+          + mutations"
+      326 +            )
+      327 +        pos_cM = bim['cm'].values
+      328 +        if np.all(pos_cM == 0):
+      329 +            pos_cM = None
+      330 +        variants = xft.struct.VariantMeta(
+      331 +            vid=bim['vid'].values.astype(str),
+      332 +            chrom=bim['chrom'].values,
+      333 +            pos_bp=bim['pos_bp'].values,
+      334 +            pos_cM=pos_cM,
+      335 +            zero_allele=bim['a0'].values.astype(str),
+      336 +            one_allele=bim['a1'].values.astype(str),
+      337 +        )
+      338 +
+      339 +    return xft.struct.GraphHaplotypeOperator(
+      340 +        grg, generation=generation, samples=samples, variants=
+          +variants,
+      341 +    )
+      342 +
+      343 +
+      344  # Legacy functions for XarrayHaplotypeArray compatibility
+      345 
+      346  def plink1_variant_index(ppxr: xr.DataArray) -> xft.index.Dipl
+           oidVariantIndex:
+
+● Step 3: Add TestGRG to testdata.py.
+
+● Update(tests/testdata.py)
+  ⎿  Added 1 line
+       4  All generators use explicit seeds for reproducibility.
+       5  Usable both inside pytest (via conftest fixtures) and standalon
+          e.
+       6  """
+       7 +import os
+       8  import numpy as np
+       9  from xftsim.struct import SampleMeta, VariantMeta, DenseHaploty
+          peArray, NPhenotypeArray
+      10  from xftsim.neffect import AdditiveEffects, MultivariateEffects
+          , SparseEffects
+
+● Now append the TestGRG class at the end of testdata.py.
+
+● Read 1 file (ctrl+o to expand)
+
+● Update(tests/testdata.py)
+  ⎿  Added 35 lines
+      189              component_names=component_names, r=r,
+      190              offspring_per_pair=offspring_per_pair,
+      191          )
+      192 +
+      193 +
+      194 +class TestGRG:
+      195 +    """Factory for GRG-backed test fixtures.
+      196 +
+      197 +    Fixture files live under glink/tests/fixtures/datasets/.
+      198 +    All methods require pygrgl — callers should use pytest.imp
+          +ortorskip.
+      199 +    """
+      200 +    _BASE = os.path.join(
+      201 +        os.path.expanduser("~"), "Dropbox", "grg", "glink",
+      202 +        "tests", "fixtures", "datasets",
+      203 +    )
+      204 +
+      205 +    TINY_GRG_PATH = os.path.join(_BASE, "tiny_clean", "genotyp
+          +es.grg")
+      206 +    TINY_BIM_PATH = os.path.join(_BASE, "tiny_clean", "genotyp
+          +es.bim")
+      207 +    SMALL_GRG_PATH = os.path.join(_BASE, "small_clean", "genot
+          +ypes.grg")
+      208 +    SMALL_BIM_PATH = os.path.join(_BASE, "small_clean", "genot
+          +ypes.bim")
+      209 +
+      210 +    @staticmethod
+      211 +    def tiny_grg():
+      212 +        """Load tiny_clean GRG (20 individuals, 100 variants) 
+          +with BIM."""
+      213 +        from xftsim.io import load_grg
+      214 +        return load_grg(TestGRG.TINY_GRG_PATH, bim_path=TestGR
+          +G.TINY_BIM_PATH)
+      215 +
+      216 +    @staticmethod
+      217 +    def small_grg():
+      218 +        """Load small_clean GRG (100 individuals, 1000 variant
+          +s) with BIM."""
+      219 +        from xftsim.io import load_grg
+      220 +        return load_grg(TestGRG.SMALL_GRG_PATH, bim_path=TestG
+          +RG.SMALL_BIM_PATH)
+      221 +
+      222 +    @staticmethod
+      223 +    def tiny_grg_no_bim():
+      224 +        """Load tiny_clean GRG without BIM (variants from GRG 
+          +metadata)."""
+      225 +        from xftsim.io import load_grg
+      226 +        return load_grg(TestGRG.TINY_GRG_PATH)
+
+● Step 4: Create unit test files.
+
+● Write(tests/unit/test_grg.py)
+  ⎿  Wrote 225 lines to tests/unit/test_grg.py
+       1 """Unit tests for GraphHaplotypeOperator."""
+       2 import numpy as np
+       3 import pytest
+       4 
+       5 pygrgl = pytest.importorskip("pygrgl")
+       6 
+       7 from xftsim.struct import (
+       8     GraphHaplotypeOperator, DenseHaplotypeArray,
+       9     HaplotypeOperator, SampleMeta, VariantMeta,
+      10     _extract_variant_meta_from_grg,
+     … +215 lines (ctrl+o to expand)
+
+● Write(tests/unit/test_grg_io.py)
+  ⎿  Wrote 42 lines to tests/unit/test_grg_io.py
+      1 """Unit tests for GRG I/O (load_grg)."""
+      2 import numpy as np
+      3 import pytest
+      4 
+      5 pygrgl = pytest.importorskip("pygrgl")
+      6 
+      7 from xftsim.io import load_grg
+      8 from xftsim.struct import GraphHaplotypeOperator
+      9 from tests.testdata import TestGRG
+     … +32 lines (ctrl+o to expand)
+
+● Step 5: Create integration tests.
+
+● Write(tests/integration/test_grg_sim.py)
+  ⎿  Wrote 107 lines to tests/integration/test_grg_sim.py
+       1 """Integration tests: GRG-backed founders through multi-generati
+         on simulation."""
+       2 import numpy as np
+       3 import pytest
+       4 
+       5 pygrgl = pytest.importorskip("pygrgl")
+       6 
+       7 from xftsim.struct import GraphHaplotypeOperator, DenseHaplotype
+         Array, SampleMeta
+       8 from xftsim.nsim import NSimulation
+       9 from xftsim.neffect import AdditiveEffects
+      10 from xftsim.narch import Architecture, GeneticComponent, NoiseCo
+         mponent, AggregationComponent
+     … +97 lines (ctrl+o to expand)
+
+● Now let's run the GRG unit tests first to see if there are any issues.
+
+● Bash(python -m pytest tests/unit/test_grg.py tests/unit/test_grg_io.py -v 2>&1
+       | head -120)
+  ⎿ ============================= test session starts =====================
+    =========
+    platform linux -- Python 3.12.7, pytest-9.0.2, pluggy-1.5.0 -- /home/rs
+    … +88 lines (ctrl+o to expand)
+
+
+
+● All 34 unit tests pass. Now run the integration tests.
+
+● Bash(python -m pytest tests/integration/test_grg_sim.py -v 2>&1)
+  ⎿ ============================= test session starts =====================
+    =========
+    platform linux -- Python 3.12.7, pytest-9.0.2, pluggy-1.5.0 -- /home/rs
+    … +28 lines (ctrl+o to expand)
+
+
+  ⎿  (timeout 2m)
+
+● All 4 integration tests pass. Now run the full test suite to make sure nothing
+   is broken.
+
+● Bash(python -m pytest tests/ -v --ignore=tests/test_demos.py 2>&1 | tail -60)
+  ⎿  tests/unit/test_sim.py::TestMeiosis::test_generation_correct PASSED
+       [ 84%]
+     tests/unit/test_sim.py::TestMeiosis::test_variants_inherited PASSED
+     … +112 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+● 315 tests pass (277 existing + 34 GRG unit + 4 GRG integration = 315). Zero
+  failures.
+
+● Now let me update the devnotes and memory.
+
+● Write(docs/plans/devnotes/2026-02-06.md)
+  ⎿  Error writing file
+
+● Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Update(docs/plans/devnotes/2026-02-06.md)
+  ⎿  Added 24 lines
+      168  ### Final test results
+      169  - `pytest tests/ -v --ignore=tests/test_demos.py` → **277 pass
+           ed** in 1.84s (189 Phase 1-3 + 88 Phase 3b)
+      170 
+      171 +## Phase 4: GRG Integration — COMPLETE
+      172 +
+      173 +### New files
+      174 +- `tests/unit/test_grg.py` — 28 tests (construction, matvec, A
+          +F, materialization, subsetting, meiosis)
+      175 +- `tests/unit/test_grg_io.py` — 6 tests (load with/without BIM
+          +, small fixture, IDs, errors, generation)
+      176 +- `tests/integration/test_grg_sim.py` — 4 tests (gen-0 phenoty
+          +pes, dense after meiosis, match dense, small 2-gen)
+      177 +
+      178 +### Modified files
+      179 +- `xftsim/struct.py` — added `_extract_variant_meta_from_grg()
+          +` helper + `GraphHaplotypeOperator(HaplotypeOperator)`: full A
+          +BC implementation using pygrgl matmul (matvec/rmatvec/maternal
+          +/paternal/standardized/recompute_af/to_dense/meiosis/getitem)
+      180 +- `xftsim/io.py` — added `load_grg(path, generation=0, bim_pat
+          +h=None)` → GraphHaplotypeOperator with optional BIM parsing
+      181 +- `tests/testdata.py` — added `TestGRG` class (paths to tiny_c
+          +lean/small_clean fixtures, factory methods)
+      182 +
+      183 +### Key design decisions
+      184 +- pygrgl is lazy-imported everywhere; not a required dependenc
+          +y
+      185 +- Tests use `pytest.importorskip("pygrgl")` — skip cleanly if
+          +unavailable
+      186 +- `standardized_matvec` uses centering trick: `G@v - 2*af@v` (
+          +no materialization needed)
+      187 +- `to_dense()` uses identity matrix through DOWN haploid trave
+          +rsal → reshape to (n,m,2)
+      188 +- `meiosis()` and `__getitem__()` delegate to `to_dense()` the
+          +n DenseHaplotypeArray
+      189 +- AF computation via UP traversal with result caching
+      190 +- Fixture data from glink/tests/fixtures/datasets/ (tiny_clean
+          +: 20 ind / 100 var, small_clean: 100 ind / 1000 var)
+      191 +
+      192 +### Test results
+      193 +- `pytest tests/ -v --ignore=tests/test_demos.py` → **315 pass
+          +ed** in 1.77s (277 Phase 1-3b + 38 Phase 4)
+      194 +
+      195  ## Files changed
+      196  - `docs/plans/2026-02-05-refactor-design.md` — ArchNode repres
+           entation, phased plan update
+      197  - `docs/plans/testing-spec.md` — new, full testing specificati
+           on
+
+● Now update the memory file.
+
+● Recalled 1 memory, wrote 1 memory (ctrl+o to expand)
+
+● Also update the GRG-related design decision now that it's implemented:
+
+● Wrote 1 memory (ctrl+o to expand)
+
+● Phase 4 is complete. Here's the summary:
+
+  Phase 4: GRG Integration — Complete
+
+  What was implemented
+
+  xftsim/struct.py — GraphHaplotypeOperator (~170 LOC)
+  - Full HaplotypeOperator ABC implementation backed by pygrgl graph traversal
+  - matvec/rmatvec via DOWN/UP traversal, matvec_maternal/matvec_paternal via
+  haploid traversal
+  - standardized_matvec uses centering trick (G@v - 2*af@v) — no materialization
+   needed
+  - recompute_af via UP traversal with caching
+  - to_dense() materializes via identity matvec
+  - meiosis()/__getitem__() delegate through to_dense()
+
+  xftsim/io.py — load_grg() (~50 LOC)
+  - Loads GRG file with optional BIM for chromosome/allele metadata
+  - Extracts IIDs from GRG individual IDs
+
+  tests/testdata.py — TestGRG factory
+  - Paths to tiny_clean (20 ind, 100 var) and small_clean (100 ind, 1000 var)
+  fixtures
+
+  Tests
+  ┌───────────────────────────────────┬───────┐
+  │               File                │ Tests │
+  ├───────────────────────────────────┼───────┤
+  │ tests/unit/test_grg.py            │ 28    │
+  ├───────────────────────────────────┼───────┤
+  │ tests/unit/test_grg_io.py         │ 6     │
+  ├───────────────────────────────────┼───────┤
+  │ tests/integration/test_grg_sim.py │ 4     │
+  ├───────────────────────────────────┼───────┤
+  │ Total new                         │ 38    │
+  └───────────────────────────────────┴───────┘
+  Final result: 315 tests passing (277 existing + 38 new), zero regressions.
+
+✻ Brewed for 5m 13s

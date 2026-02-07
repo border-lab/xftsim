@@ -4,6 +4,7 @@ Deterministic test data generators for xftsim tests.
 All generators use explicit seeds for reproducibility.
 Usable both inside pytest (via conftest fixtures) and standalone.
 """
+import os
 import numpy as np
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
 from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
@@ -188,3 +189,38 @@ class TestSimulation:
             component_names=component_names, r=r,
             offspring_per_pair=offspring_per_pair,
         )
+
+
+class TestGRG:
+    """Factory for GRG-backed test fixtures.
+
+    Fixture files live under glink/tests/fixtures/datasets/.
+    All methods require pygrgl — callers should use pytest.importorskip.
+    """
+    _BASE = os.path.join(
+        os.path.expanduser("~"), "Dropbox", "grg", "glink",
+        "tests", "fixtures", "datasets",
+    )
+
+    TINY_GRG_PATH = os.path.join(_BASE, "tiny_clean", "genotypes.grg")
+    TINY_BIM_PATH = os.path.join(_BASE, "tiny_clean", "genotypes.bim")
+    SMALL_GRG_PATH = os.path.join(_BASE, "small_clean", "genotypes.grg")
+    SMALL_BIM_PATH = os.path.join(_BASE, "small_clean", "genotypes.bim")
+
+    @staticmethod
+    def tiny_grg():
+        """Load tiny_clean GRG (20 individuals, 100 variants) with BIM."""
+        from xftsim.io import load_grg
+        return load_grg(TestGRG.TINY_GRG_PATH, bim_path=TestGRG.TINY_BIM_PATH)
+
+    @staticmethod
+    def small_grg():
+        """Load small_clean GRG (100 individuals, 1000 variants) with BIM."""
+        from xftsim.io import load_grg
+        return load_grg(TestGRG.SMALL_GRG_PATH, bim_path=TestGRG.SMALL_BIM_PATH)
+
+    @staticmethod
+    def tiny_grg_no_bim():
+        """Load tiny_clean GRG without BIM (variants from GRG metadata)."""
+        from xftsim.io import load_grg
+        return load_grg(TestGRG.TINY_GRG_PATH)

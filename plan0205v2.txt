@@ -1,0 +1,1529 @@
+
+╭─── Claude Code v2.1.31 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                Welcome back Richard!               │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ Recent activity         │
+│                        ▘▘ ▝▝                       │ No recent activity      │
+│                                                    │                         │
+│ Opus 4.5 · Claude Max · border.richard@gmail.com's │                         │
+│  Organization                                      │                         │
+│                  ~/Dropbox/xftsim                  │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+❯ resume from refactor_tuesday.txt 
+
+● Read 1 file (ctrl+o to expand)
+
+● Let me continue reading the rest of the file.
+
+● Read 1 file (ctrl+o to expand)
+
+● Good, I've read through the full brainstorming transcript. The conversation
+  ended at Question 11: Mating Specification with three options presented but no
+   answer from you yet.
+
+  Let me check the current state of the codebase and the referenced plan file to
+   fully orient myself.
+
+● Skill(superpowers:brainstorming)
+  ⎿  Successfully loaded skill
+
+● Read 1 file (ctrl+o to expand)
+
+● Explore(Explore current xftsim code state)
+  ⎿  Done (18 tool uses · 137.4k tokens · 1m 38s)
+
+● The conversation ended at Question 11: Mating Specification with three options
+   presented:
+  - Option A: Completely separate object
+  - Option B: In Architecture DSL as separate block
+  - Option C: Mating defined separately but references arch
+
+  The user hasn't answered yet. Let me resume the brainstorming session
+  naturally.
+
+  Let me also review what was covered in the brainstorm so far:
+
+  1. Q1: Pain points → usability, flexibility, maintainability (2,3,4)
+  2. Q2: DSL style → formula strings (Option A)
+  3. Q3: Phenotype vs component → explicit components (Option A)
+  4. Q4: Linear operators → graph-based structure (grapp/glink)
+  5. Q5: Core abstractions → HaplotypeOperator with metadata
+  6. Q6: Refactor scope → Ground-up with incremental scaffolding (Option 3)
+  7. Q7: Indexing syntax → Option A (numpy-style attribute-based)
+    - Extra metadata → Option A1 (bracket access on meta object)
+  8. Q8: DSL grammar → multivariate components with tuple LHS, univariate
+  aggregation
+    - Vertical transmission → mother()/father()/parent()
+    - Indirect genetic effects → arithmetic (Option B)
+    - Founder fallback → || operator
+  9. Q9: Effect specification → sampled once, manual allowed, h2/rg/covg options
+  10. Q10: Dependency graph / execution order → auto-toposort with || founder
+  fallback
+  11. Sibling effects → reference functions, | FID grouping syntax
+  12. Q11: Mating specification → unanswered (Options A, B, C)
+
+  I need to continue the brainstorm from Q11. Let me present the current state
+  and ask the question.
+
+
+  Using the brainstorming skill to continue the xftsim refactor design session.
+
+  I've reviewed the full transcript from Tuesday's session and the current state
+   of the ajay branch. Here's where we left off:
+
+  ---
+  Decisions made so far (Q1-Q10 + sibling effects):
+  Topic: Priorities
+  Decision: Usability, flexibility, maintainability
+  ────────────────────────────────────────
+  Topic: DSL style
+  Decision: Formula strings (lavaan-like)
+  ────────────────────────────────────────
+  Topic: Components
+  Decision: Explicit (height.G, height.E, etc.)
+  ────────────────────────────────────────
+  Topic: Operators
+  Decision: HaplotypeOperator ABC with SampleMeta/VariantMeta
+  ────────────────────────────────────────
+  Topic: Refactor scope
+  Decision: Ground-up rewrite, phased
+  ────────────────────────────────────────
+  Topic: Indexing
+  Decision: Attribute-based + bracket for extras (H[:, H.variants['coding'] == 
+    1])
+  ────────────────────────────────────────
+  Topic: Multivariate
+  Decision: Tuple LHS (height.G, bmi.G) ~ mvEffects(...)
+  ────────────────────────────────────────
+  Topic: Aggregation
+  Decision: Always univariate, supports arithmetic (+, *)
+  ────────────────────────────────────────
+  Topic: Parents
+  Decision: mother(), father(), parent() primitives
+  ────────────────────────────────────────
+  Topic: Indirect genetics
+  Decision: Arithmetic: mother(height.G) - height.G_maternal
+  ────────────────────────────────────────
+  Topic: Founder fallback
+  Decision: || operator: height.VT ~ parent(height) || noise(0.3)
+  ────────────────────────────────────────
+  Topic: Effects
+  Decision: Sampled once; support h2/rg/covg; manual matrix OK
+  ────────────────────────────────────────
+  Topic: Sparse overlap
+  Decision: Composition-based (separate shared/specific components)
+  ────────────────────────────────────────
+  Topic: Siblings
+  Decision: sibling_mean(), sibling_eldest(), etc.; cnoise(0.1) | FID for shared
+
+    env
+  ---
+  We stopped at Question 11: Mating Specification. You had three options:
+
+  Option A: Completely separate object
+  arch = Architecture(formula)
+  mating = LinearAssortativeMating(phenotypes=['height', 'bmi'], weights=[1.0,
+  0.5])
+  sim = Simulation(arch, mating, founders)
+
+  Option B: In Architecture DSL as separate block
+  arch = Architecture("""
+      height.G ~ genetic(eff)
+      height ~ height.G + noise(0.2)
+      @mating: linear_assortative(height + 0.5 * bmi)
+  """)
+
+  Option C: Mating defined separately but references arch
+  arch = Architecture(formula)
+  mating = LinearAssortativeMating.from_formula('height + 0.5 * bmi', arch)
+
+  My recommendation is Option A — mating and architecture are orthogonal
+  concerns. You might want the same architecture with random mating, assortative
+   mating, or spatial mating. Keeping them separate also keeps the DSL parser
+  simpler.
+
+  Which approach do you prefer?
+
+✻ Sautéed for 2m 14s
+
+❯ A 
+
+● Good — mating stays separate. Simulation(arch, mating, founders) is the
+  top-level API.
+
+  ---
+  Brainstorming Question 12
+
+  Now let's talk about phenotype storage. The current system uses xarray
+  DataArrays with a complex multi-index (sample × component). For the refactor,
+  phenotypes need to flow between:
+
+  - Architecture components (computed values)
+  - Mating regime (reads phenotypes to assign mates)
+  - Statistics (computes summary stats)
+  - Vertical transmission (parent phenotypes → child components)
+
+  Option A: Simple dict of arrays
+  phenotypes = {
+      'height': np.ndarray,      # (n,) final phenotype
+      'height.G': np.ndarray,    # (n,) genetic component
+      'height.E': np.ndarray,    # (n,) noise component
+      'bmi': np.ndarray,
+      ...
+  }
+  - Dead simple, fast, easy to debug
+  - Flat namespace — component names are just dot-separated strings
+  - No metadata overhead
+
+  Option B: Structured PhenotypeArray class
+  class PhenotypeArray:
+      values: dict[str, np.ndarray]   # component name → values
+      samples: SampleMeta
+
+      def phenotype(self, name) -> np.ndarray:  # get final phenotype
+      def component(self, name) -> np.ndarray:  # get component
+      def components_of(self, pheno) -> dict:   # all components for a phenotype
+  - Keeps samples metadata attached
+  - Can validate shapes, provide convenient accessors
+  - Slightly more overhead
+
+  I'd lean Option B — having SampleMeta travel with the phenotypes prevents bugs
+   when subsetting or reordering samples. But it's a thin wrapper, not
+  xarray-level complexity.
+
+  Which feels right?
+
+❯ B 
+
+● Good — PhenotypeArray as a thin wrapper with SampleMeta attached. Keeps things
+   aligned without xarray complexity.
+
+  ---
+  Brainstorming Question 13
+
+  Let's talk about the simulation loop. The current Simulation.run_generation()
+  does roughly:
+
+  1. Compute phenotypes (architecture)
+  2. Collect statistics
+  3. Assign mates (mating regime)
+  4. Reproduce (meiosis → new haplotypes)
+  5. Advance generation
+
+  For the refactored Simulation, the key question is how generations of data are
+   stored and accessed.
+
+  Option A: Rolling window — only keep what's needed
+  class Simulation:
+      current_haplotypes: HaplotypeOperator
+      current_phenotypes: PhenotypeArray
+      previous_phenotypes: PhenotypeArray | None  # for VT
+      results: list[GenerationResult]  # lightweight stats per gen
+  - Memory efficient — old haplotypes are discarded
+  - previous_phenotypes is enough for parent() references
+  - Statistics are computed and stored, raw data is dropped
+
+  Option B: Full history — keep everything
+  class Simulation:
+      haplotypes: dict[int, HaplotypeOperator]   # gen → haplotypes
+      phenotypes: dict[int, PhenotypeArray]       # gen → phenotypes
+      pedigree: PedigreeArray
+  - Can retroactively compute new statistics
+  - Enables cross-generation analyses (e.g., parent-offspring regression)
+  - Memory scales with generations × samples
+
+  Option C: Configurable retention
+  class Simulation:
+      retain_haplotypes: int = 1   # how many past generations to keep
+      retain_phenotypes: int = 2   # need ≥1 for VT
+  - Default is memory-efficient
+  - User can opt into full history when needed
+
+  I'd recommend Option C — sensible defaults (keep minimal), but the user can
+  request full history for analyses that need it. The retain_phenotypes minimum
+  would be enforced based on the architecture's parent() depth.
+
+  Which approach?
+
+❯ C 
+
+● Good — configurable retention with sensible defaults, minimum enforced by
+  architecture's parent() depth.
+
+  ---
+  Brainstorming Question 14
+
+  Now the core engine: how does Architecture execute the formula?
+
+  When you call arch.compute(haplotypes, previous_phenotypes), it needs to
+  evaluate the dependency graph. Each statement in the formula becomes a node.
+
+  height.G ~ genetic(eff)              # depends on: haplotypes
+  height.VT ~ 0.3 * parent(height) || noise(0.3)  # depends on: prev phenotypes
+  height.E ~ noise(0.2)               # depends on: nothing (random)
+  height ~ height.G + height.VT + height.E  # depends on: height.G, height.VT,
+  height.E
+
+  Option A: Eager evaluation via topological sort
+  - Parse formula → build DAG → toposort → execute in order
+  - Each node writes its result into PhenotypeArray
+  - Simple, predictable, easy to debug
+  - Multivariate nodes (a.G, b.G) ~ mvEffects(...) produce multiple outputs in
+  one step
+
+  Option B: Lazy evaluation with caching
+  - Nodes are computed on demand when referenced
+  - Results cached after first computation
+  - More flexible for conditional execution
+  - Harder to debug, less predictable order
+
+  Option C: Compiled execution plan
+  - Parse formula once → generate a reusable ExecutionPlan object
+  - Plan is a flat list of operations (like a bytecode)
+  - plan.execute(haplotypes, prev_phenos) runs the list
+  - Fast repeated execution (no re-parsing per generation)
+
+  I'd recommend Option A for correctness, with Option C as optimization — parse
+  and toposort once at Architecture.__init__, store the execution order, replay
+  it each generation. Essentially A and C combined: toposort at init time,
+  execute the sorted list each generation.
+
+  Does that work, or do you see a need for lazy evaluation?
+
+❯ haplotypes also contains past haplotypes? does it work for VT? But yes,   
+  avoiding lazy eval seems smart                                            
+
+● Good catch — parent(height) doesn't just need "previous generation
+  phenotypes," it needs this offspring's specific parents' phenotypes, which
+  requires a parentage mapping.
+
+  Let me clarify the compute signature:
+
+  def compute(
+      self,
+      haplotypes: HaplotypeOperator,        # current generation
+      pedigree: PedigreeArray,              # who are my parents?
+      parent_phenotypes: PhenotypeArray,    # previous gen phenotypes
+  ) -> PhenotypeArray:
+
+  When evaluating parent(height) for offspring i:
+  1. Look up i's mother and father in pedigree
+  2. Index into parent_phenotypes to get their height values
+  3. mother(height) → mother's value, father(height) → father's value
+
+  For indirect genetic effects like mother(height.G) - height.G_maternal:
+  - mother(height.G) pulls from parent_phenotypes['height.G'] — the mother's
+  genetic component, already computed last generation
+  - height.G_maternal is computed fresh from current haplotypes [:, :, 0] @ 
+  effects
+
+  So the rule is: mother(X) / father(X) / parent(X) always reference 
+  parent_phenotypes, never recompute. This means the previous generation's
+  PhenotypeArray must retain components (not just final phenotypes) if they're
+  referenced.
+
+  This also constrains retention — retain_phenotypes must keep all components
+  that appear inside parent() / mother() / father() calls.
+
+  Does this model work? Or are there cases where you'd need to reference parent
+  haplotypes directly (rather than pre-computed parent components)?
+
+❯ this feels a bit complicated. in the current implementation haplotypes /  
+  phenotypes are just aliases for haplotypeStore[current generation],       
+  phenotypeStore[current gen]. and if not retained those elements can just  
+  be None. would that work or are there gotchas we're missing. Note that    
+  IGEs can just be computed by differrencing eg maternal genetic component  
+  and offspring maternally inherited component                              
+
+● You're right, that's much simpler. Just use generation-keyed stores:
+
+  class Simulation:
+      haplotype_store: dict[int, HaplotypeOperator | None]
+      phenotype_store: dict[int, PhenotypeArray | None]
+      pedigree_store: dict[int, PedigreeArray | None]
+      generation: int
+
+      @property
+      def haplotypes(self):
+          return self.haplotype_store[self.generation]
+
+      @property 
+      def phenotypes(self):
+          return self.phenotype_store[self.generation]
+
+  And compute just gets the stores:
+
+  def compute(self, generation, haplotype_store, phenotype_store, 
+  pedigree_store):
+
+  Then nodes resolve naturally:
+  - genetic(eff) → haplotype_store[generation].matvec(eff)
+  - parent(height) → phenotype_store[generation - 1]['height'] + pedigree lookup
+  - mother(height.G) → phenotype_store[generation - 1]['height.G'] indexed by
+  mother
+  - height.G_maternal → haplotype_store[generation][:, :, 0] @ eff
+
+  Non-retained generations are None. Only gotcha I see: if retention is too
+  small for the architecture's lookback depth, but we already said we'd enforce
+  that at init time.
+
+  Does this cover it, or do you foresee needing lookback deeper than one
+  generation (e.g., grandparent effects)?
+
+❯ maybe call them histories instead of stores. but yes that sounds great.   
+  id we do end up needing to go back further in time that's easy enough to  
+  implement within this framework                                           
+
+● Histories it is. And agreed — deeper lookback is just generation - k into the
+  same dict.
+
+  ---
+  Brainstorming Question 15
+
+  Let's talk about statistics and output. The current stats.py has modular
+  Statistic classes that compute things like heritability, cross-trait
+  correlations, GWAS, etc. each generation.
+
+  Two questions here:
+
+  What gets computed vs. stored?
+
+  Option A: Statistics are computed eagerly each generation, stored as results
+  class GenerationResult:
+      generation: int
+      statistics: dict[str, np.ndarray]  # e.g. {'h2_height': 0.58, 
+  'rg_height_bmi': 0.23}
+  - Can't go back and compute new stats later (unless haplotypes/phenotypes
+  retained)
+  - Lightweight storage
+
+  Option B: Statistics are lazy — computed on demand from retained data
+  sim.stats.h2('height', generation=5)  # computes from retained data
+  - Flexible but requires retention
+  - Inconsistent behavior depending on what's retained
+
+  I'd recommend Option A — define your stats up front, compute each generation,
+  store the results. If you need ad-hoc analysis, retain the data and do it
+  yourself. Keeps the Simulation focused on simulation.
+
+  Does that match how you use statistics in practice, or do you often go back
+  and compute things you didn't plan for?
+
+❯ yes, do A, can always step through gen by gen and change stats obj to get 
+   only specific generations without a storage penalty                      
+
+● Exactly — re-run with a different Statistics object is cheap if you don't need
+   to retain data.
+
+  ---
+  Brainstorming Question 16
+
+  Module organization. The current package has 16 files. For the ground-up
+  rewrite, do you want to reorganize?
+
+  Option A: Flat (similar to current)
+  xftsim/
+  ├── struct.py        # SampleMeta, VariantMeta, HaplotypeOperator,
+  PhenotypeArray
+  ├── arch.py          # Architecture, formula parser, execution
+  ├── effect.py        # EffectSpec classes
+  ├── mate.py          # Mating regimes
+  ├── reproduce.py     # Meiosis, recombination
+  ├── sim.py           # Simulation loop
+  ├── stats.py         # Statistics
+  ├── io.py            # I/O
+  ├── ped.py           # Pedigree
+  └── utils.py
+
+  Option B: Grouped by concern
+  xftsim/
+  ├── core/
+  │   ├── struct.py       # SampleMeta, VariantMeta, PhenotypeArray
+  │   ├── operators.py    # HaplotypeOperator ABC, DenseHaplotypeArray
+  │   └── ped.py
+  ├── arch/
+  │   ├── parser.py       # Formula DSL parser
+  │   ├── engine.py       # Execution plan, dependency graph
+  │   └── effects.py      # EffectSpec classes
+  ├── sim.py
+  ├── mate.py
+  ├── reproduce.py
+  ├── stats.py
+  └── io.py
+
+  Option C: Minimal — consolidate small modules
+  xftsim/
+  ├── struct.py        # All data structures + operators
+  ├── arch.py          # Architecture + effects + parser
+  ├── sim.py           # Simulation + mating + reproduction
+  ├── stats.py
+  └── io.py
+
+  For a research codebase, I'd lean Option A — flat is easy to navigate, each
+  file has a clear purpose, and you already know where things live. Option B
+  adds indirection without much payoff at this scale.
+
+  Preference?
+
+❯ A works 
+
+● Flat and simple.
+
+  ---
+  Brainstorming Question 17
+
+  Pedigree tracking. The parent() / mother() / father() primitives need to map
+  each offspring to their parents. The current system uses SampleIndex with
+  maternal/paternal IDs.
+
+  For the refactored system, how should parentage be represented?
+
+  Option A: Index arrays on PedigreeArray
+  class PedigreeArray:
+      offspring: SampleMeta
+      maternal_idx: np.ndarray  # (n,) index into parent generation's SampleMeta
+      paternal_idx: np.ndarray  # (n,) index into parent generation's SampleMeta
+  - mother(height) for offspring i →
+  parent_phenotypes['height'][maternal_idx[i]]
+  - Simple integer indexing, fast
+  - Stored per generation in pedigree_history
+
+  Option B: ID-based lookup
+  class PedigreeArray:
+      offspring_iid: np.ndarray
+      mother_iid: np.ndarray
+      father_iid: np.ndarray
+  - More portable (IDs survive reordering)
+  - Requires lookup to resolve to indices each time
+  - Safer but slower
+
+  Option C: Both — IDs for storage, indices computed lazily
+  class PedigreeArray:
+      offspring_iid: np.ndarray
+      mother_iid: np.ndarray
+      father_iid: np.ndarray
+      _maternal_idx: np.ndarray | None  # cached
+
+      def maternal_idx(self, parent_samples: SampleMeta) -> np.ndarray:
+          # compute and cache index mapping
+
+  I'd recommend Option A — indices are computed once at reproduction time (you
+  already know the mapping), and everything downstream is fast integer indexing.
+   IDs can be recovered from SampleMeta if needed for export.
+
+  Preference?
+
+❯ A 
+
+● Fast integer indexing, computed once at reproduction.
+
+  ---
+  Brainstorming Question 18
+
+  Meiosis implementation. You mentioned the current numba acceleration is
+  fragile (sloppy prange spawning thousands of threads). For the new system,
+  meiosis takes parent HaplotypeOperator and produces offspring
+  HaplotypeOperator.
+
+  The core operation: for each offspring, pick crossover points from
+  RecombinationMap, then stitch together grandparental haplotypes.
+
+  Option A: Pure numpy (no numba)
+  def meiosis(parent_haplotypes, recombination_map, rng):
+      # Vectorized crossover point sampling
+      # Boolean mask switching between haplotypes
+      return offspring_haploid  # (n, m) one haploid gamete per parent
+  - Simpler, no numba dependency issues
+  - May be slower for very large arrays
+  - Easier to maintain and debug
+
+  Option B: Numba with guardrails
+  - Keep numba but fix the threading issues (explicit num_threads, no unbounded
+  prange)
+  - Fallback to numpy if numba unavailable
+
+  Option C: Defer to HaplotypeOperator
+  class HaplotypeOperator(ABC):
+      @abstractmethod
+      def meiosis(self, crossover_points, parent_indices) -> HaplotypeOperator:
+  ...
+  - Each implementation handles its own meiosis
+  - DenseHaplotypeArray uses numpy/numba
+  - GraphHaplotypeOperator uses native graph recombination (grapp already does
+  this)
+
+  Option C seems natural — the graph structure handles recombination natively,
+  so forcing a single meiosis implementation across all operator types would be
+  limiting. The reproduce.py module would orchestrate (sample crossover points,
+  call mate assignment) but delegate the actual haplotype stitching.
+
+  Does that make sense for how grapp handles recombination?
+
+❯ C. we just need a robust spec for how recombination works. though this    
+  raise a tricky issue: GRGs store previous generation haplotypes (with     
+  little cost). So HaplotypeStore will need to work differently (just       
+  defines different endpoints for graph traversal). OR, we alternatively    
+  modify things such that IGEs are computed before generation advances.     
+  Another alternative is we add a method for create non-transmitted pseudo  
+  offspring if needs be. lets talk through this                             
+
+● This is a crucial design point. Let me lay out the tension and the three
+  options:
+
+  The core problem: For dense arrays, each generation is a separate (n, m, 2)
+  array. For GRGs, recombination just adds edges — all generations live in the
+  same graph. So haplotype_history[gen] means fundamentally different things.
+
+  ---
+  Option 1: HaplotypeOperator abstracts this away
+
+  For dense arrays, haplotype_history[gen] is an independent array. For graphs,
+  it's a lightweight view (different root nodes into the same graph). The
+  interface is identical:
+
+  haplotype_history[gen].matvec(effects)           # works for both
+  haplotype_history[gen].matvec_maternal(effects)   # works for both
+
+  "Retention" for graphs is essentially free (just keep endpoint references).
+  For dense arrays, retention means keeping the actual array. The
+  retain_haplotypes setting would matter for dense but be irrelevant for graphs.
+
+  Concern: Is there any case where the graph interface can't provide the same
+  operations as the dense array? Specifically, can a GRG do
+  matvec_maternal(effects) — i.e., traverse only the maternal haplotype path for
+   the offspring?
+
+  ---
+  Option 2: Compute IGEs before advancing
+
+  Reorder the simulation loop:
+  1. Compute parent phenotypes (gen t)
+  2. Assign mates
+  3. Meiosis → offspring haplotypes (gen t+1)
+  4. Compute offspring components that reference parents:
+     - height.G_maternal = haplotypes[t+1][:,:,0] @ eff
+     - indirect = parent_phenos['height.G'] - height.G_maternal
+  5. Compute remaining offspring phenotypes
+
+  This works with any backing structure since offspring haplotypes exist by step
+   4. But it tangles the architecture execution — some offspring components must
+   be computed in a specific window relative to meiosis.
+
+  Concern: Breaks the clean separation between "architecture computes
+  phenotypes" and "simulation handles reproduction."
+
+  ---
+  Option 3: Non-transmitted accessor method
+
+  class HaplotypeOperator(ABC):
+      @abstractmethod
+      def nontransmitted_matvec(self, effects, parent_haplotypes, pedigree) -> 
+  np.ndarray:
+          """Compute (parent_diploid - transmitted_haploid) @ effects"""
+
+  For dense: parent.diploid_matvec(eff) - offspring.matvec_maternal(eff)
+  For graph: could traverse the complementary path directly (if grapp supports
+  this)
+
+  Concern: Adds complexity to the operator interface for a single use case.
+
+  ---
+  My instinct is Option 1 is cleanest if the GRG can provide matvec_maternal /
+  matvec_paternal on offspring nodes. The IGE calculation then becomes standard
+  arithmetic on components that are already in phenotype_history and
+  haplotype_history. No special ordering, no extra methods.
+
+  Can grapp give you "traverse only the maternal haplotype path for this
+  offspring"?
+
+✻ Cogitated for 34s
+
+❯ theres another option that's easy but alittle ugly which is just to       
+  duplicate the GRG before recombination if memory is on and store in       
+  history as arrays                                                         
+
+● That's actually pretty clean in practice. Let me lay out the full picture:
+
+  Option 4: Snapshot to dense for history
+
+  class Simulation:
+      def advance_generation(self):
+          # Snapshot current gen before meiosis overwrites graph
+          if self.should_retain(self.generation):
+              self.haplotype_history[self.generation] = \
+                  self.haplotypes.to_dense()  # GRG → DenseHaplotypeArray
+
+          # Meiosis (modifies graph in place for GRG)
+          self.haplotypes = self.haplotypes.meiosis(...)
+
+  - History is always DenseHaplotypeArray — uniform, simple
+  - GRG used for current-gen operations (matvec, meiosis)
+  - to_dense() is a method on HaplotypeOperator — trivial for dense (return
+  self), materializes for GRG
+  - Memory cost only for retained generations (usually 1-2)
+
+  Tradeoff vs Option 1:
+  ┌────────────────┬──────────────────────────────────┬────────────────────────┐
+  │                │         Option 1 (views)         │  Option 4 (snapshot)   │
+  ├────────────────┼──────────────────────────────────┼────────────────────────┤
+  │ History type   │ Mixed (graph views vs arrays)    │ Always dense           │
+  ├────────────────┼──────────────────────────────────┼────────────────────────┤
+  │ Memory         │ Cheaper for graphs               │ O(n×m) per retained    │
+  │                │                                  │ gen                    │
+  ├────────────────┼──────────────────────────────────┼────────────────────────┤
+  │ Complexity     │ GRG must support historical      │ Just to_dense()        │
+  │                │ traversal                        │                        │
+  ├────────────────┼──────────────────────────────────┼────────────────────────┤
+  │ IGE            │ Same interface everywhere        │ Same interface         │
+  │ computation    │                                  │ everywhere             │
+  └────────────────┴──────────────────────────────────┴────────────────────────┘
+  For biobank-scale (millions of samples), the materialization cost could
+  matter. But you'd typically only retain 1-2 generations, and at that scale
+  you're probably using the GRG because the full array doesn't fit in memory.
+
+  So maybe: Option 1 as the default path, Option 4 as fallback if graph 
+  historical traversal turns out to be painful?
+
+  Or do you think the snapshot approach is good enough for the foreseeable use
+  cases?
+
+❯ when you say dense history you mean just keeping a GRG for prior          
+  generations right?                                                        
+
+● No — by "dense history" I meant materializing the GRG into a numpy
+  DenseHaplotypeArray for storage. But you're raising a good point.
+
+  If the GRG naturally preserves prior generations (since recombination just
+  adds edges to the graph), then there's nothing to snapshot — the prior
+  generation's haplotypes are still in the graph. You just need to keep the
+  endpoint references:
+
+  haplotype_history[gen] = GraphHaplotypeOperator(
+      graph=same_grg,           # same underlying graph
+      endpoints=gen_endpoints,  # just the root nodes for this generation
+  )
+
+  That's essentially Option 1 — and it's free in memory since you're just
+  storing a lightweight view.
+
+  So to clarify: when you said "duplicate the GRG before recombination and store
+   in history as arrays," did you mean:
+
+  A) Materialize to numpy array (actual dense n×m×2 copy) — for cases where you
+  don't want to keep the full graph around
+
+  B) Keep a GRG reference with the right endpoints — essentially free, but
+  requires the graph to support historical traversal (matvec_maternal on old
+  endpoints)
+
+  If the GRG can do (B) reliably, that seems like the obvious answer and we just
+   go with Option 1. The to_dense() method exists as an escape hatch if someone
+  needs it.
+
+❯ no i mean litterally duplicate the GRG. so the history object is a list   
+  of GRGs. this is trival. B is nicer but would require new features added  
+  to grgl so maybe leave this in the roadmap but for later                  
+
+● Got it — literally copy the GRG object. That's straightforward:
+
+  # Before recombination
+  if self.should_retain(self.generation):
+      haplotype_history[self.generation] = current_grg.copy()  # full GRG 
+  duplicate
+
+  # Recombination modifies current_grg in place
+
+  History is a list of independent GRGs. Cheap enough since GRGs are compressed,
+   and you're only retaining 1-2 generations.
+
+  Roadmap:
+  - Now: duplicate GRG for history
+  - Later: single GRG with endpoint views (Option B) when grgl supports it
+  - to_dense() available as escape hatch on any HaplotypeOperator
+
+  ---
+  Brainstorming Question 19
+
+  I think we've covered the major architectural decisions. Let me check if
+  there's anything left before I write up the full design.
+
+  Remaining topics I can think of:
+
+  1. I/O — reading/writing haplotypes, phenotypes, results. The current io.py
+  handles PLINK/sgkit. Anything changing here beyond accepting the new types?
+  2. Recombination map specification — the current RecombinationMap class seems
+  fine, just needs to work with the new operator interface.
+  3. Testing strategy — any preferences on what to test first?
+
+  Or is there another design question we haven't addressed? Are there any of the
+   decisions so far that feel shaky and worth revisiting before I write up the
+  design doc?
+
+❯ io is going to be different. should work with pgen, plink 1.9 binary,     
+  vcf, grg, sgkit zarr but lets just stick with grg and one dense format    
+  for now. I think thats all but why don't you write down all the current   
+  decisions, than look over everything and reread the xftsim docs and then  
+  critique the plan                                                         
+
+● Let me compile everything, then review the docs and critique.
+
+● Explore(Read xftsim docs and examples)
+  ⎿  Done (33 tool uses · 153.6k tokens · 1m 26s)
+
+● Good. Here's the full compilation of decisions, followed by a critique after
+  reviewing the docs and current codebase.
+
+  ---
+  Complete Decision Summary
+
+  Core Data Structures
+  Decision: SampleMeta
+  Choice: Frozen dataclass: iid, fid, sex, generation, extra: dict
+  ────────────────────────────────────────
+  Decision: VariantMeta
+  Choice: Frozen dataclass: vid, chrom, pos_bp, pos_cM, af, alleles, extra: dict
+  ────────────────────────────────────────
+  Decision: HaplotypeOperator
+  Choice: ABC with samples, variants attrs; matvec, rmatvec, __getitem__;
+    meiosis() delegated to implementations
+  ────────────────────────────────────────
+  Decision: Haplotype convention
+  Choice: [:,:,0] = maternal, [:,:,1] = paternal
+  ────────────────────────────────────────
+  Decision: PhenotypeArray
+  Choice: Thin wrapper: values: dict[str, np.ndarray], samples: SampleMeta
+  ────────────────────────────────────────
+  Decision: Indexing
+  Choice: Attribute-based + bracket for extras: H[:, H.variants['coding'] == 1]
+  DSL Grammar
+  Statement Type: Univariate component
+  Syntax: height.G ~ genetic(eff)
+  ────────────────────────────────────────
+  Statement Type: Multivariate component
+  Syntax: (height.G, bmi.G) ~ mvGenetic(mv_effects)
+  ────────────────────────────────────────
+  Statement Type: Univariate noise
+  Syntax: height.E ~ noise(0.2)
+  ────────────────────────────────────────
+  Statement Type: Multivariate noise
+  Syntax: (height.E, bmi.E) ~ mvNoise(cov=...)
+  ────────────────────────────────────────
+  Statement Type: Aggregation
+  Syntax: height ~ height.G + height.E (always univariate, supports +, *, -, /)
+  ────────────────────────────────────────
+  Statement Type: Vertical transmission
+  Syntax: height.VT ~ 0.3 * parent(height)
+  ────────────────────────────────────────
+  Statement Type: Founder fallback
+  Syntax: height.VT ~ parent(height) || noise(0.3)
+  ────────────────────────────────────────
+  Statement Type: Haplotype-specific
+  Syntax: height.G_mat ~ haplotypeGenetic(eff, haplotype='maternal')
+  ────────────────────────────────────────
+  Statement Type: Grouped noise
+  Syntax: height.famEnv ~ cnoise(0.1) | FID
+  ────────────────────────────────────────
+  Statement Type: Sibling refs
+  Syntax: sibling_mean(X), sibling_eldest(X), sibling_count(X), etc.
+  Effect Specification
+  Decision: Sampling
+  Choice: Once at architecture creation
+  ────────────────────────────────────────
+  Decision: Manual
+  Choice: from_matrix(effects, standardized=True)
+  ────────────────────────────────────────
+  Decision: Univariate
+  Choice: AdditiveEffects.from_h2(h2, variants)
+  ────────────────────────────────────────
+  Decision: Multivariate
+  Choice: MultivariateEffects.from_h2_rg(h2, rg) or .from_covg(covg)
+  ────────────────────────────────────────
+  Decision: Sparse overlap
+  Choice: Composition: separate shared/specific components
+  ────────────────────────────────────────
+  Decision: Standardization
+  Choice: Flag on effects: standardized: bool
+  Simulation
+  Decision: Mating
+  Choice: Separate object: Simulation(arch, mating, founders)
+  ────────────────────────────────────────
+  Decision: Execution
+  Choice: Toposort at init, replay sorted list each generation
+  ────────────────────────────────────────
+  Decision: History
+  Choice: haplotype_history, phenotype_history, pedigree_history — configurable
+    retention
+  ────────────────────────────────────────
+  Decision: GRG history
+  Choice: Duplicate GRG for now; endpoint views roadmap
+  ────────────────────────────────────────
+  Decision: Pedigree
+  Choice: PedigreeArray with maternal_idx, paternal_idx (integer arrays)
+  ────────────────────────────────────────
+  Decision: Statistics
+  Choice: Eager: defined upfront, computed per generation, stored as
+    GenerationResult
+  Infrastructure
+  Decision: Refactor scope
+  Choice: Ground-up rewrite, phased
+  ────────────────────────────────────────
+  Decision: Module layout
+  Choice: Flat: struct.py, arch.py, effect.py, mate.py, reproduce.py, sim.py,
+    stats.py, io.py, ped.py, utils.py
+  ────────────────────────────────────────
+  Decision: I/O
+  Choice: GRG + one dense format for now
+  ────────────────────────────────────────
+  Decision: Meiosis
+  Choice: Delegated to HaplotypeOperator.meiosis()
+  ---
+  Now let me critique this against the current codebase realities.
+
+  Critique
+
+  1. Effect standardization is under-specified
+
+  The current system has a confusing matrix of beta_raw_diploid,
+  beta_scaled_standardized_haploid, etc. (4+ variants). The new design says
+  standardized: bool but doesn't address when standardization happens.
+
+  When computing haplotypes.matvec(effects), does the operator standardize
+  internally, or does the caller pass pre-transformed effects? If the operator
+  standardizes, it needs allele frequencies. If the caller transforms, every
+  architecture node needs to know the convention.
+
+  Recommendation: Standardization should live in EffectSpec, not the operator.
+  EffectSpec.get_effects(af) returns the correctly-scaled vector for raw
+  genotype matvec. The operator always does raw G @ beta. This keeps the
+  operator simple and effect logic contained.
+
+  2. PhenotypeArray namespace collisions
+
+  Using dot-separated strings (height.G, height.E, height) means the system
+  needs to parse strings to answer "what are the components of height?" This is
+  fragile.
+
+  Recommendation: Keep the flat dict, but add a method components_of(phenotype) 
+  -> dict that does prefix matching. Or track the phenotype→component mapping
+  explicitly in the Architecture at parse time.
+
+  3. Missing: how mating accesses phenotypes
+
+  Currently, LinearAssortativeMatingRegime takes a ComponentIndex to know which
+  phenotype columns to sort on. With PhenotypeArray as a dict of strings, the
+  mating regime needs phenotype names.
+
+  Recommendation: Mating regime constructor takes phenotypes: list[str] and
+  weights: list[float]. It indexes into PhenotypeArray by string name. Simple.
+
+  4. Missing: offspring SampleMeta creation
+
+  Who creates the offspring SampleMeta (new iids, fids, sex assignment)?
+  Currently this happens in MateAssignment. The new system needs the same —
+  mating produces a MateAssignment with offspring metadata, then
+  HaplotypeOperator.meiosis() uses it.
+
+  Recommendation: Keep this in the mating regime. MateAssignment contains
+  offspring SampleMeta + parent indices.
+
+  5. Missing: filtering
+
+  The current system has filters.py with sample filtering between mating and
+  statistics. The new design doesn't mention filtering.
+
+  Recommendation: Filtering is just boolean indexing on HaplotypeOperator and
+  PhenotypeArray. No special system needed — users can do haplotypes[mask, :]
+  directly. If you want automatic per-generation filtering, it's a hook in the
+  simulation loop.
+
+  6. | FID grouping — who resolves the group?
+
+  height.famEnv ~ cnoise(0.1) | FID needs to:
+  1. Look up FID in SampleMeta (core field or extra)
+  2. Draw one value per unique FID
+  3. Broadcast to all samples sharing that FID
+
+  This means architecture execution nodes need access to SampleMeta, not just
+  haplotypes. The compute() signature needs to pass it (it's on
+  haplotype_history[gen].samples, so it's available, but the execution engine
+  needs to thread it through).
+
+  7. Sibling references — who are siblings?
+
+  sibling_mean(X) needs sibling identity. Is this FID-based (all individuals
+  sharing FID in the same generation)? Or pedigree-based (share at least one
+  parent)? For the current mating model where each pair produces multiple
+  offspring, these are equivalent. But with complex pedigrees (half-siblings),
+  they diverge.
+
+  Recommendation: Define siblings as same-FID-same-generation. Simple, covers
+  the common case. Document the assumption.
+
+  8. Multivariate node execution
+
+  (height.G, bmi.G) ~ mvEffects(eff) is one node in the DAG but produces two
+  outputs. The toposort needs to handle multi-output nodes — downstream nodes
+  referencing height.G or bmi.G should depend on this single node.
+
+  Recommendation: The execution plan should have a concept of "node outputs" vs
+  "node identity." A single mvEffects node registers both height.G and bmi.G as
+  outputs. The dependency graph tracks output names, but execution fires the
+  node once.
+
+  9. Post-processors may still be useful
+
+  With configurable retention replacing LimitMemory, do we need post-processors
+  at all? The current system uses them for custom per-generation hooks (e.g.,
+  saving snapshots, logging).
+
+  Recommendation: Keep a simple callbacks: list[Callable] on Simulation instead
+  of a formal PostProcessor class. Lighter weight.
+
+  10. What about the current .xft compatibility shim?
+
+  The ajay branch already has NHaplotypeArrayAccessor providing .xft-like
+  access. In the ground-up rewrite, do we keep any backwards compatibility?
+
+  Recommendation: No. Clean break. The new API is different enough that a shim
+  would be confusing. Old code uses the old package; new code uses the new API.
+
+  ---
+  Overall assessment: The design is solid. The biggest gaps are (1) effect
+  standardization mechanics, (2) explicit specification of how data flows into
+  execution nodes (SampleMeta, pedigree), and (3) a few "who creates what"
+  questions around offspring metadata. None of these are architectural blockers
+  — they're implementation details to nail down in Phase 1-2.
+
+  What are your thoughts on these critiques? Anything you disagree with or want
+  to discuss further?
+
+✻ Crunched for 3m 4s
+
+❯ Let's go through these one at a time. after i respond to one and youve    
+  requested any clairification then let's move onto the next one (please    
+  redisplay). 1: the operator standardizes, but will have different matvecs 
+   avialble for this. since standardization can be done on the fly using    
+  lin op abstraction this is fine. but haplotypesarrays should have option  
+  to recompute af per generation or not.                                    
+
+● Got it. So the operator provides multiple matvec methods:
+
+  class HaplotypeOperator(ABC):
+      def matvec(self, effects) -> np.ndarray:                # raw G @ effects
+      def standardized_matvec(self, effects, af=None) -> np.ndarray:  # 
+  standardized G @ effects
+      def matvec_maternal(self, effects) -> np.ndarray:       # hap[:,0] @ 
+  effects
+      def matvec_paternal(self, effects) -> np.ndarray:       # hap[:,1] @ 
+  effects
+      # ... standardized versions of maternal/paternal too
+
+      def recompute_af(self):  # update empirical AFs from current data
+
+  Effects are always stored as-is (for standardized or raw genotypes, flagged by
+   standardized: bool). The architecture node picks the right matvec based on
+  the flag.
+
+  AF recomputation: operator stores AFs (initially from founders or data). User
+  can opt into per-generation recomputation (important for drift under
+  assortative mating) or keep founder AFs as the reference.
+
+  One clarification: should EffectSpec track which AFs it was calibrated
+  against, so there's a consistency check? Or is that the user's responsibility?
+
+  ---
+  Critique #2: PhenotypeArray namespace collisions
+
+  Using dot-separated strings (height.G, height.E, height) means the system
+  needs to parse strings to answer "what are the components of height?" This is
+  fragile — what if a phenotype name contains a dot?
+
+  Recommendation was: keep flat dict but add components_of(phenotype) via prefix
+   matching, or track the phenotype→component mapping explicitly in Architecture
+   at parse time.
+
+❯ no, effects are fixed and cannot change across generations, that would    
+  make sense biologically. 2: can you explain what your recommendation      
+  would look like in practice                                               
+
+● Right — effects fixed at architecture creation. No cross-generation AF
+  tracking needed.
+
+  For #2, here's what it looks like concretely. The issue: given
+  PhenotypeArray.values = {'height.G': ..., 'height.E': ..., 'height': ..., 
+  'bmi.G': ..., 'bmi': ...}, how do you answer "what components belong to
+  height?"
+
+  Approach A: Prefix matching on PhenotypeArray
+
+  class PhenotypeArray:
+      values: dict[str, np.ndarray]
+      samples: SampleMeta
+
+      def components_of(self, phenotype: str) -> dict[str, np.ndarray]:
+          prefix = phenotype + '.'
+          return {k: v for k, v in self.values.items() if k.startswith(prefix)}
+
+  # Usage
+  phenos.components_of('height')
+  # → {'height.G': array, 'height.E': array, 'height.VT': array}
+
+  Risk: if someone names a phenotype height.corrected, prefix matching thinks
+  it's a component of height.
+
+  Approach B: Architecture tracks the mapping
+
+  class Architecture:
+      # Built during formula parsing
+      phenotype_components: dict[str, list[str]] = {
+          'height': ['height.G', 'height.E', 'height.VT'],
+          'bmi': ['bmi.G', 'bmi.E'],
+      }
+
+  PhenotypeArray stays a dumb flat dict. The Architecture knows the structure
+  because it parsed the formula. Anything that needs structured access asks the
+  Architecture, not the PhenotypeArray.
+
+  Approach B is safer — no naming convention assumptions, and the mapping is
+  derived from the actual formula. The cost is that you need the Architecture
+  object around whenever you want structured access.
+
+  Does either of these feel right, or is this a non-issue for your use cases?
+
+❯ I don't think we even need to do this at all. just have a warning if      
+  users duplicate names but think of height.G and height as just vectors,   
+  the assocation is implicit in the architecture                            
+
+● Clean. PhenotypeArray is just a flat dict[str, np.ndarray] — no structure, no
+  prefix parsing. The dot in height.G is a human convention, not something the
+  system interprets. The Architecture defines relationships through the formula.
+   Warn on duplicate names, that's it.
+
+  Moving on.
+
+  ---
+  Critique #3: How mating accesses phenotypes
+
+  Currently LinearAssortativeMatingRegime takes a ComponentIndex to know which
+  phenotype columns to sort on. With PhenotypeArray as a flat dict, the mating
+  regime needs a different way to specify this.
+
+  Recommendation: mating regime constructor takes phenotype names and weights
+  directly:
+
+  mating = LinearAssortativeMating(
+      phenotypes=['height', 'bmi'],
+      weights=[1.0, 0.5],
+      offspring_per_pair=2,
+  )
+
+  # Internally, mate() does:
+  def mate(self, phenotypes: PhenotypeArray) -> MateAssignment:
+      sort_values = sum(w * phenotypes[p] for w, p in zip(self.weights,
+  self.phenotypes))
+      # ... solve assignment
+
+  Straightforward? Or do you want mating to be able to sort on components too
+  (e.g., sort on height.G rather than final height)?
+
+❯ given my resp to critique 2, this would work for phenotypes and phenotype 
+   components since the distinction doesn't matter anymore. so your rec     
+  should work great                                                         
+
+● Exactly — since height and height.G are both just string keys, mating can sort
+   on anything in the PhenotypeArray. No distinction needed.
+
+  ---
+  Critique #4: Offspring SampleMeta creation
+
+  Who creates the offspring SampleMeta (new iids, fids, sex assignment)?
+  Currently this happens in MateAssignment. The new system needs the same.
+
+  Recommendation: MateAssignment contains the offspring SampleMeta plus parent
+  index arrays. The mating regime produces it, then HaplotypeOperator.meiosis()
+  consumes it:
+
+  class MateAssignment:
+      offspring_samples: SampleMeta    # new iids, fids, sex
+      maternal_idx: np.ndarray         # index into parent SampleMeta
+      paternal_idx: np.ndarray         # index into parent SampleMeta
+
+  # Flow:
+  assignment = mating.mate(phenotypes)       # creates MateAssignment
+  offspring_haplotypes = haplotypes.meiosis(  # consumes it
+      assignment, recombination_map
+  )
+  # offspring_haplotypes.samples == assignment.offspring_samples
+
+  This also feeds directly into PedigreeArray — the maternal_idx and
+  paternal_idx are the same arrays.
+
+  Does this flow work, or should offspring metadata creation live somewhere
+  else?
+
+❯ that's great. mating generates offspring 
+
+● Good. Mating produces offspring metadata, meiosis produces offspring
+  haplotypes.
+
+  ---
+  Critique #5: Filtering
+
+  The current system has filters.py with sample filtering between mating and
+  statistics. The new design doesn't mention filtering.
+
+  Recommendation: no special filtering system. Filtering is just boolean
+  indexing on the new data structures:
+
+  # Manual filtering
+  alive = phenotypes['survival'] > 0
+  haplotypes = haplotypes[alive, :]
+  phenotypes = phenotypes[alive]
+
+  If you want automatic per-generation filtering, it's a callback in the
+  simulation loop — not a first-class concept.
+
+  Does the current filtering do anything more complex than boolean subsetting,
+  or is this sufficient?
+
+❯ so the idea here is that you want a way to people to test stats on        
+  subsets (e.g. for within family methods or for sample-size related        
+  testing). it's nice to have this separated from the stats as most stats   
+  will use the same filters. but yes, it might be more complex, such as     
+  delivering trio data or sib pairs                                         
+
+● Ah, so filtering is more than boolean masks — it's about producing structured 
+  relational subsets (trios, sib pairs, within-family groups) that stats can
+  consume. And filters are reusable across multiple stats.
+
+  Option A: Filters produce structured views
+
+  class Filter(ABC):
+      def apply(self, phenotypes, pedigree_history) -> FilteredView: ...
+
+  class TrioFilter(Filter):
+      # Returns: offspring phenotypes + matched mother/father phenotypes
+
+  class SibPairFilter(Filter):
+      # Returns: pairs of sibling phenotype vectors
+
+  class WithinFamilyFilter(Filter):
+      # Returns: phenotypes grouped by FID
+
+  Stats declare which filter they need:
+
+  stats = [
+      SampleStatistics(),                           # no filter (full sample)
+      HasemanElston(filter=SibPairFilter()),         # needs sib pairs
+      ParentOffspringRegression(filter=TrioFilter()), # needs trios
+  ]
+
+  Option B: Filters are separate, stats receive pre-filtered data
+
+  sim = Simulation(
+      ...,
+      filters={'trios': TrioFilter(), 'sibs': SibPairFilter()},
+      statistics=[
+          SampleStatistics(),
+          HasemanElston(filter='sibs'),
+          ParentOffspringRegression(filter='trios'),
+      ],
+  )
+
+  Filters are computed once per generation, then shared across all stats that
+  reference them. Avoids recomputing the same relational query for multiple
+  stats.
+
+  I'd lean Option B — filters computed once, referenced by name, shared across
+  stats.
+
+  Does this match the use case, or are the relational queries more complex than
+  this?
+
+❯ B is great 
+
+● Good — named filters computed once, shared across stats.
+
+  ---
+  Critique #6: | FID grouping — who resolves the group?
+
+  height.famEnv ~ cnoise(0.1) | FID needs to:
+  1. Look up FID in SampleMeta (core field or extra)
+  2. Draw one noise value per unique FID
+  3. Broadcast to all samples sharing that FID
+
+  This means architecture execution nodes need access to SampleMeta. It's
+  available via haplotype_history[gen].samples, but the execution engine needs
+  to explicitly thread it through to each node.
+
+  Is this just an implementation detail (make sure SampleMeta is accessible
+  during compute()), or does it change the design in any meaningful way?
+
+❯ pause for a second to take notes, i don't want to lose any of this. then  
+  commit to repo and push. then resume on critique 6                        
+
+● Let me write up the full design document first.
+
+● Write(docs/plans/2026-02-05-refactor-design.md)
+  ⎿  Wrote 547 lines to docs/plans/2026-02-05-refactor-design.md
+      1 # xftsim Refactor Design Document
+      2 
+      3 **Date:** 2026-02-05
+      4 **Branch:** ajay
+      5 **Status:** In progress — brainstorming phase
+      6 
+      7 ---
+      8 
+      9 ## Motivation
+     … +537 lines (ctrl+o to expand)
+
+● Now let me commit and push.
+
+● Bash(git status)
+  ⎿  On branch ajay
+     Your branch is ahead of 'origin/ajay' by 1 commit.
+       (use "git push" to publish your local commits)
+     … +13 lines (ctrl+o to expand)
+
+● Bash(git log --oneline -5)
+  ⎿  db9d7df refactor plan continuing
+     82c1407 refactoring
+     05b93b4 Ajay's refactor
+     … +2 lines (ctrl+o to expand)
+
+● Bash(git add docs/plans/2026-02-05-refactor-design.md && git commit -m "Add
+      comprehensive refactor design document from brainstorming session…)
+  ⎿ [ajay ce383ba] Add comprehensive refactor design document from brainsto
+    rming session
+     2 files changed, 547 insertions(+), 1 deletion(-)
+    … +2 lines (ctrl+o to expand)
+
+
+● Bash(git push)
+  ⎿  To github.com:border-lab/xftsim.git
+        82c1407..ce383ba  ajay -> ajay
+
+● Committed and pushed. Now back to the critique.
+
+  ---
+  Critique #6: | FID grouping — who resolves the group?
+
+  height.famEnv ~ cnoise(0.1) | FID needs to:
+  1. Look up FID in SampleMeta (core field or extra)
+  2. Draw one noise value per unique FID
+  3. Broadcast to all samples sharing that FID
+
+  This means execution nodes need access to SampleMeta. It's available via
+  haplotype_history[gen].samples, so the compute() method just needs to pass it
+  through.
+
+  Is this just a straightforward implementation detail, or do you see
+  complications?
+
+✻ Sautéed for 2m 0s
+
+❯ re 6 i don't think that should change the design in a meaningful way--we  
+  already use sample meta for VT right?. also we want to make a note that   
+  we'll need to come up with a robust testing / CI framework for the        
+  development process, ideally by hammering out a super detailed spec at    
+  first and periodically reassessing to modify if agents run into trouble   
+
+● Right — SampleMeta is already accessible for VT (pedigree lookups), so | FID
+  just uses the same path. Non-issue.
+
+  Noted on testing/CI. I'll add that to the design doc before we're done — the
+  idea being: write a detailed spec upfront so agents can write tests against
+  it, then reassess the spec periodically as implementation reveals surprises.
+
+  ---
+  Critique #7: Sibling references — who are siblings?
+
+  sibling_mean(X) needs to know sibling identity. Recommendation was: siblings =
+   same FID + same generation. This is simple and covers the common case (each
+  mating pair produces a sibship).
+
+  Edge case: half-siblings (share one parent but different FID). Would you ever
+  need half_sibling_mean(X), or is FID-based sufficient?
+
+❯ another way would be to nest noise within clustering factors (e.g.        
+  mother)                                                                   
+
+● That's more expressive. So | takes any grouping factor, including relational
+  ones:
+
+  height.famEnv ~ cnoise(0.1) | FID          # shared within nuclear family
+  height.matEnv ~ cnoise(0.1) | mother       # shared among maternal half-sibs
+  height.patEnv ~ cnoise(0.1) | father       # shared among paternal half-sibs
+  height.school ~ cnoise(0.1) | school       # from SampleMeta.extra
+
+  For | mother and | father, the grouping resolves via pedigree — group all
+  offspring sharing the same maternal_idx or paternal_idx. This naturally
+  handles half-siblings without needing a separate concept.
+
+  And for sibling reference functions like sibling_mean(X), you could scope them
+   the same way:
+
+  edu.sib ~ sibling_mean(edu) | mother       # mean among maternal half-sibs
+  edu.sib ~ sibling_mean(edu) | FID          # mean among full sibs (default)
+
+  Does sibling scoping via | feel right, or should sibling references default to
+   FID and the | syntax stay just for noise grouping?
+
+❯ yes that's perfect. not just noise, you could imagine means as well 
+
+● Right — | is a general grouping operator, not noise-specific:
+
+  # Grouped noise
+  height.famEnv ~ cnoise(0.1) | FID
+
+  # Grouped means (sibling references)
+  edu.sib ~ sibling_mean(edu) | mother
+
+  # Could also imagine grouped aggregation
+  height.familyMean ~ mean(height) | FID
+
+  The | operator means "compute the left-hand expression within groups defined
+  by the right-hand variable." The variable resolves from SampleMeta fields,
+  SampleMeta extras, or relational references (mother, father via pedigree).
+
+  I'll update the design doc with this. Moving on.
+
+  ---
+  Critique #8: Multivariate node execution
+
+  (height.G, bmi.G) ~ mvEffects(eff) is one node in the DAG but produces two
+  outputs. The toposort needs to handle this.
+
+  Recommendation: a single node registers multiple output names. The dependency
+  graph tracks output names, but execution fires the node once. Downstream nodes
+   referencing height.G or bmi.G both depend on this single node.
+
+  DAG node: "mvEffects_0"
+    outputs: ["height.G", "bmi.G"]
+
+  DAG node: "aggregation_height"
+    inputs: ["height.G", "height.E"]
+    outputs: ["height"]
+
+  Straightforward implementation detail, or do you see issues?
+
+❯ /export plan0205.txt 
+  ⎿  Conversation exported to: plan0205.txt
+
+❯ we need to stop for now, let's come back to this. commit / track any      
+  loose ends                                                                
+
+● Let me update the design doc with the new decisions and track remaining items.
+
+● Read 1 file (ctrl+o to expand)
+
+● Update(docs/plans/2026-02-05-refactor-design.md)
+  ⎿  Added 25 lines
+      519  height ~ height.G + height.famEnv + height.E
+      520  ```
+      521  
+      522 +### Grouping operator `|` (general)                           
+      523 +                                                              
+      524 +`|` is a general grouping operator, not noise-specific. The ri
+          +ght-hand variable resolves from:                              
+      525 +- SampleMeta core fields (FID, sex, generation)               
+      526 +- SampleMeta extras (school, batch, etc.)                     
+      527 +- Relational references (mother, father — resolved via pedigre
+          +e)                                                            
+      528 +                                                              
+      529 +```                                                           
+      530 +# Grouped noise                                               
+      531 +height.famEnv ~ cnoise(0.1) | FID            # shared within n
+          +uclear family                                                 
+      532 +height.matEnv ~ cnoise(0.1) | mother         # shared among ma
+          +ternal half-sibs                                              
+      533 +height.patEnv ~ cnoise(0.1) | father         # shared among pa
+          +ternal half-sibs                                              
+      534 +height.school ~ cnoise(0.1) | school         # from SampleMeta
+          +.extra                                                        
+      535 +                                                              
+      536 +# Grouped means (sibling references)                          
+      537 +edu.sib ~ sibling_mean(edu) | mother         # mean among mate
+          +rnal half-sibs                                                
+      538 +edu.sib ~ sibling_mean(edu) | FID            # mean among full
+          + sibs                                                         
+      539 +                                                              
+      540 +# General grouped aggregation                                 
+      541 +height.familyMean ~ mean(height) | FID                        
+      542 +```                                                           
+      543 +                                                              
+      544 +For `| mother` and `| father`, grouping resolves via pedigree 
+          +— all offspring sharing                                       
+      545 +the same `maternal_idx` or `paternal_idx` are grouped together
+          +.                                                             
+      546 +                                                              
+      547  ### GxE interaction
+      548  ```
+      549  income.G ~ genetic(eff)
+
+● Update(docs/plans/2026-02-05-refactor-design.md)
+  ⎿  Added 11 lines, removed 6 lines
+      563  4. **Offspring SampleMeta** — Mating regime creates offspring 
+           metadata in MateAssignment.
+      564  5. **Filtering** — Named filters computed once per gen, shared
+            across stats. Support structured relational subsets (trios, s
+           ib pairs).
+      565  
+      566 -### In Progress (continuing critique)                         
+      567 -6. `| FID` grouping — execution engine needs SampleMeta access
+      568 -7. Siblings — same-FID-same-generation definition             
+      569 -8. Multivariate node execution — multi-output nodes in DAG    
+      570 -9. Post-processors → callbacks                                
+      571 -10. No backwards compatibility shim (clean break)             
+      566 +### Resolved (continued, 2026-02-05 session 2)                
+      567 +6. **`|` grouping operator** — General grouping, not just nois
+          +e. Resolves from SampleMeta fields, extras, or relational refs
+          + (mother/father via pedigree). SampleMeta already accessible f
+          +or VT, so no design change needed.                            
+      568 +7. **Sibling identity** — Scoped via `|` operator: `sibling_me
+          +an(X) | FID` (full sibs), `sibling_mean(X) | mother` (maternal
+          + half-sibs). No hardcoded sibling definition.                 
+      569 +                                                              
+      570 +### Remaining Critiques (to resume)                           
+      571 +8. Multivariate node execution — multi-output nodes in DAG (re
+          +commendation drafted, needs confirmation)                     
+      572 +9. Post-processors → callbacks (recommendation: simple `list[C
+          +allable]`)                                                    
+      573 +10. No backwards compatibility shim (recommendation: clean bre
+          +ak)                                                           
+      574 +                                                              
+      575 +### Additional Notes                                          
+      576 +- **Testing/CI framework needed:** Write a detailed spec upfro
+          +nt so agents can write tests against it. Periodically reassess
+          + spec as implementation reveals surprises. This is critical fo
+          +r the agent-driven development workflow.                      
+
+● Now let me also save a memory file so future sessions can pick up quickly.
+
+● Wrote 1 memory (ctrl+o to expand)
+
+❯ /export plan0205v2.txt 
+
+● Bash(git add docs/plans/2026-02-05-refactor-design.md && git commit -m "Update
+       design doc: grouping operator refinements and remaining critiques…)
+  ⎿ [ajay 81383a2] Update design doc: grouping operator refinements and rem
+    aining critiques
+     2 files changed, 37 insertions(+), 7 deletions(-)
+    … +5 lines (ctrl+o to expand)
+
+
+● All committed and pushed. To resume next time:
+
+  Where we left off:
+  - Design doc: docs/plans/2026-02-05-refactor-design.md
+  - 3 remaining critiques: #8 (multivariate DAG nodes), #9 (callbacks vs
+  post-processors), #10 (backwards compat)
+  - After critiques: write detailed testing/CI spec, then move to implementation
+   planning
+  - Session transcripts saved as refactor_tuesday.txt, plan0205.txt,
+  plan0205v2.txt
+
+✻ Cooked for 50s

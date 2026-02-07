@@ -2450,6 +2450,209 @@ class DenseHaplotypeArray(HaplotypeArray, HaplotypeOperator):
         return f"DenseHaplotypeArray({', '.join(parts)})"
 
 
+def _extract_variant_meta_from_grg(grg) -> VariantMeta:
+    """Extract VariantMeta from a pygrgl GRG object.
+
+    Constructs variant IDs as "{position}:{ref}:{alt}".
+    Chromosome information is not available from GRG metadata.
+    """
+    m = grg.num_mutations
+    positions = np.empty(m, dtype=np.int64)
+    ref_alleles = np.empty(m, dtype=object)
+    alt_alleles = np.empty(m, dtype=object)
+    vids = np.empty(m, dtype=object)
+
+    for i in range(m):
+        mut = grg.get_mutation_by_id(i)
+        positions[i] = int(mut.position)
+        ref_alleles[i] = str(mut.ref_allele)
+        alt_alleles[i] = str(mut.allele)
+        vids[i] = f"{int(mut.position)}:{mut.ref_allele}:{mut.allele}"
+
+    return VariantMeta(
+        vid=vids,
+        pos_bp=positions,
+        zero_allele=ref_alleles,
+        one_allele=alt_alleles,
+    )
+
+
+class GraphHaplotypeOperator(HaplotypeOperator):
+    """GRG-backed haplotype operator using pygrgl graph traversal.
+
+    Provides O(nodes)-per-variant matvec without materializing the full
+    genotype matrix.  After meiosis, offspring revert to DenseHaplotypeArray
+    since GRG has no native recombination support.
+
+    Parameters
+    ----------
+    grg : pygrgl.GRG
+        Loaded GRG object (via ``pygrgl.load_immutable_grg``).
+    generation : int
+        Generation number (default 0).
+    samples : SampleMeta, optional
+        Sample metadata.  If None, extracted from GRG individual IDs.
+    variants : VariantMeta, optional
+        Variant metadata.  If None, extracted from GRG mutation data.
+    """
+
+    def __init__(self, grg, generation: int = 0,
+                 samples: Optional[SampleMeta] = None,
+                 variants: Optional[VariantMeta] = None):
+        self._grg = grg
+        self._generation = generation
+        self._cached_af = None
+
+        # --- Samples ---
+        if samples is None:
+            n = grg.num_individuals
+            if grg.has_individual_ids:
+                iid = np.array([grg.get_individual_id(i) for i in range(n)])
+            else:
+                iid = np.arange(n, dtype=np.int64)
+            self.samples = SampleMeta(iid=iid, generation=generation)
+        else:
+            if samples.n != grg.num_individuals:
+                raise ValueError(
+                    f"samples.n ({samples.n}) != grg.num_individuals ({grg.num_individuals})"
+                )
+            if samples.generation != generation:
+                self.samples = samples.with_generation(generation)
+            else:
+                self.samples = samples
+
+        # --- Variants ---
+        if variants is None:
+            self.variants = _extract_variant_meta_from_grg(grg)
+        else:
+            if variants.m != grg.num_mutations:
+                raise ValueError(
+                    f"variants.m ({variants.m}) != grg.num_mutations ({grg.num_mutations})"
+                )
+            self.variants = variants
+
+    # --- properties ---
+
+    @property
+    def n(self) -> int:
+        return self._grg.num_individuals
+
+    @property
+    def m(self) -> int:
+        return self._grg.num_mutations
+
+    @property
+    def generation(self) -> int:
+        return self._generation
+
+    @generation.setter
+    def generation(self, value: int):
+        self._generation = value
+
+    # --- matrix-vector operations ---
+
+    def matvec(self, v: np.ndarray) -> np.ndarray:
+        """Diploid G @ v via GRG DOWN traversal (by_individual=True)."""
+        import pygrgl
+        v = np.asarray(v, dtype=np.float64)
+        inp = np.atleast_2d(v.T)  # (K, m)
+        out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalDirection.DOWN,
+                            by_individual=True)  # (K, n)
+        result = out.T  # (n, K)
+        if v.ndim == 1:
+            return result.ravel()
+        return result
+
+    def rmatvec(self, v: np.ndarray) -> np.ndarray:
+        """G.T @ v via GRG UP traversal (by_individual=True)."""
+        import pygrgl
+        v = np.asarray(v, dtype=np.float64)
+        inp = np.atleast_2d(v.T)  # (K, n)
+        out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalDirection.UP,
+                            by_individual=True)  # (K, m)
+        result = out.T  # (m, K)
+        if v.ndim == 1:
+            return result.ravel()
+        return result
+
+    def matvec_maternal(self, v: np.ndarray) -> np.ndarray:
+        """Maternal haplotype matvec via GRG DOWN haploid, even indices."""
+        import pygrgl
+        v = np.asarray(v, dtype=np.float64)
+        inp = np.atleast_2d(v.T)  # (K, m)
+        out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalDirection.DOWN,
+                            by_individual=False)  # (K, 2n)
+        maternal = out[:, 0::2]  # even = maternal
+        result = maternal.T  # (n, K)
+        if v.ndim == 1:
+            return result.ravel()
+        return result
+
+    def matvec_paternal(self, v: np.ndarray) -> np.ndarray:
+        """Paternal haplotype matvec via GRG DOWN haploid, odd indices."""
+        import pygrgl
+        v = np.asarray(v, dtype=np.float64)
+        inp = np.atleast_2d(v.T)  # (K, m)
+        out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalDirection.DOWN,
+                            by_individual=False)  # (K, 2n)
+        paternal = out[:, 1::2]  # odd = paternal
+        result = paternal.T  # (n, K)
+        if v.ndim == 1:
+            return result.ravel()
+        return result
+
+    def standardized_matvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
+        """Centered diploid matvec: G@v - 2*af@v (no materialization)."""
+        v = np.asarray(v, dtype=np.float64)
+        if af is None:
+            af = self.recompute_af()
+        raw = self.matvec(v)
+        # centering: E[G_ij] = 2*af_j, so (G - 2p)@v = G@v - 2p@v
+        correction = 2.0 * (af @ v)
+        return raw - correction
+
+    def recompute_af(self) -> np.ndarray:
+        """Compute allele frequencies via GRG UP traversal: G.T @ 1 / (2n)."""
+        import pygrgl
+        if self._cached_af is not None:
+            return self._cached_af
+        ones = np.ones((1, self.n), dtype=np.float64)
+        counts = pygrgl.matmul(self._grg, ones, pygrgl.TraversalDirection.UP,
+                               by_individual=True)  # (1, m)
+        self._cached_af = (counts.ravel() / (2.0 * self.n))
+        return self._cached_af
+
+    def to_dense(self) -> DenseHaplotypeArray:
+        """Materialize full genotype matrix via identity matvec."""
+        import pygrgl
+        eye = np.eye(self.m, dtype=np.float64)  # (m, m)
+        # DOWN haploid: (m, m) -> (m, 2n)
+        haploid = pygrgl.matmul(self._grg, eye, pygrgl.TraversalDirection.DOWN,
+                                by_individual=False)  # (m, 2n)
+        # Reshape to (n, m, 2): maternal=even, paternal=odd
+        maternal = haploid[:, 0::2].T  # (n, m)
+        paternal = haploid[:, 1::2].T  # (n, m)
+        genotypes = np.stack([maternal, paternal], axis=2).astype(np.int8)
+        return DenseHaplotypeArray(
+            genotypes=genotypes,
+            generation=self._generation,
+            samples=self.samples,
+            variants=self.variants,
+        )
+
+    def meiosis(self, assignment, recombination_map) -> DenseHaplotypeArray:
+        """Materialize to dense, then perform meiosis."""
+        return self.to_dense().meiosis(assignment, recombination_map)
+
+    def __getitem__(self, key) -> DenseHaplotypeArray:
+        """Materialize to dense and subset."""
+        return self.to_dense()[key]
+
+    def __repr__(self) -> str:
+        return (f"GraphHaplotypeOperator(n={self.n}, m={self.m}, "
+                f"generation={self.generation})")
+
+
 class NHaplotypeArrayAccessor:
     """
     Accessor class that mimics the xarray .xft interface for DenseHaplotypeArray.

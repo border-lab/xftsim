@@ -283,6 +283,64 @@ def load_haplotypes_npz(path: str) -> xft.struct.NHaplotypeArray:
     )
 
 
+def load_grg(path: str, generation: int = 0,
+             bim_path: str = None) -> "xft.struct.GraphHaplotypeOperator":
+    """
+    Load a GRG file and return a GraphHaplotypeOperator.
+
+    Parameters
+    ----------
+    path : str
+        Path to the .grg file.
+    generation : int, optional
+        Generation number. Default 0.
+    bim_path : str, optional
+        Path to a PLINK .bim file for chromosome/allele metadata.
+        If None, variant metadata is extracted from the GRG itself.
+
+    Returns
+    -------
+    xft.struct.GraphHaplotypeOperator
+    """
+    import pygrgl
+    grg = pygrgl.load_immutable_grg(path)
+
+    # Extract sample metadata from GRG
+    n = grg.num_individuals
+    if grg.has_individual_ids:
+        iid = np.array([grg.get_individual_id(i) for i in range(n)])
+    else:
+        iid = np.arange(n, dtype=np.int64)
+    samples = xft.struct.SampleMeta(iid=iid, generation=generation)
+
+    # Variant metadata: from BIM if provided, else from GRG
+    variants = None
+    if bim_path is not None:
+        bim = pd.read_csv(bim_path, sep='\t', header=None,
+                          names=['chrom', 'vid', 'cm', 'pos_bp', 'a1', 'a0'])
+        m_bim = len(bim)
+        m_grg = grg.num_mutations
+        if m_bim != m_grg:
+            raise ValueError(
+                f"BIM has {m_bim} variants but GRG has {m_grg} mutations"
+            )
+        pos_cM = bim['cm'].values
+        if np.all(pos_cM == 0):
+            pos_cM = None
+        variants = xft.struct.VariantMeta(
+            vid=bim['vid'].values.astype(str),
+            chrom=bim['chrom'].values,
+            pos_bp=bim['pos_bp'].values,
+            pos_cM=pos_cM,
+            zero_allele=bim['a0'].values.astype(str),
+            one_allele=bim['a1'].values.astype(str),
+        )
+
+    return xft.struct.GraphHaplotypeOperator(
+        grg, generation=generation, samples=samples, variants=variants,
+    )
+
+
 # Legacy functions for XarrayHaplotypeArray compatibility
 
 def plink1_variant_index(ppxr: xr.DataArray) -> xft.index.DiploidVariantIndex:
