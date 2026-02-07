@@ -341,6 +341,54 @@ def load_grg(path: str, generation: int = 0,
     )
 
 
+def save_phenotypes_npz(phenotypes: xft.struct.NPhenotypeArray,
+                         path: str) -> None:
+    """
+    Save NPhenotypeArray to compressed numpy format.
+
+    Parameters
+    ----------
+    phenotypes : xft.struct.NPhenotypeArray
+        The phenotype data to save.
+    path : str
+        The path to save to (will add .npz extension if not present).
+    """
+    save_dict = {
+        'sample_iid': phenotypes.samples.iid,
+        'sample_fid': phenotypes.samples.fid,
+        'sample_sex': phenotypes.samples.sex,
+        'pheno_keys': np.array(list(phenotypes.keys)),
+    }
+    for key in phenotypes.keys:
+        save_dict[f'pheno_{key}'] = phenotypes[key]
+    np.savez_compressed(path, **save_dict)
+
+
+def load_phenotypes_npz(path: str) -> xft.struct.NPhenotypeArray:
+    """
+    Load NPhenotypeArray from compressed numpy format.
+
+    Parameters
+    ----------
+    path : str
+        The path to load from.
+
+    Returns
+    -------
+    xft.struct.NPhenotypeArray
+    """
+    data = np.load(path, allow_pickle=True)
+    samples = xft.struct.SampleMeta(
+        iid=data['sample_iid'],
+        fid=data['sample_fid'],
+        sex=data['sample_sex'],
+    )
+    values = {}
+    for key in data['pheno_keys']:
+        values[str(key)] = data[f'pheno_{key}']
+    return xft.struct.NPhenotypeArray(samples=samples, values=values)
+
+
 # Legacy functions for XarrayHaplotypeArray compatibility
 
 def plink1_variant_index(ppxr: xr.DataArray) -> xft.index.DiploidVariantIndex:

@@ -672,6 +672,23 @@ class Architecture:
                 self._register_node(node)
             self._sorted = self._toposort()
 
+    @classmethod
+    def from_formula(cls, formula: str, effects: dict = None) -> "Architecture":
+        """Construct an Architecture from a DSL formula string.
+
+        Parameters
+        ----------
+        formula : str
+            Multi-line formula string (see parser module for grammar).
+        effects : dict, optional
+            Name → EffectSpec mapping for resolving effect references.
+
+        Returns
+        -------
+        Architecture
+        """
+        return cls(formula=formula, effects=effects)
+
     def add(self, outputs: Union[str, list], component: ArchComponent,
             inputs: list = None, grouping: str = None):
         """

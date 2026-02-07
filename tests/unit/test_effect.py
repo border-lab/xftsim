@@ -113,3 +113,62 @@ class TestSparseEffects:
         e2 = SparseEffects.from_h2(h2=0.5, m=50, k_causal=5, seed=42)
         np.testing.assert_array_equal(e1.effects, e2.effects)
         np.testing.assert_array_equal(e1.variant_mask, e2.variant_mask)
+
+
+class TestSparseEffectsIntegration:
+    """Verify SparseEffects works with GeneticComponent and simulations."""
+
+    def test_sparse_with_genetic_component(self):
+        """SparseEffects should work as a drop-in for GeneticComponent."""
+        from xftsim.narch import GeneticComponent
+        from tests.testdata import TestGenomes
+
+        eff = SparseEffects.from_h2(h2=0.5, m=100, k_causal=10, seed=42)
+        gc = GeneticComponent(effects=eff)
+        hap = TestGenomes.simple(n=50, m=100, seed=42)
+
+        from xftsim.narch import ArchNode
+        from xftsim.struct import NPhenotypeArray
+        node = ArchNode(outputs=['Y.G'], component=gc, inputs=[])
+        pheno = NPhenotypeArray(samples=hap.samples)
+        result = gc.compute(node, hap, pheno)
+        assert result.shape == (50,)
+        assert np.all(np.isfinite(result))
+
+    def test_sparse_in_formula(self):
+        """SparseEffects should work via formula-based Architecture."""
+        from xftsim.narch import Architecture
+
+        eff = SparseEffects.from_h2(h2=0.5, m=50, k_causal=5, seed=42)
+        arch = Architecture.from_formula("""
+            Y.G ~ genetic(eff)
+            Y.E ~ noise(0.5)
+            Y ~ Y.G + Y.E
+        """, effects={'eff': eff})
+        assert len(arch.nodes) == 3
+
+    def test_sparse_sim_runs(self):
+        """Full simulation with SparseEffects should complete."""
+        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.nsim import NSimulation
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+        from tests.testdata import TestSimulation
+
+        m = 50
+        eff = SparseEffects.from_h2(h2=0.5, m=m, k_causal=10, seed=42)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        hap = TestSimulation.founder_haplotypes(n=500, m=m, seed=42)
+        rmap = RecombinationMap.constant_map(m=m, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        sim = NSimulation(
+            founder_haplotypes=hap, architecture=arch,
+            mating_regime=mate, recombination_map=rmap, seed=42,
+        )
+        sim.run(2)
+        assert np.all(np.isfinite(sim.phenotype_history[0]['Y']))
+        assert np.all(np.isfinite(sim.phenotype_history[1]['Y']))

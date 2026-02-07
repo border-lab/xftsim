@@ -1926,7 +1926,7 @@ class HaplotypeOperator(ABC):
 
     Concrete implementations:
     - DenseHaplotypeArray — NumPy-backed (n, m, 2) array
-    - GraphHaplotypeOperator — GRG wrapper (Phase 4)
+    - GraphHaplotypeOperator — GRG wrapper (pygrgl graph traversal)
     """
 
     # samples: SampleMeta  — set by concrete implementations
