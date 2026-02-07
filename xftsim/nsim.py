@@ -167,6 +167,21 @@ class NSimulation:
         """Current generation's phenotypes."""
         return self.phenotype_history[self.generation]
 
+    def _validate(self):
+        """Check that architecture effect dimensions match haplotype dimensions."""
+        from xftsim.narch import GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent
+        hap = self.haplotype_history[0]
+        m = hap.m
+        for node in self.architecture.nodes:
+            comp = node.component
+            if isinstance(comp, (GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent)):
+                eff_m = comp.effects.m
+                if eff_m != m:
+                    raise ValueError(
+                        f"Effect dimension mismatch for node {node.outputs}: "
+                        f"effects have m={eff_m} but founder haplotypes have m={m}"
+                    )
+
     def run(self, n_generations: int):
         """
         Run the simulation for n_generations.
@@ -179,6 +194,8 @@ class NSimulation:
         n_generations : int
             Number of generations to simulate (including gen 0).
         """
+        self._validate()
+
         # --- Generation 0: founders ---
         hap = self.haplotype_history[0]
         pheno = self.architecture.compute(

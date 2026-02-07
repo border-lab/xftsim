@@ -393,3 +393,32 @@ class TestGeneticCovariance:
         assert 0.15 < observed_h2 < 0.85, (
             f"Observed h2={observed_h2:.3f}, expected roughly ~{h2}"
         )
+
+
+class TestValidation:
+    def test_effect_dimension_mismatch(self):
+        """Mismatched effect m vs founder m should raise ValueError."""
+        hap = TestSimulation.founder_haplotypes(n=100, m=50, seed=42)
+        # Effects with m=20, but founders have m=50
+        eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        rmap = RecombinationMap.constant_map(m=50, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+
+        with pytest.raises(ValueError, match="Effect dimension mismatch"):
+            sim.run(1)
+
+    def test_matching_dimensions_ok(self):
+        """Matching effect m and founder m should not raise."""
+        hap = TestSimulation.founder_haplotypes(n=100, m=50, seed=42)
+        arch = TestSimulation.simple_architecture(m=50, h2=0.5, seed=42)
+        rmap = RecombinationMap.constant_map(m=50, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim.run(1)  # Should not raise
+        assert np.all(np.isfinite(sim.phenotype_history[0]['Y']))
