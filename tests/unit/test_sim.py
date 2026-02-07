@@ -6,8 +6,11 @@ import pytest
 
 from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
 from xftsim.nmate import NMateAssignment, RandomMating
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.neffect import AdditiveEffects
+from xftsim.narch import (
+    Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
+    MVGeneticComponent, HaplotypeGeneticComponent,
+)
+from xftsim.neffect import AdditiveEffects, MultivariateEffects
 from xftsim.reproduce import RecombinationMap
 from xftsim.nsim import NSimulation
 
@@ -605,3 +608,134 @@ class TestNSimulationEdgeCases:
         assert len(sim.results) == 3
         for r in sim.results:
             assert 'SampleStatistics' in r.statistics
+
+
+class TestSimCallbackEdgeCases:
+    """Test callback behavior edge cases."""
+
+    @pytest.fixture
+    def sim_components(self):
+        hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
+        arch = TestSimulation.simple_architecture(m=20, h2=0.5, seed=123)
+        rmap = RecombinationMap.constant_map(m=20, p=0.5)
+        return hap, arch, RandomMating(offspring_per_pair=2), rmap
+
+    def test_callback_exception_propagates(self, sim_components):
+        """If a callback raises an exception, it should propagate."""
+        hap, arch, rm, rmap = sim_components
+        def bad_callback(sim):
+            raise RuntimeError("callback error")
+        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[bad_callback])
+        with pytest.raises(RuntimeError, match="callback error"):
+            sim.run(2)
+
+    def test_callback_receives_sim_object(self, sim_components):
+        """Callback should receive the simulation object."""
+        hap, arch, rm, rmap = sim_components
+        received = []
+        def track_callback(s):
+            received.append(s.generation)
+        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[track_callback])
+        sim.run(3)
+        assert received == [0, 1, 2]
+
+    def test_multiple_callbacks_all_called(self, sim_components):
+        """All callbacks should be called each generation."""
+        hap, arch, rm, rmap = sim_components
+        counts = [0, 0]
+        def cb1(s): counts[0] += 1
+        def cb2(s): counts[1] += 1
+        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[cb1, cb2])
+        sim.run(3)
+        assert counts == [3, 3]
+
+
+class TestSimValidationEdgeCases:
+    """Test _validate() with different component types."""
+
+    def test_mvgenetic_dimension_mismatch(self):
+        """MVGeneticComponent with wrong m should raise at validation."""
+        hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
+        eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=30, seed=42)
+        arch = Architecture()
+        arch.add(['Y1.G', 'Y2.G'], MVGeneticComponent(eff))
+        arch.add('Y1.E', NoiseComponent(variance=0.5))
+        arch.add('Y2.E', NoiseComponent(variance=0.5))
+        arch.add('Y1', AggregationComponent('Y1.G + Y1.E'))
+        arch.add('Y2', AggregationComponent('Y2.G + Y2.E'))
+
+        rmap = RecombinationMap.constant_map(m=20, p=0.5)
+        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
+        with pytest.raises(ValueError, match="Effect dimension mismatch"):
+            sim.run(1)
+
+    def test_haplotype_genetic_dimension_mismatch(self):
+        """HaplotypeGeneticComponent with wrong m should raise at validation."""
+        hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
+        eff = AdditiveEffects.from_h2(h2=0.5, m=30, seed=42)
+        arch = Architecture()
+        arch.add('Y.G', HaplotypeGeneticComponent(eff, haplotype='maternal'))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        rmap = RecombinationMap.constant_map(m=20, p=0.5)
+        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
+        with pytest.raises(ValueError, match="Effect dimension mismatch"):
+            sim.run(1)
+
+    def test_matching_dimensions_pass(self):
+        """Correctly matched dimensions should not raise."""
+        hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
+        eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        rmap = RecombinationMap.constant_map(m=20, p=0.5)
+        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
+        sim.run(1)  # Should not raise
+        assert np.all(np.isfinite(sim.phenotypes['Y']))
+
+
+class TestSimRetentionEdgeCases:
+    """Test retention policy edge cases."""
+
+    def test_retain_haplotypes_zero(self):
+        """retain_haplotypes=0 should keep no old haplotypes (only current gen)."""
+        hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
+        arch = TestSimulation.simple_architecture(m=20, h2=0.5, seed=123)
+        rmap = RecombinationMap.constant_map(m=20, p=0.5)
+        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
+                         seed=42, retain_haplotypes=0)
+        sim.run(5)
+        # Only the most recent gen's haplotypes should remain
+        # (gen 4 is current, retain=0 means keep 0 past gens → only gen 4)
+        assert sim.generation == 4
+        assert 4 in sim.haplotype_history
+        # Earlier generations should be pruned
+        assert 0 not in sim.haplotype_history
+        assert 1 not in sim.haplotype_history
+
+    def test_retain_phenotypes_one(self):
+        """retain_phenotypes=1 should keep only current + 1 past gen."""
+        hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
+        arch = TestSimulation.simple_architecture(m=20, h2=0.5, seed=123)
+        rmap = RecombinationMap.constant_map(m=20, p=0.5)
+        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
+                         seed=42, retain_phenotypes=1)
+        sim.run(5)
+        # Should have at most 2 generations in phenotype history
+        assert len(sim.phenotype_history) <= 2
+        assert 4 in sim.phenotype_history
+
+    def test_single_generation_no_pruning(self):
+        """Running 1 generation should not prune anything."""
+        hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
+        arch = TestSimulation.simple_architecture(m=20, h2=0.5, seed=123)
+        rmap = RecombinationMap.constant_map(m=20, p=0.5)
+        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
+                         seed=42, retain_haplotypes=1, retain_phenotypes=1)
+        sim.run(1)
+        assert 0 in sim.haplotype_history
+        assert 0 in sim.phenotype_history

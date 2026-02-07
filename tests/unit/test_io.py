@@ -543,6 +543,20 @@ class TestIOEdgeCases:
         assert loaded['retain_haplotypes'] == 3
         assert loaded['retain_phenotypes'] == 7
 
+    def test_load_effects_unknown_class(self, tmp_path):
+        """Loading effects with an unknown class name should raise ValueError."""
+        # Create a valid effects file, then tamper with the class_name
+        eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
+        path = str(tmp_path / "tampered.npz")
+        np.savez_compressed(path,
+            effects=eff.effects,
+            standardized=np.array([eff.standardized]),
+            variant_mask=eff.variant_mask,
+            class_name=np.array(['FakeEffectsClass']),
+        )
+        with pytest.raises(ValueError, match="Unknown EffectSpec class"):
+            load_effects_npz(path)
+
     def test_architecture_with_sibling_roundtrip(self, tmp_path):
         """Architecture with sibling component should roundtrip."""
         from xftsim.io import save_architecture, load_architecture
@@ -558,3 +572,79 @@ class TestIOEdgeCases:
 
         assert len(loaded.nodes) == 2
         assert loaded.nodes[1].outputs == ['X.mean']
+
+
+class TestGenotypesToPseudoHaplotypes:
+    """Tests for the genotypes_to_pseudo_haplotypes function."""
+
+    def test_homozygous_zero(self):
+        """Genotype 0 should produce (0, 0) haplotypes."""
+        from xftsim.io import genotypes_to_pseudo_haplotypes
+        geno = np.array([[0, 0, 0]], dtype=np.int8)
+        hap = genotypes_to_pseudo_haplotypes(geno)
+        assert hap.shape == (1, 3, 2)
+        np.testing.assert_array_equal(hap[0, :, 0] + hap[0, :, 1], [0, 0, 0])
+
+    def test_homozygous_two(self):
+        """Genotype 2 should produce (1, 1) haplotypes."""
+        from xftsim.io import genotypes_to_pseudo_haplotypes
+        geno = np.array([[2, 2, 2]], dtype=np.int8)
+        hap = genotypes_to_pseudo_haplotypes(geno)
+        np.testing.assert_array_equal(hap[0, :, 0], [1, 1, 1])
+        np.testing.assert_array_equal(hap[0, :, 1], [1, 1, 1])
+
+    def test_heterozygous_sum(self):
+        """Genotype 1 should produce haplotypes summing to 1."""
+        from xftsim.io import genotypes_to_pseudo_haplotypes
+        geno = np.array([[1, 1, 1, 1, 1]], dtype=np.int8)
+        hap = genotypes_to_pseudo_haplotypes(geno)
+        sums = hap[0, :, 0] + hap[0, :, 1]
+        np.testing.assert_array_equal(sums, [1, 1, 1, 1, 1])
+
+    def test_output_shape(self):
+        """Output should be (n, m, 2)."""
+        from xftsim.io import genotypes_to_pseudo_haplotypes
+        geno = np.zeros((10, 5), dtype=np.int8)
+        hap = genotypes_to_pseudo_haplotypes(geno)
+        assert hap.shape == (10, 5, 2)
+
+    def test_output_dtype(self):
+        """Output should be int8."""
+        from xftsim.io import genotypes_to_pseudo_haplotypes
+        geno = np.zeros((3, 3), dtype=np.int8)
+        hap = genotypes_to_pseudo_haplotypes(geno)
+        assert hap.dtype == np.int8
+
+    def test_diploid_sum_preserved(self):
+        """Sum across haplotypes should equal original genotype."""
+        from xftsim.io import genotypes_to_pseudo_haplotypes
+        rng = np.random.RandomState(42)
+        geno = rng.choice([0, 1, 2], size=(20, 10)).astype(np.int8)
+        hap = genotypes_to_pseudo_haplotypes(geno)
+        diploid_sum = hap[:, :, 0] + hap[:, :, 1]
+        np.testing.assert_array_equal(diploid_sum, geno)
+
+
+class TestCheckpointCorruptionHandling:
+    """Tests for corrupted/missing checkpoint files."""
+
+    def test_checkpoint_missing_metadata(self, tmp_path):
+        """Checkpoint with missing metadata.json should raise."""
+        from xftsim.io import load_simulation_checkpoint
+        dir_path = str(tmp_path / "bad_checkpoint")
+        os.makedirs(dir_path)
+        with pytest.raises((FileNotFoundError, OSError, KeyError)):
+            load_simulation_checkpoint(dir_path)
+
+    def test_checkpoint_corrupt_metadata(self, tmp_path):
+        """Checkpoint with invalid JSON metadata should raise."""
+        from xftsim.io import load_simulation_checkpoint
+        dir_path = str(tmp_path / "corrupt_checkpoint")
+        os.makedirs(dir_path)
+        with open(os.path.join(dir_path, "meta.json"), "w") as f:
+            f.write("not valid json {{{")
+        with pytest.raises((json.JSONDecodeError, ValueError, KeyError)):
+            load_simulation_checkpoint(dir_path)
+
+
+import json

@@ -526,3 +526,81 @@ class TestArchitectureComputeEdgeCases:
         pheno = arch.compute(haplotypes, rng=rng)
         expected = pheno['A'] - pheno['B']
         np.testing.assert_allclose(pheno['diff'], expected, atol=1e-10)
+
+
+class TestExpressionEdgeCases:
+    """Test _evaluate_expression / AggregationComponent edge cases."""
+
+    @pytest.fixture
+    def haplotypes(self):
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(20, 10, 2)).astype(np.int8)
+        return DenseHaplotypeArray(genotypes=geno)
+
+    def test_unary_minus_number(self, haplotypes):
+        """Unary minus on a number: -1 * A."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('-1 * A'))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        np.testing.assert_allclose(pheno['Y'], -pheno['A'], atol=1e-10)
+
+    def test_unary_minus_name(self, haplotypes):
+        """Unary minus on a name: Y = -A (parsed as -1 * A)."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('-A'))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        np.testing.assert_allclose(pheno['Y'], -pheno['A'], atol=1e-10)
+
+    def test_nested_parentheses(self, haplotypes):
+        """Nested parentheses: (A + (B * 2))."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('B', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('(A + (B * 2))'))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        expected = pheno['A'] + pheno['B'] * 2
+        np.testing.assert_allclose(pheno['Y'], expected, atol=1e-10)
+
+    def test_division_expression(self, haplotypes):
+        """Division in expression: A / 2."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('A / 2'))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        np.testing.assert_allclose(pheno['Y'], pheno['A'] / 2, atol=1e-10)
+
+    def test_undefined_reference_raises(self, haplotypes):
+        """Referencing an undefined name should raise ValueError."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('A + UNDEFINED'))
+        rng = np.random.RandomState(42)
+        with pytest.raises(ValueError, match="Undefined reference"):
+            arch.compute(haplotypes, rng=rng)
+
+    def test_mismatched_parentheses_raises(self, haplotypes):
+        """Mismatched parentheses in expression should raise at compute time."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('B', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('(A + B'))
+        rng = np.random.RandomState(42)
+        with pytest.raises(ValueError, match="[Pp]arenthes"):
+            arch.compute(haplotypes, rng=rng)
+
+    def test_complex_expression_precedence(self, haplotypes):
+        """Operator precedence: A + B * 2 should be A + (B*2) not (A+B)*2."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('B', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('A + B * 2'))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        expected = pheno['A'] + pheno['B'] * 2
+        np.testing.assert_allclose(pheno['Y'], expected, atol=1e-10)

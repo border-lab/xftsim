@@ -258,3 +258,66 @@ class TestMeiosisClass:
         # Instead, test that the class can be constructed and used with rmap
         returned = m.get_recombination_map(hap)
         assert returned.m == 50
+
+
+class TestSingleLocusMeiosis:
+    """Edge case: single-locus meiosis."""
+
+    def test_single_locus_shape(self):
+        """Meiosis with m=1 should produce correct shape."""
+        geno = np.array([[[1, 0]], [[0, 1]], [[1, 1]], [[0, 0]]], dtype=np.int8)
+        sex = np.array([0, 1, 0, 1])
+        samples = SampleMeta(iid=np.arange(4), sex=sex)
+        hap = DenseHaplotypeArray(genotypes=geno, samples=samples)
+        rmap = RecombinationMap.constant_map(m=1, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        ma = mate.mate(hap.samples, rng=np.random.RandomState(42))
+        offspring = hap.meiosis(ma, rmap)
+        assert offspring.m == 1
+        assert offspring.genotypes.shape[2] == 2
+
+    def test_single_locus_alleles_from_parents(self):
+        """Each offspring allele should come from a parent with m=1."""
+        geno = np.array([[[1, 1]], [[0, 0]], [[1, 1]], [[0, 0]]], dtype=np.int8)
+        sex = np.array([0, 1, 0, 1])
+        samples = SampleMeta(iid=np.arange(4), sex=sex)
+        hap = DenseHaplotypeArray(genotypes=geno, samples=samples)
+        rmap = RecombinationMap.constant_map(m=1, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        ma = mate.mate(hap.samples, rng=np.random.RandomState(42))
+        offspring = hap.meiosis(ma, rmap)
+        # Mothers are all 1/1, fathers are all 0/0
+        # So maternal allele should be 1, paternal should be 0
+        for i in range(offspring.n):
+            mother_idx = ma.maternal_idx[i]
+            father_idx = ma.paternal_idx[i]
+            # Offspring maternal allele must be one of mother's alleles
+            assert offspring.genotypes[i, 0, 0] in geno[mother_idx, 0]
+            # Offspring paternal allele must be one of father's alleles
+            assert offspring.genotypes[i, 0, 1] in geno[father_idx, 0]
+
+
+class TestNoRecombinationMeiosis:
+    """Test meiosis with p=0 (no recombination)."""
+
+    def test_no_recombination_inherits_whole_haplotype(self):
+        """With p=0, offspring should get intact parental haplotypes."""
+        n, m = 4, 10
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
+        sex = np.array([0, 1, 0, 1])
+        samples = SampleMeta(iid=np.arange(n), sex=sex)
+        hap = DenseHaplotypeArray(genotypes=geno, samples=samples)
+        rmap = RecombinationMap.constant_map(m=m, p=0.0)
+        mate = RandomMating(offspring_per_pair=2)
+        ma = mate.mate(hap.samples, rng=np.random.RandomState(99))
+        offspring = hap.meiosis(ma, rmap)
+        # Each offspring's maternal haplotype should be a copy of one of
+        # the mother's haplotypes (either hap 0 or hap 1)
+        for i in range(offspring.n):
+            mother_idx = ma.maternal_idx[i]
+            mat_alleles = offspring.genotypes[i, :, 0]
+            mother_hap0 = geno[mother_idx, :, 0]
+            mother_hap1 = geno[mother_idx, :, 1]
+            assert (np.array_equal(mat_alleles, mother_hap0) or
+                    np.array_equal(mat_alleles, mother_hap1))
