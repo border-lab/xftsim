@@ -442,3 +442,119 @@ class TestSimulationCheckpoint:
         np.testing.assert_array_almost_equal(
             resumed.phenotype_history[0]['Y.G'], gen0_yg
         )
+
+
+# ── I/O error handling and edge cases ─────────────────────────────────────
+
+class TestIOErrorHandling:
+    def test_load_haplotypes_nonexistent_file(self):
+        with pytest.raises((FileNotFoundError, OSError)):
+            load_haplotypes_npz("/nonexistent/path.npz")
+
+    def test_load_phenotypes_nonexistent_file(self):
+        with pytest.raises((FileNotFoundError, OSError)):
+            load_phenotypes_npz("/nonexistent/path.npz")
+
+    def test_load_effects_nonexistent_file(self):
+        with pytest.raises((FileNotFoundError, OSError)):
+            load_effects_npz("/nonexistent/path.npz")
+
+    def test_load_architecture_nonexistent_dir(self):
+        from xftsim.io import load_architecture
+        with pytest.raises((FileNotFoundError, OSError)):
+            load_architecture("/nonexistent/dir")
+
+
+class TestIOEdgeCases:
+    def test_haplotypes_single_sample(self, tmp_path):
+        """Single-sample haplotype should roundtrip."""
+        geno = np.array([[[1, 0], [0, 1], [1, 1]]], dtype=np.int8)
+        sm = SampleMeta(iid=np.array([0]))
+        hap = DenseHaplotypeArray(genotypes=geno, samples=sm)
+        path = str(tmp_path / "single.npz")
+        save_haplotypes_npz(hap, path)
+        loaded = load_haplotypes_npz(path)
+        assert loaded.n == 1
+        np.testing.assert_array_equal(loaded.genotypes, geno)
+
+    def test_haplotypes_single_variant(self, tmp_path):
+        """Single-variant haplotype should roundtrip."""
+        geno = np.zeros((5, 1, 2), dtype=np.int8)
+        hap = DenseHaplotypeArray(genotypes=geno)
+        path = str(tmp_path / "single_var.npz")
+        save_haplotypes_npz(hap, path)
+        loaded = load_haplotypes_npz(path)
+        assert loaded.m == 1
+        np.testing.assert_array_equal(loaded.genotypes, geno)
+
+    def test_phenotype_empty_keys(self, tmp_path):
+        """Phenotype with no keys should roundtrip."""
+        sm = SampleMeta(iid=np.arange(5))
+        pheno = NPhenotypeArray(samples=sm)
+        path = str(tmp_path / "empty_pheno.npz")
+        save_phenotypes_npz(pheno, path)
+        loaded = load_phenotypes_npz(path)
+        assert len(list(loaded.keys)) == 0
+        assert loaded.samples.n == 5
+
+    def test_phenotype_many_keys(self, tmp_path):
+        """Phenotype with many keys should roundtrip."""
+        sm = SampleMeta(iid=np.arange(10))
+        pheno = NPhenotypeArray(samples=sm)
+        rng = np.random.RandomState(42)
+        for i in range(20):
+            pheno._values[f'trait_{i}'] = rng.randn(10)
+        path = str(tmp_path / "many_keys.npz")
+        save_phenotypes_npz(pheno, path)
+        loaded = load_phenotypes_npz(path)
+        assert set(loaded.keys) == set(pheno.keys)
+        for key in pheno.keys:
+            np.testing.assert_array_almost_equal(loaded[key], pheno[key])
+
+    def test_effects_from_array_roundtrip(self, tmp_path):
+        """Effects created from raw array should roundtrip."""
+        arr = np.array([0.1, -0.2, 0.3, 0.0, 0.5])
+        eff = AdditiveEffects.from_array(arr, standardized=False)
+        path = str(tmp_path / "raw_eff.npz")
+        save_effects_npz(eff, path)
+        loaded = load_effects_npz(path)
+        np.testing.assert_array_equal(loaded.effects, arr)
+        assert loaded.standardized is False
+
+    def test_checkpoint_retention_values_preserved(self, tmp_path):
+        """Retention settings should be preserved in checkpoint."""
+        from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
+        from xftsim.nsim import NSimulation
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+
+        hap = TestSimulation.founder_haplotypes(n=100, m=20)
+        arch = TestSimulation.simple_architecture(m=20, h2=0.5)
+        rmap = RecombinationMap.constant_map(m=20, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        sim = NSimulation(
+            hap, arch, mate, rmap, seed=42,
+            retain_haplotypes=3, retain_phenotypes=7,
+        )
+        sim.run(2)
+        dir_path = str(tmp_path / "retention")
+        save_simulation_checkpoint(sim, dir_path)
+        loaded = load_simulation_checkpoint(dir_path)
+        assert loaded['retain_haplotypes'] == 3
+        assert loaded['retain_phenotypes'] == 7
+
+    def test_architecture_with_sibling_roundtrip(self, tmp_path):
+        """Architecture with sibling component should roundtrip."""
+        from xftsim.io import save_architecture, load_architecture
+        from xftsim.narch import Architecture, NoiseComponent, SiblingMeanComponent, AggregationComponent
+
+        arch = Architecture()
+        arch.add('X', NoiseComponent(variance=1.0))
+        arch.add('X.mean', SiblingMeanComponent('X'), inputs=['X'])
+
+        dir_path = str(tmp_path / "arch_sibling")
+        save_architecture(arch, dir_path)
+        loaded = load_architecture(dir_path)
+
+        assert len(loaded.nodes) == 2
+        assert loaded.nodes[1].outputs == ['X.mean']

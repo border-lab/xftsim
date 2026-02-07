@@ -172,3 +172,87 @@ class TestSparseEffectsIntegration:
         sim.run(2)
         assert np.all(np.isfinite(sim.phenotype_history[0]['Y']))
         assert np.all(np.isfinite(sim.phenotype_history[1]['Y']))
+
+
+# ── Additional edge case tests ─────────────────────────────────────────────
+
+class TestEffectSpecEdgeCases:
+    """Edge cases and repr tests for all EffectSpec classes."""
+
+    def test_additive_repr(self):
+        eff = AdditiveEffects.from_h2(h2=0.5, m=10, seed=42)
+        r = repr(eff)
+        assert 'AdditiveEffects' in r
+        assert 'm=10' in r
+
+    def test_multivariate_repr(self):
+        eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=10, seed=42)
+        r = repr(eff)
+        assert 'MultivariateEffects' in r
+        assert 'k=2' in r
+
+    def test_sparse_repr(self):
+        eff = SparseEffects.from_h2(h2=0.5, m=50, k_causal=5, seed=42)
+        r = repr(eff)
+        assert 'SparseEffects' in r
+        assert 'm_causal=5' in r
+
+    def test_additive_single_variant(self):
+        eff = AdditiveEffects.from_h2(h2=0.5, m=1, seed=42)
+        assert eff.m == 1
+        assert eff.m_causal == 1
+        assert eff.effects.shape == (1,)
+
+    def test_multivariate_three_traits(self):
+        eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3, 0.4], rg=0.1, m=20, seed=42)
+        assert eff.k == 3
+        assert eff.effects.shape == (20, 3)
+
+    def test_multivariate_from_covg_matches_h2_rg(self):
+        """from_covg with diagonal covg ≈ from_h2_rg with rg=0."""
+        m = 5000
+        h2 = [0.5, 0.3]
+        covg = np.diag(h2)
+        eff1 = MultivariateEffects.from_covg(covg=covg, m=m, seed=42)
+        # Check trait variances are approximately correct
+        var_g = np.sum(eff1.effects**2, axis=0)
+        np.testing.assert_allclose(var_g, h2, atol=0.1)
+
+    def test_sparse_all_causal(self):
+        """SparseEffects with k_causal=m should have all variants causal."""
+        eff = SparseEffects.from_h2(h2=0.5, m=10, k_causal=10, seed=42)
+        assert eff.m_causal == 10
+        assert np.all(eff.variant_mask)
+
+    def test_sparse_single_causal(self):
+        """SparseEffects with k_causal=1."""
+        eff = SparseEffects.from_h2(h2=0.5, m=100, k_causal=1, seed=42)
+        assert eff.m_causal == 1
+        assert np.sum(eff.effects != 0) == 1
+
+    def test_additive_different_seeds_differ(self):
+        e1 = AdditiveEffects.from_h2(h2=0.5, m=50, seed=42)
+        e2 = AdditiveEffects.from_h2(h2=0.5, m=50, seed=99)
+        assert not np.array_equal(e1.effects, e2.effects)
+
+    def test_sparse_different_seeds_differ(self):
+        e1 = SparseEffects.from_h2(h2=0.5, m=50, k_causal=5, seed=42)
+        e2 = SparseEffects.from_h2(h2=0.5, m=50, k_causal=5, seed=99)
+        # Different causal variants
+        assert not np.array_equal(e1.variant_mask, e2.variant_mask)
+
+    def test_from_array_preserves_zeros(self):
+        """from_array should keep exact zeros."""
+        arr = np.array([0.0, 1.0, 0.0, 2.0, 0.0])
+        eff = AdditiveEffects.from_array(arr)
+        assert eff.effects[0] == 0.0
+        assert eff.effects[2] == 0.0
+        # variant_mask is all True for AdditiveEffects (all "causal")
+        assert np.all(eff.variant_mask)
+
+    def test_multivariate_from_array_preserves_shape(self):
+        arr = np.random.RandomState(42).randn(30, 4)
+        eff = MultivariateEffects.from_array(arr)
+        assert eff.m == 30
+        assert eff.k == 4
+        np.testing.assert_array_equal(eff.effects, arr)
