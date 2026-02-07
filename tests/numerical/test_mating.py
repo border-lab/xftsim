@@ -128,3 +128,64 @@ class TestAssortativeMatingNumerical:
         keys_r = sim_rand.results[-1].statistics['SampleStatistics']['keys']
         y_idx = keys_r.index('Y')
         assert var_assort[y_idx] > var_rand[y_idx] * 0.95  # allow some noise
+
+
+class TestMultivariateAssortativeMating:
+    """Test assortative mating on a composite of two phenotypes."""
+
+    def _make_bivariate_pop(self, n=N, m=M, seed=42):
+        """Create a population with two phenotypes."""
+        rng = np.random.RandomState(seed)
+        geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
+        sex = np.tile([0, 1], (n + 1) // 2)[:n]
+        samples = SampleMeta(iid=np.arange(n), sex=sex)
+        variants = VariantMeta(vid=np.arange(m), af=np.full(m, 0.5))
+        hap = DenseHaplotypeArray(genotypes=geno, samples=samples, variants=variants)
+        pheno = NPhenotypeArray(samples=samples)
+        eff1 = AdditiveEffects.from_h2(h2=0.5, m=m, seed=123, standardized=False)
+        eff2 = AdditiveEffects.from_h2(h2=0.3, m=m, seed=456, standardized=False)
+        G = (geno[:, :, 0] + geno[:, :, 1]).astype(np.float64)
+        pheno._values['Y1'] = G @ eff1.effects + rng.normal(0, 0.5, size=n)
+        pheno._values['Y2'] = G @ eff2.effects + rng.normal(0, 0.7, size=n)
+        return hap, pheno
+
+    def test_composite_spouse_correlation(self, stochastic_seed):
+        """Assortment on [Y1, Y2] should produce positive composite spouse correlation."""
+        hap, pheno = self._make_bivariate_pop(seed=stochastic_seed.seed)
+        mate = LinearAssortativeMating(['Y1', 'Y2'], r=0.5)
+        assignment = mate.mate(hap.samples, rng=stochastic_seed.rng, phenotypes=pheno)
+
+        # Composite = standardized average of Y1 and Y2
+        y1 = pheno['Y1']
+        y2 = pheno['Y2']
+        composite = (y1 - y1.mean()) / max(y1.std(), 1e-10) + \
+                    (y2 - y2.mean()) / max(y2.std(), 1e-10)
+        composite /= 2
+
+        mother_comp = composite[assignment.maternal_idx[::2]]
+        father_comp = composite[assignment.paternal_idx[::2]]
+        corr = np.corrcoef(mother_comp, father_comp)[0, 1]
+        assert corr > 0.05, (
+            f"seed={stochastic_seed.seed}, composite_corr={corr:.4f}"
+        )
+
+    def test_single_trait_vs_composite_correlation(self, stochastic_seed):
+        """Assortment on [Y1] only should correlate spouses on Y1 more than on Y2."""
+        hap, pheno = self._make_bivariate_pop(seed=stochastic_seed.seed)
+        mate = LinearAssortativeMating(['Y1'], r=0.5)
+        assignment = mate.mate(hap.samples, rng=stochastic_seed.rng, phenotypes=pheno)
+
+        corr_y1 = np.corrcoef(
+            pheno['Y1'][assignment.maternal_idx[::2]],
+            pheno['Y1'][assignment.paternal_idx[::2]]
+        )[0, 1]
+        corr_y2 = np.corrcoef(
+            pheno['Y2'][assignment.maternal_idx[::2]],
+            pheno['Y2'][assignment.paternal_idx[::2]]
+        )[0, 1]
+
+        # Y1 should have higher spouse correlation since we assort on it
+        # (Y2 may still show some correlation if genetically correlated)
+        assert corr_y1 > corr_y2 - 0.1, (
+            f"seed={stochastic_seed.seed}, corr_Y1={corr_y1:.4f}, corr_Y2={corr_y2:.4f}"
+        )

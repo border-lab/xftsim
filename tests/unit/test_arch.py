@@ -436,3 +436,93 @@ class TestFromFormula:
             c ~ a + b
         """)
         assert len(arch.nodes) == 3
+
+
+class TestArchitectureComputeEdgeCases:
+    """Edge cases for Architecture.compute()."""
+
+    def test_single_noise_component(self, haplotypes, rng):
+        """Architecture with a single noise component should work."""
+        arch = Architecture()
+        arch.add('E', NoiseComponent(variance=1.0))
+        pheno = arch.compute(haplotypes, rng=rng)
+        assert 'E' in pheno.keys
+        assert pheno['E'].shape == (haplotypes.n,)
+        assert np.all(np.isfinite(pheno['E']))
+
+    def test_single_genetic_component(self, haplotypes, effects, rng):
+        """Architecture with a single genetic component should work."""
+        arch = Architecture()
+        arch.add('G', GeneticComponent(effects))
+        pheno = arch.compute(haplotypes, rng=rng)
+        assert 'G' in pheno.keys
+        assert pheno['G'].shape == (haplotypes.n,)
+
+    def test_many_independent_noises(self, haplotypes, rng):
+        """Architecture with many independent noise components."""
+        arch = Architecture()
+        for i in range(10):
+            arch.add(f'E{i}', NoiseComponent(variance=0.1 * (i + 1)))
+        pheno = arch.compute(haplotypes, rng=rng)
+        for i in range(10):
+            assert f'E{i}' in pheno.keys
+            assert np.all(np.isfinite(pheno[f'E{i}']))
+
+    def test_deep_aggregation_chain(self, haplotypes, rng):
+        """Deeply nested aggregation should work."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('B', NoiseComponent(variance=1.0))
+        arch.add('AB', AggregationComponent('A + B'))
+        arch.add('C', NoiseComponent(variance=1.0))
+        arch.add('ABC', AggregationComponent('AB + C'))
+        arch.add('D', NoiseComponent(variance=1.0))
+        arch.add('ABCD', AggregationComponent('ABC + D'))
+        pheno = arch.compute(haplotypes, rng=rng)
+        # ABCD should equal A + B + C + D
+        expected = pheno['A'] + pheno['B'] + pheno['C'] + pheno['D']
+        np.testing.assert_allclose(pheno['ABCD'], expected, atol=1e-10)
+
+    def test_aggregation_with_coefficients(self, haplotypes, effects, rng):
+        """Aggregation with various coefficient patterns."""
+        arch = Architecture()
+        arch.add('G', GeneticComponent(effects))
+        arch.add('E', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('0.5 * G + 2.0 * E'))
+        pheno = arch.compute(haplotypes, rng=rng)
+        expected = 0.5 * pheno['G'] + 2.0 * pheno['E']
+        np.testing.assert_allclose(pheno['Y'], expected, atol=1e-10)
+
+    def test_compute_deterministic_with_seed(self, haplotypes, effects):
+        """Same seed should produce identical results."""
+        arch = Architecture()
+        arch.add('G', GeneticComponent(effects))
+        arch.add('E', NoiseComponent(variance=1.0))
+        arch.add('Y', AggregationComponent('G + E'))
+
+        rng1 = np.random.RandomState(42)
+        rng2 = np.random.RandomState(42)
+        p1 = arch.compute(haplotypes, rng=rng1)
+        p2 = arch.compute(haplotypes, rng=rng2)
+        np.testing.assert_array_equal(p1['Y'], p2['Y'])
+
+    def test_compute_different_seeds_differ(self, haplotypes, effects):
+        """Different seeds should produce different results (noise differs)."""
+        arch = Architecture()
+        arch.add('E', NoiseComponent(variance=1.0))
+
+        rng1 = np.random.RandomState(42)
+        rng2 = np.random.RandomState(99)
+        p1 = arch.compute(haplotypes, rng=rng1)
+        p2 = arch.compute(haplotypes, rng=rng2)
+        assert not np.array_equal(p1['E'], p2['E'])
+
+    def test_aggregation_subtraction(self, haplotypes, rng):
+        """Subtraction in aggregation expression."""
+        arch = Architecture()
+        arch.add('A', NoiseComponent(variance=1.0))
+        arch.add('B', NoiseComponent(variance=1.0))
+        arch.add('diff', AggregationComponent('A - B'))
+        pheno = arch.compute(haplotypes, rng=rng)
+        expected = pheno['A'] - pheno['B']
+        np.testing.assert_allclose(pheno['diff'], expected, atol=1e-10)
