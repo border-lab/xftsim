@@ -318,3 +318,61 @@ class TestDenseHaplotypeArrayMeiosis:
         assignment = mate.mate(hap.samples, rng=np.random.RandomState(42))
         offspring = hap.meiosis(assignment, rmap)
         assert set(np.unique(offspring.genotypes)).issubset({0, 1})
+
+
+class TestToDiploidStandardized:
+    """Tests for DenseHaplotypeArray.to_diploid_standardized()."""
+
+    def test_default_centering(self, rng):
+        """Centered genotypes should have near-zero column means."""
+        geno = rng.randint(0, 2, size=(200, 10, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        G_std = h.to_diploid_standardized()
+        # Column means should be approximately 0 (centered)
+        col_means = G_std.mean(axis=0)
+        np.testing.assert_allclose(col_means, 0.0, atol=1e-10)
+
+    def test_shape_matches_diploid(self, rng):
+        """Output shape should match (n, m)."""
+        geno = rng.randint(0, 2, size=(50, 8, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        G_std = h.to_diploid_standardized()
+        assert G_std.shape == (50, 8)
+
+    def test_custom_af(self, rng):
+        """Custom AF should center using G - 2*af."""
+        geno = rng.randint(0, 2, size=(50, 5, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        custom_af = np.full(5, 0.5)
+        G_std = h.to_diploid_standardized(af=custom_af)
+        G_diploid = h.diploid_genotypes.astype(np.float64)
+        expected = G_diploid - 2 * custom_af
+        np.testing.assert_allclose(G_std, expected)
+
+    def test_scale_true(self, rng):
+        """scale=True should divide by sqrt(2*p*(1-p))."""
+        geno = rng.randint(0, 2, size=(100, 5, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        af = h.af_empirical
+        G_centered = h.diploid_genotypes.astype(np.float64) - 2 * af
+        denom = np.sqrt(2 * af * (1 - af))
+        denom[denom == 0] = 1.0
+        expected = G_centered / denom
+        result = h.to_diploid_standardized(scale=True)
+        np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_scale_false_vs_true_differ(self, rng):
+        """scale=True and scale=False should give different results when AF != 0.5."""
+        geno = rng.randint(0, 2, size=(100, 5, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        unscaled = h.to_diploid_standardized(scale=False)
+        scaled = h.to_diploid_standardized(scale=True)
+        assert not np.allclose(unscaled, scaled)
+
+    def test_monomorphic_variant_safe(self):
+        """Monomorphic variants (AF=0 or 1) should not produce NaN/Inf."""
+        geno = np.zeros((20, 3, 2), dtype=np.int8)
+        geno[:, 1, :] = 1  # variant 1 is all-1 (AF=1.0)
+        h = DenseHaplotypeArray(genotypes=geno)
+        result = h.to_diploid_standardized(scale=True)
+        assert np.all(np.isfinite(result))
