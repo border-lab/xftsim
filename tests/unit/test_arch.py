@@ -1,14 +1,18 @@
 """
 Unit tests for Architecture, ArchNode, toposort, and execution.
 """
+import warnings
 import numpy as np
 import pytest
 from xftsim.narch import (
     Architecture, ArchNode, GeneticComponent, NoiseComponent,
-    AggregationComponent,
+    AggregationComponent, MVGeneticComponent, CNoiseComponent,
+    _resolve_grouping,
 )
-from xftsim.neffect import AdditiveEffects
-from xftsim.struct import DenseHaplotypeArray, NPhenotypeArray, SampleMeta
+from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.struct import (
+    DenseHaplotypeArray, NPhenotypeArray, SampleMeta, PedigreeArray,
+)
 
 
 @pytest.fixture
@@ -604,3 +608,232 @@ class TestExpressionEdgeCases:
         pheno = arch.compute(haplotypes, rng=rng)
         expected = pheno['A'] + pheno['B'] * 2
         np.testing.assert_allclose(pheno['Y'], expected, atol=1e-10)
+
+
+class TestResolveGrouping:
+    """Tests for _resolve_grouping() function."""
+
+    def _make_hap(self, n=20, m=10, fid=None, extra=None):
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
+        sex = np.tile([0, 1], (n + 1) // 2)[:n]
+        if fid is None:
+            fid = np.repeat(np.arange(n // 2), 2)
+        samples = SampleMeta(iid=np.arange(n), fid=fid, sex=sex,
+                             extra=extra or {})
+        return DenseHaplotypeArray(genotypes=geno, samples=samples)
+
+    def test_none_returns_none(self):
+        """grouping=None should return None."""
+        hap = self._make_hap()
+        result = _resolve_grouping(None, hap)
+        assert result is None
+
+    def test_fid_grouping(self):
+        """grouping='FID' should return FID labels."""
+        fid = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4,
+                        5, 5, 6, 6, 7, 7, 8, 8, 9, 9])
+        hap = self._make_hap(fid=fid)
+        result = _resolve_grouping('FID', hap)
+        np.testing.assert_array_equal(result, fid)
+
+    def test_sex_grouping(self):
+        """grouping='sex' should return sex labels."""
+        hap = self._make_hap()
+        result = _resolve_grouping('sex', hap)
+        expected = np.tile([0, 1], 10)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_mother_grouping_gen0_warns(self):
+        """grouping='mother' at gen 0 should warn and return None."""
+        hap = self._make_hap()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = _resolve_grouping('mother', hap, generation=0, pedigree_history={})
+        assert result is None
+        assert len(w) >= 1
+        assert "mother" in str(w[0].message).lower()
+
+    def test_father_grouping_gen0_warns(self):
+        """grouping='father' at gen 0 should warn and return None."""
+        hap = self._make_hap()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = _resolve_grouping('father', hap, generation=0, pedigree_history={})
+        assert result is None
+        assert len(w) >= 1
+
+    def test_mother_grouping_with_pedigree(self):
+        """grouping='mother' with pedigree should return maternal_idx."""
+        hap = self._make_hap()
+        n = hap.n
+        maternal_idx = np.repeat(np.arange(n // 2), 2)
+        paternal_idx = np.tile(np.arange(n // 2, n), 2)[:n]
+        ped = PedigreeArray(
+            offspring_samples=hap.samples,
+            maternal_idx=maternal_idx,
+            paternal_idx=paternal_idx,
+            parent_n=n,
+        )
+        result = _resolve_grouping('mother', hap, generation=1,
+                                    pedigree_history={1: ped})
+        np.testing.assert_array_equal(result, maternal_idx)
+
+    def test_extra_field_grouping(self):
+        """Custom extra field on SampleMeta should work as grouping."""
+        cluster = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
+                            2, 2, 2, 2, 2, 3, 3, 3, 3, 3])
+        hap = self._make_hap(extra={'cluster': cluster})
+        result = _resolve_grouping('cluster', hap)
+        np.testing.assert_array_equal(result, cluster)
+
+    def test_unknown_grouping_raises(self):
+        """Unknown grouping variable should raise ValueError."""
+        hap = self._make_hap()
+        with pytest.raises(ValueError, match="Unknown grouping"):
+            _resolve_grouping('nonexistent', hap)
+
+
+class TestMultiOutputComponents:
+    """Tests for MVGeneticComponent and CNoiseComponent multi-output handling."""
+
+    @pytest.fixture
+    def haplotypes(self):
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(50, 20, 2)).astype(np.int8)
+        return DenseHaplotypeArray(genotypes=geno)
+
+    def test_mvgenetic_produces_correct_shape(self, haplotypes):
+        """MVGeneticComponent with k=2 should produce 2 output columns."""
+        eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=20, seed=42)
+        arch = Architecture()
+        arch.add(['Y1.G', 'Y2.G'], MVGeneticComponent(eff))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        assert 'Y1.G' in pheno.keys
+        assert 'Y2.G' in pheno.keys
+        assert len(pheno['Y1.G']) == 50
+        assert len(pheno['Y2.G']) == 50
+
+    def test_mvgenetic_traits_differ(self, haplotypes):
+        """Different traits from MVGeneticComponent should not be identical."""
+        eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=20, seed=42)
+        arch = Architecture()
+        arch.add(['Y1.G', 'Y2.G'], MVGeneticComponent(eff))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        assert not np.array_equal(pheno['Y1.G'], pheno['Y2.G'])
+
+    def test_cnoise_produces_correct_shape(self, haplotypes):
+        """CNoiseComponent with k=2 should produce 2 output columns."""
+        cov = np.array([[1.0, 0.3], [0.3, 1.0]])
+        arch = Architecture()
+        arch.add(['Y1.E', 'Y2.E'], CNoiseComponent(cov=cov))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        assert 'Y1.E' in pheno.keys
+        assert 'Y2.E' in pheno.keys
+        assert len(pheno['Y1.E']) == 50
+
+    def test_cnoise_traits_correlated(self, haplotypes):
+        """CNoiseComponent with positive off-diagonal should produce correlated traits."""
+        cov = np.array([[1.0, 0.8], [0.8, 1.0]])
+        arch = Architecture()
+        arch.add(['Y1.E', 'Y2.E'], CNoiseComponent(cov=cov))
+        rng = np.random.RandomState(42)
+        # Use more samples for reliable correlation
+        geno = rng.randint(0, 2, size=(500, 20, 2)).astype(np.int8)
+        big_hap = DenseHaplotypeArray(genotypes=geno)
+        pheno = arch.compute(big_hap, rng=np.random.RandomState(42))
+        corr = np.corrcoef(pheno['Y1.E'], pheno['Y2.E'])[0, 1]
+        assert corr > 0.5, f"Expected high correlation, got {corr}"
+
+    def test_cnoise_non_square_cov_raises(self):
+        """Non-square covariance matrix should raise."""
+        with pytest.raises(ValueError, match="square"):
+            CNoiseComponent(cov=np.array([[1.0, 0.3]]))
+
+    def test_bivariate_full_architecture(self, haplotypes):
+        """Full bivariate architecture: MVGenetic + CNoise + 2 Aggregations."""
+        eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=20, seed=42)
+        cov = np.array([[0.5, 0.1], [0.1, 0.7]])
+        arch = Architecture()
+        arch.add(['Y1.G', 'Y2.G'], MVGeneticComponent(eff))
+        arch.add(['Y1.E', 'Y2.E'], CNoiseComponent(cov=cov))
+        arch.add('Y1', AggregationComponent('Y1.G + Y1.E'))
+        arch.add('Y2', AggregationComponent('Y2.G + Y2.E'))
+        rng = np.random.RandomState(42)
+        pheno = arch.compute(haplotypes, rng=rng)
+        # Y1 should equal Y1.G + Y1.E
+        np.testing.assert_allclose(
+            pheno['Y1'], pheno['Y1.G'] + pheno['Y1.E'], atol=1e-10
+        )
+        np.testing.assert_allclose(
+            pheno['Y2'], pheno['Y2.G'] + pheno['Y2.E'], atol=1e-10
+        )
+
+
+class TestGroupedNoise:
+    """Test grouped noise components (noise with grouping variable)."""
+
+    def test_fid_grouped_noise_siblings_share_value(self):
+        """Noise grouped by FID: siblings should share the same noise value."""
+        n, m = 20, 10
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
+        fid = np.repeat(np.arange(n // 2), 2)  # pairs share FID
+        sex = np.tile([0, 1], n // 2)
+        samples = SampleMeta(iid=np.arange(n), fid=fid, sex=sex)
+        hap = DenseHaplotypeArray(genotypes=geno, samples=samples)
+
+        arch = Architecture()
+        arch.add('Y.E', NoiseComponent(variance=1.0), grouping='FID')
+        pheno = arch.compute(hap, rng=np.random.RandomState(42))
+
+        # Each pair (i, i+1) should have the same noise value
+        for i in range(0, n, 2):
+            assert pheno['Y.E'][i] == pheno['Y.E'][i + 1], (
+                f"Siblings at {i},{i+1} have different noise: "
+                f"{pheno['Y.E'][i]} vs {pheno['Y.E'][i+1]}"
+            )
+
+    def test_sex_grouped_noise_same_sex_share(self):
+        """Noise grouped by sex: same-sex individuals share value."""
+        n, m = 20, 10
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
+        sex = np.tile([0, 1], n // 2)
+        samples = SampleMeta(iid=np.arange(n), sex=sex)
+        hap = DenseHaplotypeArray(genotypes=geno, samples=samples)
+
+        arch = Architecture()
+        arch.add('Y.E', NoiseComponent(variance=1.0), grouping='sex')
+        pheno = arch.compute(hap, rng=np.random.RandomState(42))
+
+        females = pheno['Y.E'][sex == 0]
+        males = pheno['Y.E'][sex == 1]
+        # All females should have the same value, all males the same value
+        assert np.all(females == females[0])
+        assert np.all(males == males[0])
+        # But males and females should differ
+        assert females[0] != males[0]
+
+    def test_grouped_cnoise_siblings_share(self):
+        """CNoiseComponent grouped by FID: siblings share correlated noise."""
+        n, m = 20, 10
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
+        fid = np.repeat(np.arange(n // 2), 2)
+        sex = np.tile([0, 1], n // 2)
+        samples = SampleMeta(iid=np.arange(n), fid=fid, sex=sex)
+        hap = DenseHaplotypeArray(genotypes=geno, samples=samples)
+
+        cov = np.array([[1.0, 0.5], [0.5, 1.0]])
+        arch = Architecture()
+        arch.add(['E1', 'E2'], CNoiseComponent(cov=cov), grouping='FID')
+        pheno = arch.compute(hap, rng=np.random.RandomState(42))
+
+        # Each pair should share both E1 and E2
+        for i in range(0, n, 2):
+            assert pheno['E1'][i] == pheno['E1'][i + 1]
+            assert pheno['E2'][i] == pheno['E2'][i + 1]
