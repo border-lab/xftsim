@@ -288,12 +288,19 @@ class TestErrorHandling:
     def test_repr_all_components(self, effects, haplotypes):
         """repr() should not crash for any component type."""
         from xftsim.narch import (
-            GeneticComponent, MVGeneticComponent, NoiseComponent,
-            CNoiseComponent, AggregationComponent, MotherComponent,
-            FatherComponent, ParentComponent, SiblingMeanComponent,
+            GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
+            NoiseComponent, CNoiseComponent, AggregationComponent,
+            MotherComponent, FatherComponent, ParentComponent,
+            SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
+            SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
         )
+        from xftsim.neffect import MultivariateEffects
+        mv_eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=effects.m, seed=42)
         components = [
             GeneticComponent(effects),
+            MVGeneticComponent(mv_eff),
+            HaplotypeGeneticComponent(effects, haplotype='maternal'),
+            HaplotypeGeneticComponent(effects, haplotype='paternal'),
             NoiseComponent(variance=1.0),
             CNoiseComponent(cov=np.eye(2)),
             AggregationComponent('a + b'),
@@ -301,6 +308,11 @@ class TestErrorHandling:
             FatherComponent('Y'),
             ParentComponent('Y'),
             SiblingMeanComponent('Y'),
+            SiblingSumComponent('Y'),
+            SiblingAnyComponent('Y'),
+            SiblingCountComponent('Y'),
+            SiblingEldestComponent('Y'),
+            SiblingYoungestComponent('Y'),
         ]
         for comp in components:
             r = repr(comp)
