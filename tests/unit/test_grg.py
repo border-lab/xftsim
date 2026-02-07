@@ -199,23 +199,84 @@ class TestSubsetting:
 # ── TestMeiosis ──────────────────────────────────────────────────────────
 
 class TestMeiosis:
+    def _make_balanced_grg(self, tiny):
+        """Create GRG with balanced sex for mating."""
+        sex = np.tile([0, 1], (tiny.n + 1) // 2)[:tiny.n]
+        samples = SampleMeta(iid=tiny.samples.iid, sex=sex)
+        return GraphHaplotypeOperator(tiny._grg, samples=samples)
+
     def test_meiosis_returns_dense(self, tiny):
         from xftsim.nmate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
-        # Need balanced sex for mating
-        sex = np.tile([0, 1], (tiny.n + 1) // 2)[:tiny.n]
-        samples = SampleMeta(iid=tiny.samples.iid, sex=sex)
-        # Replace samples for mating
-        tiny_copy = GraphHaplotypeOperator(
-            tiny._grg, samples=samples,
-        )
+        tiny_copy = self._make_balanced_grg(tiny)
         rmap = RecombinationMap.constant_map(m=tiny.m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
         assignment = mate.mate(tiny_copy.samples, rng=np.random.RandomState(42))
         offspring = tiny_copy.meiosis(assignment, rmap)
         assert isinstance(offspring, DenseHaplotypeArray)
         assert offspring.m == tiny.m
+
+    def test_meiosis_offspring_count(self, tiny):
+        """Meiosis should produce expected number of offspring."""
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+
+        tiny_copy = self._make_balanced_grg(tiny)
+        rmap = RecombinationMap.constant_map(m=tiny.m, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        assignment = mate.mate(tiny_copy.samples, rng=np.random.RandomState(42))
+        offspring = tiny_copy.meiosis(assignment, rmap)
+        assert offspring.n == len(assignment.maternal_idx)
+        assert offspring.genotypes.shape == (offspring.n, tiny.m, 2)
+
+    def test_offspring_alleles_from_parents(self, tiny):
+        """Each offspring allele should be present in the corresponding parent."""
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+
+        tiny_copy = self._make_balanced_grg(tiny)
+        dense = tiny_copy.to_dense()
+
+        rmap = RecombinationMap.constant_map(m=tiny.m, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        assignment = mate.mate(tiny_copy.samples, rng=np.random.RandomState(42))
+        offspring = tiny_copy.meiosis(assignment, rmap)
+
+        # For each offspring, maternal haplotype should come from mother's two haplotypes
+        for i in range(offspring.n):
+            mom_idx = assignment.maternal_idx[i]
+            dad_idx = assignment.paternal_idx[i]
+            for j in range(offspring.m):
+                # Offspring maternal allele ([:,j,0]) came from mother
+                off_mat = offspring.genotypes[i, j, 0]
+                mom_hap0 = dense.genotypes[mom_idx, j, 0]
+                mom_hap1 = dense.genotypes[mom_idx, j, 1]
+                assert off_mat in (mom_hap0, mom_hap1), (
+                    f"Offspring {i} variant {j}: maternal allele {off_mat} "
+                    f"not in mother {mom_idx}'s haplotypes ({mom_hap0}, {mom_hap1})"
+                )
+
+                # Offspring paternal allele ([:,j,1]) came from father
+                off_pat = offspring.genotypes[i, j, 1]
+                dad_hap0 = dense.genotypes[dad_idx, j, 0]
+                dad_hap1 = dense.genotypes[dad_idx, j, 1]
+                assert off_pat in (dad_hap0, dad_hap1), (
+                    f"Offspring {i} variant {j}: paternal allele {off_pat} "
+                    f"not in father {dad_idx}'s haplotypes ({dad_hap0}, {dad_hap1})"
+                )
+
+    def test_meiosis_variant_meta_preserved(self, tiny):
+        """Offspring should inherit variant metadata from parents."""
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+
+        tiny_copy = self._make_balanced_grg(tiny)
+        rmap = RecombinationMap.constant_map(m=tiny.m, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        assignment = mate.mate(tiny_copy.samples, rng=np.random.RandomState(42))
+        offspring = tiny_copy.meiosis(assignment, rmap)
+        np.testing.assert_array_equal(offspring.variants.vid, tiny_copy.variants.vid)
 
     def test_repr(self, tiny):
         r = repr(tiny)

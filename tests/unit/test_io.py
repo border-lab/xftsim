@@ -1,5 +1,5 @@
 """
-I/O round-trip tests for haplotype and phenotype save/load.
+I/O round-trip tests for haplotype, phenotype, and effect save/load.
 """
 import numpy as np
 import pytest
@@ -10,7 +10,9 @@ from xftsim.struct import DenseHaplotypeArray, SampleMeta, VariantMeta, NPhenoty
 from xftsim.io import (
     save_haplotypes_npz, load_haplotypes_npz,
     save_phenotypes_npz, load_phenotypes_npz,
+    save_effects_npz, load_effects_npz,
 )
+from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -105,3 +107,273 @@ class TestPhenotypeIO:
 
         for key in pheno.keys:
             np.testing.assert_array_almost_equal(loaded[key], pheno[key])
+
+
+class TestEffectsIO:
+    def test_roundtrip_additive(self, tmp_path):
+        """AdditiveEffects should round-trip exactly."""
+        eff = AdditiveEffects.from_h2(h2=0.5, m=100, seed=42)
+        path = str(tmp_path / "eff.npz")
+        save_effects_npz(eff, path)
+        loaded = load_effects_npz(path)
+        assert isinstance(loaded, AdditiveEffects)
+        np.testing.assert_array_equal(loaded.effects, eff.effects)
+        assert loaded.standardized == eff.standardized
+        np.testing.assert_array_equal(loaded.variant_mask, eff.variant_mask)
+
+    def test_roundtrip_multivariate(self, tmp_path):
+        """MultivariateEffects should round-trip exactly."""
+        eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=50, seed=42)
+        path = str(tmp_path / "mv_eff.npz")
+        save_effects_npz(eff, path)
+        loaded = load_effects_npz(path)
+        assert isinstance(loaded, MultivariateEffects)
+        np.testing.assert_array_equal(loaded.effects, eff.effects)
+        assert loaded.k == 2
+        assert loaded.standardized == eff.standardized
+
+    def test_roundtrip_sparse(self, tmp_path):
+        """SparseEffects should round-trip exactly."""
+        eff = SparseEffects.from_h2(h2=0.5, m=100, k_causal=10, seed=42)
+        path = str(tmp_path / "sparse_eff.npz")
+        save_effects_npz(eff, path)
+        loaded = load_effects_npz(path)
+        assert isinstance(loaded, SparseEffects)
+        np.testing.assert_array_equal(loaded.effects, eff.effects)
+        np.testing.assert_array_equal(loaded.variant_mask, eff.variant_mask)
+        assert loaded.m_causal == 10
+
+    def test_standardized_flag_preserved(self, tmp_path):
+        """The standardized flag should survive round-trip."""
+        eff = AdditiveEffects.from_h2(h2=0.5, m=50, standardized=False, seed=42)
+        path = str(tmp_path / "eff_unstd.npz")
+        save_effects_npz(eff, path)
+        loaded = load_effects_npz(path)
+        assert loaded.standardized is False
+
+    def test_properties_preserved(self, tmp_path):
+        """m, m_causal, k properties should match after round-trip."""
+        eff = SparseEffects.from_h2(h2=0.5, m=80, k_causal=15, seed=42)
+        path = str(tmp_path / "eff_props.npz")
+        save_effects_npz(eff, path)
+        loaded = load_effects_npz(path)
+        assert loaded.m == eff.m
+        assert loaded.m_causal == eff.m_causal
+        assert loaded.k == eff.k
+
+
+class TestArchitectureIO:
+    def test_roundtrip_simple(self, tmp_path):
+        """Simple genetic + noise + aggregation should round-trip."""
+        from xftsim.io import save_architecture, load_architecture
+        from xftsim.narch import (
+            Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
+        )
+        eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        dir_path = str(tmp_path / "arch_simple")
+        save_architecture(arch, dir_path)
+        loaded = load_architecture(dir_path)
+
+        assert len(loaded.nodes) == 3
+        assert loaded.nodes[0].outputs == ['Y.G']
+        assert loaded.nodes[1].outputs == ['Y.E']
+        assert loaded.nodes[2].outputs == ['Y']
+
+    def test_roundtrip_effects_match(self, tmp_path):
+        """Loaded architecture should have identical effects."""
+        from xftsim.io import save_architecture, load_architecture
+        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+
+        eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        dir_path = str(tmp_path / "arch_eff")
+        save_architecture(arch, dir_path)
+        loaded = load_architecture(dir_path)
+
+        # GeneticComponent is the first node
+        orig_eff = arch._nodes[0].component.effects
+        loaded_eff = loaded._nodes[0].component.effects
+        np.testing.assert_array_equal(loaded_eff.effects, orig_eff.effects)
+
+    def test_roundtrip_multivariate(self, tmp_path):
+        """MVGeneticComponent + CNoiseComponent should round-trip."""
+        from xftsim.io import save_architecture, load_architecture
+        from xftsim.narch import (
+            Architecture, MVGeneticComponent, CNoiseComponent, AggregationComponent,
+        )
+        eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=20, seed=42)
+        cov = np.array([[0.5, 0.1], [0.1, 0.7]])
+        arch = Architecture()
+        arch.add(['Y1.G', 'Y2.G'], MVGeneticComponent(eff))
+        arch.add(['Y1.E', 'Y2.E'], CNoiseComponent(cov=cov))
+        arch.add('Y1', AggregationComponent('Y1.G + Y1.E'))
+        arch.add('Y2', AggregationComponent('Y2.G + Y2.E'))
+
+        dir_path = str(tmp_path / "arch_mv")
+        save_architecture(arch, dir_path)
+        loaded = load_architecture(dir_path)
+
+        assert len(loaded.nodes) == 4
+        loaded_cov = loaded._nodes[1].component.cov
+        np.testing.assert_array_almost_equal(loaded_cov, cov)
+
+    def test_roundtrip_vertical_transmission(self, tmp_path):
+        """ParentComponent should round-trip."""
+        from xftsim.io import save_architecture, load_architecture
+        from xftsim.narch import (
+            Architecture, GeneticComponent, NoiseComponent,
+            ParentComponent, AggregationComponent,
+        )
+        eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.VT', ParentComponent('Y'))
+        arch.add('Y.E', NoiseComponent(variance=0.3))
+        arch.add('Y', AggregationComponent('Y.G + Y.VT + Y.E'))
+
+        dir_path = str(tmp_path / "arch_vt")
+        save_architecture(arch, dir_path)
+        loaded = load_architecture(dir_path)
+
+        assert len(loaded.nodes) == 4
+        assert loaded._nodes[1].component.phenotype_name == 'Y'
+
+    def test_roundtrip_produces_identical_phenotypes(self, tmp_path):
+        """Loaded architecture should produce identical phenotypes."""
+        from xftsim.io import save_architecture, load_architecture
+        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+
+        eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        dir_path = str(tmp_path / "arch_compute")
+        save_architecture(arch, dir_path)
+        loaded = load_architecture(dir_path)
+
+        hap = TestSimulation.founder_haplotypes(n=50, m=20, seed=42)
+        rng1 = np.random.RandomState(99)
+        rng2 = np.random.RandomState(99)
+        p1 = arch.compute(hap, rng=rng1)
+        p2 = loaded.compute(hap, rng=rng2)
+
+        np.testing.assert_array_equal(p1['Y.G'], p2['Y.G'])
+        np.testing.assert_array_equal(p1['Y.E'], p2['Y.E'])
+        np.testing.assert_array_equal(p1['Y'], p2['Y'])
+
+
+class TestSimulationCheckpoint:
+    def _make_sim(self, m=20, n=100, seed=42):
+        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.nsim import NSimulation
+        from xftsim.nmate import RandomMating
+        from xftsim.reproduce import RecombinationMap
+
+        eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=seed)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=seed)
+        rmap = RecombinationMap.constant_map(m=m, p=0.5)
+        mate = RandomMating(offspring_per_pair=2)
+        return NSimulation(
+            founder_haplotypes=hap, architecture=arch,
+            mating_regime=mate, recombination_map=rmap,
+            retain_haplotypes=5, retain_phenotypes=5, seed=seed,
+        )
+
+    def test_checkpoint_roundtrip(self, tmp_path):
+        """Checkpoint save/load should preserve generation and history keys."""
+        from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
+
+        sim = self._make_sim()
+        sim.run(3)
+        dir_path = str(tmp_path / "checkpoint")
+        save_simulation_checkpoint(sim, dir_path)
+        loaded = load_simulation_checkpoint(dir_path)
+
+        assert loaded['generation'] == sim.generation
+        assert set(loaded['haplotype_history'].keys()) == set(sim.haplotype_history.keys())
+        assert set(loaded['phenotype_history'].keys()) == set(sim.phenotype_history.keys())
+        assert set(loaded['pedigree_history'].keys()) == set(sim.pedigree_history.keys())
+
+    def test_checkpoint_phenotypes_match(self, tmp_path):
+        """Loaded phenotypes should exactly match original."""
+        from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
+
+        sim = self._make_sim()
+        sim.run(2)
+        dir_path = str(tmp_path / "checkpoint_pheno")
+        save_simulation_checkpoint(sim, dir_path)
+        loaded = load_simulation_checkpoint(dir_path)
+
+        for gen in sim.phenotype_history:
+            for key in sim.phenotype_history[gen].keys:
+                np.testing.assert_array_almost_equal(
+                    loaded['phenotype_history'][gen][key],
+                    sim.phenotype_history[gen][key],
+                )
+
+    def test_checkpoint_haplotypes_match(self, tmp_path):
+        """Loaded haplotypes should exactly match original."""
+        from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
+
+        sim = self._make_sim()
+        sim.run(2)
+        dir_path = str(tmp_path / "checkpoint_hap")
+        save_simulation_checkpoint(sim, dir_path)
+        loaded = load_simulation_checkpoint(dir_path)
+
+        for gen in sim.haplotype_history:
+            np.testing.assert_array_equal(
+                loaded['haplotype_history'][gen].genotypes,
+                sim.haplotype_history[gen].genotypes,
+            )
+
+    def test_checkpoint_pedigree_match(self, tmp_path):
+        """Loaded pedigrees should match original."""
+        from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
+
+        sim = self._make_sim()
+        sim.run(3)
+        dir_path = str(tmp_path / "checkpoint_ped")
+        save_simulation_checkpoint(sim, dir_path)
+        loaded = load_simulation_checkpoint(dir_path)
+
+        for gen in sim.pedigree_history:
+            orig = sim.pedigree_history[gen]
+            load = loaded['pedigree_history'][gen]
+            np.testing.assert_array_equal(load.maternal_idx, orig.maternal_idx)
+            np.testing.assert_array_equal(load.paternal_idx, orig.paternal_idx)
+            assert load.parent_n == orig.parent_n
+
+    def test_checkpoint_architecture_functional(self, tmp_path):
+        """Loaded architecture should produce same genetic values."""
+        from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
+
+        sim = self._make_sim()
+        sim.run(1)
+        dir_path = str(tmp_path / "checkpoint_arch")
+        save_simulation_checkpoint(sim, dir_path)
+        loaded = load_simulation_checkpoint(dir_path)
+
+        hap = loaded['haplotype_history'][0]
+        rng = np.random.RandomState(99)
+        pheno = loaded['architecture'].compute(hap, rng=rng)
+        # Y.G should match (deterministic given same genotypes and effects)
+        np.testing.assert_array_almost_equal(
+            pheno['Y.G'], sim.phenotype_history[0]['Y.G']
+        )

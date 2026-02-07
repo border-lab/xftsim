@@ -1,4 +1,6 @@
 import warnings
+import json
+import os
 import numpy as np
 import numba as nb
 import pandas as pd
@@ -387,6 +389,342 @@ def load_phenotypes_npz(path: str) -> xft.struct.NPhenotypeArray:
     for key in data['pheno_keys']:
         values[str(key)] = data[f'pheno_{key}']
     return xft.struct.NPhenotypeArray(samples=samples, values=values)
+
+
+def save_effects_npz(effects: "xft.neffect.EffectSpec", path: str) -> None:
+    """
+    Save an EffectSpec (any subclass) to compressed numpy format.
+
+    Parameters
+    ----------
+    effects : xft.neffect.EffectSpec
+        The effect specification to save.
+    path : str
+        The path to save to.
+    """
+    save_dict = {
+        'effects': effects.effects,
+        'standardized': np.array([effects.standardized]),
+        'variant_mask': effects.variant_mask,
+        'class_name': np.array([type(effects).__name__]),
+    }
+    np.savez_compressed(path, **save_dict)
+
+
+def load_effects_npz(path: str) -> "xft.neffect.EffectSpec":
+    """
+    Load an EffectSpec from compressed numpy format.
+
+    Parameters
+    ----------
+    path : str
+        The path to load from.
+
+    Returns
+    -------
+    xft.neffect.EffectSpec
+        The loaded effect specification (concrete subclass).
+    """
+    from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+
+    data = np.load(path, allow_pickle=True)
+    effects = data['effects']
+    standardized = bool(data['standardized'][0])
+    variant_mask = data['variant_mask']
+    class_name = str(data['class_name'][0])
+
+    cls_map = {
+        'AdditiveEffects': AdditiveEffects,
+        'MultivariateEffects': MultivariateEffects,
+        'SparseEffects': SparseEffects,
+    }
+    if class_name not in cls_map:
+        raise ValueError(f"Unknown EffectSpec class: {class_name}")
+
+    return cls_map[class_name](
+        effects=effects, standardized=standardized, variant_mask=variant_mask,
+    )
+
+
+def save_architecture(arch: "xft.narch.Architecture", dir_path: str) -> None:
+    """
+    Save an Architecture to a directory (JSON metadata + effect .npz files).
+
+    Parameters
+    ----------
+    arch : xft.narch.Architecture
+        The architecture to save.
+    dir_path : str
+        Directory path (created if it doesn't exist).
+    """
+    from xftsim.narch import (
+        GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
+        NoiseComponent, CNoiseComponent, AggregationComponent,
+        MotherComponent, FatherComponent, ParentComponent,
+        _SiblingComponent, _ParentalComponent,
+    )
+
+    os.makedirs(dir_path, exist_ok=True)
+    node_specs = []
+    effect_idx = 0
+
+    for node in arch._nodes:
+        comp = node.component
+        spec = {
+            'outputs': node.outputs,
+            'inputs': node.inputs,
+            'grouping': node.grouping,
+            'component_type': type(comp).__name__,
+        }
+
+        if isinstance(comp, HaplotypeGeneticComponent):
+            eff_name = f'effect_{effect_idx}'
+            save_effects_npz(comp.effects, os.path.join(dir_path, f'{eff_name}.npz'))
+            spec['effect_file'] = f'{eff_name}.npz'
+            spec['haplotype'] = comp.haplotype
+            effect_idx += 1
+        elif isinstance(comp, (GeneticComponent, MVGeneticComponent)):
+            eff_name = f'effect_{effect_idx}'
+            save_effects_npz(comp.effects, os.path.join(dir_path, f'{eff_name}.npz'))
+            spec['effect_file'] = f'{eff_name}.npz'
+            effect_idx += 1
+        elif isinstance(comp, NoiseComponent):
+            spec['variance'] = comp.variance
+        elif isinstance(comp, CNoiseComponent):
+            spec['cov'] = comp.cov.tolist()
+        elif isinstance(comp, AggregationComponent):
+            spec['expression'] = comp.expression
+        elif isinstance(comp, _ParentalComponent):
+            spec['phenotype_name'] = comp.phenotype_name
+        elif isinstance(comp, _SiblingComponent):
+            spec['source_name'] = comp.source_name
+
+        node_specs.append(spec)
+
+    with open(os.path.join(dir_path, 'architecture.json'), 'w') as f:
+        json.dump(node_specs, f, indent=2)
+
+
+def load_architecture(dir_path: str) -> "xft.narch.Architecture":
+    """
+    Load an Architecture from a directory.
+
+    Parameters
+    ----------
+    dir_path : str
+        Directory containing architecture.json and effect .npz files.
+
+    Returns
+    -------
+    xft.narch.Architecture
+    """
+    from xftsim.narch import (
+        Architecture, GeneticComponent, MVGeneticComponent,
+        HaplotypeGeneticComponent, NoiseComponent, CNoiseComponent,
+        AggregationComponent, MotherComponent, FatherComponent,
+        ParentComponent, BUILTINS, _SIBLING_COMPONENTS,
+    )
+
+    with open(os.path.join(dir_path, 'architecture.json'), 'r') as f:
+        node_specs = json.load(f)
+
+    arch = Architecture()
+    comp_map = {
+        'GeneticComponent': lambda s: GeneticComponent(
+            load_effects_npz(os.path.join(dir_path, s['effect_file']))
+        ),
+        'MVGeneticComponent': lambda s: MVGeneticComponent(
+            load_effects_npz(os.path.join(dir_path, s['effect_file']))
+        ),
+        'HaplotypeGeneticComponent': lambda s: HaplotypeGeneticComponent(
+            load_effects_npz(os.path.join(dir_path, s['effect_file'])),
+            haplotype=s['haplotype'],
+        ),
+        'NoiseComponent': lambda s: NoiseComponent(variance=s['variance']),
+        'CNoiseComponent': lambda s: CNoiseComponent(cov=np.array(s['cov'])),
+        'AggregationComponent': lambda s: AggregationComponent(expression=s['expression']),
+        'MotherComponent': lambda s: MotherComponent(phenotype_name=s['phenotype_name']),
+        'FatherComponent': lambda s: FatherComponent(phenotype_name=s['phenotype_name']),
+        'ParentComponent': lambda s: ParentComponent(phenotype_name=s['phenotype_name']),
+    }
+    # Add sibling component constructors
+    for sib_name, sib_cls in _SIBLING_COMPONENTS.items():
+        cls_name = sib_cls.__name__
+        comp_map[cls_name] = lambda s, c=sib_cls: c(source_name=s['source_name'])
+
+    for spec in node_specs:
+        comp_type = spec['component_type']
+        if comp_type not in comp_map:
+            raise ValueError(f"Unknown component type: {comp_type}")
+        comp = comp_map[comp_type](spec)
+        arch.add(
+            outputs=spec['outputs'],
+            component=comp,
+            inputs=spec.get('inputs', []),
+            grouping=spec.get('grouping'),
+        )
+
+    return arch
+
+
+def save_simulation_checkpoint(sim: "xft.nsim.NSimulation",
+                               dir_path: str) -> None:
+    """
+    Save a simulation checkpoint to a directory.
+
+    Saves haplotype history (dense only), phenotype history, pedigree history,
+    architecture, generation counter, and RNG state.
+
+    Parameters
+    ----------
+    sim : xft.nsim.NSimulation
+        The simulation to checkpoint.
+    dir_path : str
+        Directory path (created if it doesn't exist).
+    """
+    os.makedirs(dir_path, exist_ok=True)
+
+    # Save architecture
+    save_architecture(sim.architecture, os.path.join(dir_path, 'architecture'))
+
+    # Save metadata
+    meta = {
+        'generation': sim.generation,
+        'retain_haplotypes': sim.retain_haplotypes,
+        'retain_phenotypes': sim.retain_phenotypes,
+    }
+    with open(os.path.join(dir_path, 'meta.json'), 'w') as f:
+        json.dump(meta, f, indent=2)
+
+    # Save RNG state
+    rng_state = sim.rng.get_state()
+    np.savez(os.path.join(dir_path, 'rng_state.npz'),
+             state_key=rng_state[1], pos=np.array([rng_state[2]]),
+             has_gauss=np.array([rng_state[3]]),
+             cached_gaussian=np.array([rng_state[4]]))
+
+    # Save haplotype history (dense only — GRG founders are not checkpointed)
+    hap_dir = os.path.join(dir_path, 'haplotypes')
+    os.makedirs(hap_dir, exist_ok=True)
+    for gen, hap in sim.haplotype_history.items():
+        if isinstance(hap, xft.struct.DenseHaplotypeArray):
+            save_haplotypes_npz(hap, os.path.join(hap_dir, f'gen_{gen}.npz'))
+        elif isinstance(hap, xft.struct.GraphHaplotypeOperator):
+            # Materialize GRG to dense for checkpointing
+            save_haplotypes_npz(hap.to_dense(), os.path.join(hap_dir, f'gen_{gen}.npz'))
+
+    # Save phenotype history
+    pheno_dir = os.path.join(dir_path, 'phenotypes')
+    os.makedirs(pheno_dir, exist_ok=True)
+    for gen, pheno in sim.phenotype_history.items():
+        save_phenotypes_npz(pheno, os.path.join(pheno_dir, f'gen_{gen}.npz'))
+
+    # Save pedigree history
+    ped_dir = os.path.join(dir_path, 'pedigrees')
+    os.makedirs(ped_dir, exist_ok=True)
+    for gen, ped in sim.pedigree_history.items():
+        np.savez_compressed(
+            os.path.join(ped_dir, f'gen_{gen}.npz'),
+            maternal_idx=ped.maternal_idx,
+            paternal_idx=ped.paternal_idx,
+            parent_n=np.array([ped.parent_n]),
+            offspring_iid=ped.offspring_samples.iid,
+            offspring_fid=ped.offspring_samples.fid,
+            offspring_sex=ped.offspring_samples.sex,
+        )
+
+    # Save generation keys for each history
+    np.savez(os.path.join(dir_path, 'history_keys.npz'),
+             haplotype_gens=np.array(list(sim.haplotype_history.keys())),
+             phenotype_gens=np.array(list(sim.phenotype_history.keys())),
+             pedigree_gens=np.array(list(sim.pedigree_history.keys())))
+
+
+def load_simulation_checkpoint(dir_path: str) -> dict:
+    """
+    Load a simulation checkpoint from a directory.
+
+    Returns a dict with all saved state — use this to inspect results
+    or to reconstruct a simulation for continued execution.
+
+    Parameters
+    ----------
+    dir_path : str
+        Directory containing checkpoint files.
+
+    Returns
+    -------
+    dict
+        Keys: architecture, generation, retain_haplotypes, retain_phenotypes,
+        rng_state, haplotype_history, phenotype_history, pedigree_history.
+    """
+    # Load metadata
+    with open(os.path.join(dir_path, 'meta.json'), 'r') as f:
+        meta = json.load(f)
+
+    # Load architecture
+    architecture = load_architecture(os.path.join(dir_path, 'architecture'))
+
+    # Load RNG state
+    rng_data = np.load(os.path.join(dir_path, 'rng_state.npz'))
+    rng = np.random.RandomState()
+    rng.set_state((
+        'MT19937',
+        rng_data['state_key'],
+        int(rng_data['pos'][0]),
+        int(rng_data['has_gauss'][0]),
+        float(rng_data['cached_gaussian'][0]),
+    ))
+
+    # Load history keys
+    keys_data = np.load(os.path.join(dir_path, 'history_keys.npz'))
+
+    # Load haplotype history
+    haplotype_history = {}
+    hap_dir = os.path.join(dir_path, 'haplotypes')
+    for gen in keys_data['haplotype_gens']:
+        gen = int(gen)
+        haplotype_history[gen] = load_haplotypes_npz(
+            os.path.join(hap_dir, f'gen_{gen}.npz')
+        )
+
+    # Load phenotype history
+    phenotype_history = {}
+    pheno_dir = os.path.join(dir_path, 'phenotypes')
+    for gen in keys_data['phenotype_gens']:
+        gen = int(gen)
+        phenotype_history[gen] = load_phenotypes_npz(
+            os.path.join(pheno_dir, f'gen_{gen}.npz')
+        )
+
+    # Load pedigree history
+    pedigree_history = {}
+    ped_dir = os.path.join(dir_path, 'pedigrees')
+    for gen in keys_data['pedigree_gens']:
+        gen = int(gen)
+        ped_data = np.load(os.path.join(ped_dir, f'gen_{gen}.npz'))
+        samples = xft.struct.SampleMeta(
+            iid=ped_data['offspring_iid'],
+            fid=ped_data['offspring_fid'],
+            sex=ped_data['offspring_sex'],
+        )
+        pedigree_history[gen] = xft.struct.PedigreeArray(
+            offspring_samples=samples,
+            maternal_idx=ped_data['maternal_idx'],
+            paternal_idx=ped_data['paternal_idx'],
+            parent_n=int(ped_data['parent_n'][0]),
+        )
+
+    return {
+        'architecture': architecture,
+        'generation': meta['generation'],
+        'retain_haplotypes': meta['retain_haplotypes'],
+        'retain_phenotypes': meta['retain_phenotypes'],
+        'rng': rng,
+        'haplotype_history': haplotype_history,
+        'phenotype_history': phenotype_history,
+        'pedigree_history': pedigree_history,
+    }
 
 
 # Legacy functions for XarrayHaplotypeArray compatibility
