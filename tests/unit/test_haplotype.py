@@ -146,3 +146,111 @@ class TestProperties:
         assert G.shape == (10, 5)
         assert G.min() >= 0
         assert G.max() <= 2
+
+
+# ── Additional DenseHaplotypeArray tests ──────────────────────────────────
+
+class TestSingleVariant:
+    """Tests with a single variant (m=1)."""
+
+    def test_single_variant_creation(self):
+        geno = np.array([[[0, 1], [1, 0]]]).reshape(2, 1, 2).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        assert h.n == 2
+        assert h.m == 1
+
+    def test_single_variant_matvec(self):
+        geno = np.array([[[1, 1]], [[0, 1]], [[1, 0]]]).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        result = h.matvec(np.array([1.0]))
+        expected = np.array([2.0, 1.0, 1.0])
+        np.testing.assert_allclose(result, expected)
+
+
+class TestSingleIndividual:
+    """Tests with a single individual (n=1)."""
+
+    def test_single_individual_creation(self):
+        geno = np.zeros((1, 5, 2), dtype=np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        assert h.n == 1
+        assert h.m == 5
+
+    def test_single_individual_matvec(self):
+        geno = np.ones((1, 3, 2), dtype=np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        v = np.array([1.0, 2.0, 3.0])
+        result = h.matvec(v)
+        # Diploid = all 2s, so result = 2*1 + 2*2 + 2*3 = 12
+        np.testing.assert_allclose(result, np.array([12.0]))
+
+
+class TestOperatorIdentities:
+    """Test mathematical identities of the operator."""
+
+    def test_rmatvec_2d(self):
+        """rmatvec with 2D input should work."""
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(20, 10, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        V = rng.randn(20, 3)
+        result = h.rmatvec(V)
+        expected = h.diploid_genotypes.T @ V
+        np.testing.assert_allclose(result, expected)
+        assert result.shape == (10, 3)
+
+    def test_standardized_matvec_zero_mean(self):
+        """Standardized matvec with ones should produce near-zero mean."""
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(1000, 20, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        v = np.ones(20)
+        result = h.standardized_matvec(v)
+        # Mean should be close to 0 (centered genotypes)
+        assert abs(result.mean()) < 0.5
+
+    def test_matvec_zero_vector(self):
+        """matvec with zero vector should produce zero result."""
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(10, 5, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        result = h.matvec(np.zeros(5))
+        np.testing.assert_array_equal(result, np.zeros(10))
+
+    def test_af_empirical_matches_genotypes(self):
+        """af_empirical should equal column means of maternal+paternal / 2."""
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(100, 10, 2)).astype(np.int8)
+        h = DenseHaplotypeArray(genotypes=geno)
+        af = h.af_empirical
+        manual_af = (geno[:, :, 0].mean(axis=0) + geno[:, :, 1].mean(axis=0)) / 2
+        np.testing.assert_allclose(af, manual_af, atol=1e-10)
+
+    def test_metadata_preserved_through_getitem(self):
+        """Custom samples/variants should survive __getitem__."""
+        geno = np.zeros((5, 3, 2), dtype=np.int8)
+        sm = SampleMeta(iid=np.array([10, 20, 30, 40, 50]))
+        vm = VariantMeta(vid=np.array([100, 200, 300]))
+        h = DenseHaplotypeArray(genotypes=geno, samples=sm, variants=vm)
+        sub = h[np.array([0, 2])]
+        np.testing.assert_array_equal(sub.samples.iid, [10, 30])
+        np.testing.assert_array_equal(sub.variants.vid, [100, 200, 300])
+
+    def test_getitem_variant_subset(self):
+        """Two-argument getitem should subset both samples and variants."""
+        rng = np.random.RandomState(42)
+        geno = rng.randint(0, 2, size=(10, 8, 2)).astype(np.int8)
+        vm = VariantMeta(vid=np.arange(8), chrom=np.array([1]*4 + [2]*4))
+        h = DenseHaplotypeArray(genotypes=geno, variants=vm)
+        sub = h[np.array([0, 1]), np.array([2, 5, 7])]
+        assert sub.n == 2
+        assert sub.m == 3
+        np.testing.assert_array_equal(sub.variants.vid, [2, 5, 7])
+
+    def test_generation_propagation(self):
+        """DenseHaplotypeArray should use the generation parameter."""
+        sm = SampleMeta(iid=np.arange(3))
+        geno = np.zeros((3, 2, 2), dtype=np.int8)
+        h = DenseHaplotypeArray(genotypes=geno, generation=5, samples=sm)
+        assert h.generation == 5
+        assert h.samples.generation == 5

@@ -241,3 +241,124 @@ class TestFormulaErrors:
         with pytest.raises(ValueError, match="Undefined reference"):
             # Y depends on Z which doesn't exist
             Architecture.from_formula("Y ~ Z + noise(0.5)")
+
+
+# ── Complex formula integration tests ──────────────────────────────────────
+
+class TestFormulaComplexArchitectures:
+    """End-to-end tests with complex formula-based architectures."""
+
+    def test_bivariate_vt_formula(self):
+        """Bivariate architecture with vertical transmission via formula."""
+        mv_eff = MultivariateEffects.from_h2_rg(h2=[0.4, 0.3], rg=0.3, m=50, seed=42)
+        formula = """
+        (Y1.G, Y2.G) ~ mvGenetic(mv)
+        Y1.VT ~ parent(Y1, founder=noise(0.3))
+        Y2.VT ~ parent(Y2, founder=noise(0.3))
+        Y1.E ~ noise(0.3)
+        Y2.E ~ noise(0.4)
+        Y1 ~ Y1.G + 0.2 * Y1.VT + Y1.E
+        Y2 ~ Y2.G + 0.2 * Y2.VT + Y2.E
+        """
+        sim = _run_formula_sim(formula, effects={'mv': mv_eff}, n_gen=5)
+        for gen in range(5):
+            if gen in sim.phenotype_history:
+                for name in ['Y1', 'Y2']:
+                    if name in sim.phenotype_history[gen].keys:
+                        assert np.all(np.isfinite(sim.phenotype_history[gen][name]))
+
+    def test_ige_formula(self):
+        """Indirect genetic effects via haplotypeGenetic."""
+        eff = AdditiveEffects.from_h2(h2=0.4, m=50, seed=42)
+        formula = """
+        Y.G.mat ~ haplotypeGenetic(eff, haplotype='maternal')
+        Y.G.pat ~ haplotypeGenetic(eff, haplotype='paternal')
+        Y.E ~ noise(0.6)
+        Y ~ Y.G.mat + Y.G.pat + Y.E
+        """
+        # Only run 1 gen so gen 0 haplotypes are available for checking
+        sim = _run_formula_sim(formula, effects={'eff': eff}, n_gen=1)
+        pheno0 = sim.phenotype_history[0]
+        assert np.all(np.isfinite(pheno0['Y']))
+        # mat + pat should equal standard genetic
+        hap = sim.haplotype_history[0]
+        expected_g = hap.matvec(eff.effects)
+        np.testing.assert_allclose(
+            pheno0['Y.G.mat'] + pheno0['Y.G.pat'],
+            expected_g,
+            atol=1e-10,
+        )
+
+    def test_sibling_mean_in_formula(self):
+        """Sibling mean used as input to aggregation."""
+        eff = AdditiveEffects.from_h2(h2=0.5, m=50, seed=42)
+        formula = """
+        Y.G ~ genetic(eff)
+        Y.E ~ noise(0.5)
+        Y ~ Y.G + Y.E
+        Y.sibmean ~ sibling_mean(Y)
+        Y.dev ~ Y - Y.sibmean
+        """
+        sim = _run_formula_sim(formula, effects={'eff': eff}, n_gen=2)
+        pheno0 = sim.phenotype_history[0]
+        assert 'Y.dev' in pheno0.keys
+        assert np.all(np.isfinite(pheno0['Y.dev']))
+        # At gen 0, each individual is in own family, so sibmean = Y
+        # and deviation should be ~0
+        np.testing.assert_allclose(pheno0['Y.dev'], 0.0, atol=1e-10)
+
+    def test_grouped_noise_across_generations(self):
+        """FID-grouped noise should produce shared family noise across gens."""
+        eff = AdditiveEffects.from_h2(h2=0.5, m=50, seed=42)
+        formula = """
+        Y.G ~ genetic(eff)
+        Y.shared ~ noise(0.3) | FID
+        Y.E ~ noise(0.2)
+        Y ~ Y.G + Y.shared + Y.E
+        """
+        sim = _run_formula_sim(
+            formula, effects={'eff': eff},
+            n_gen=3, n=200, m=50,
+        )
+        # Gen 1 offspring: siblings should have same Y.shared
+        if 1 in sim.phenotype_history:
+            pheno1 = sim.phenotype_history[1]
+            fids = pheno1.samples.fid
+            unique_fids = np.unique(fids)
+            for fid in unique_fids[:5]:
+                mask = fids == fid
+                shared = pheno1['Y.shared'][mask]
+                assert np.all(shared == shared[0])
+
+    def test_complex_chain(self):
+        """Deep chain of aggregations should work."""
+        eff = AdditiveEffects.from_h2(h2=0.3, m=50, seed=42)
+        formula = """
+        a ~ genetic(eff)
+        b ~ noise(0.2)
+        c ~ a + b
+        d ~ 0.5 * c
+        e ~ noise(0.1)
+        f ~ d + e
+        """
+        sim = _run_formula_sim(formula, effects={'eff': eff}, n_gen=2)
+        pheno0 = sim.phenotype_history[0]
+        # Verify chain: f = 0.5*(a+b) + e
+        expected_f = 0.5 * (pheno0['a'] + pheno0['b']) + pheno0['e']
+        np.testing.assert_allclose(pheno0['f'], expected_f, atol=1e-10)
+
+    def test_mother_father_separate_effects(self):
+        """Separate mother/father VT components should stay finite."""
+        eff = AdditiveEffects.from_h2(h2=0.4, m=50, seed=42)
+        formula = """
+        Y.G ~ genetic(eff)
+        Y.M ~ mother(Y, founder=noise(0.2))
+        Y.F ~ father(Y, founder=noise(0.2))
+        Y.E ~ noise(0.2)
+        Y ~ Y.G + 0.15 * Y.M + 0.15 * Y.F + Y.E
+        """
+        sim = _run_formula_sim(formula, effects={'eff': eff}, n_gen=5)
+        last_gen = sim.generation
+        pheno = sim.phenotype_history[last_gen]
+        assert np.all(np.isfinite(pheno['Y']))
+        assert pheno['Y'].var() < 100.0
