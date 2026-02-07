@@ -377,3 +377,68 @@ class TestSimulationCheckpoint:
         np.testing.assert_array_almost_equal(
             pheno['Y.G'], sim.phenotype_history[0]['Y.G']
         )
+
+    def test_checkpoint_recombination_map(self, tmp_path):
+        """RecombinationMap should be saved and loaded."""
+        from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
+
+        sim = self._make_sim()
+        sim.run(1)
+        dir_path = str(tmp_path / "checkpoint_rmap")
+        save_simulation_checkpoint(sim, dir_path)
+        loaded = load_simulation_checkpoint(dir_path)
+
+        assert loaded['recombination_map'] is not None
+        np.testing.assert_array_almost_equal(
+            loaded['recombination_map']._probabilities,
+            sim.recombination_map._probabilities,
+        )
+
+    def test_checkpoint_mating_regime(self, tmp_path):
+        """Mating regime config should be saved and loaded."""
+        from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
+
+        sim = self._make_sim()
+        sim.run(1)
+        dir_path = str(tmp_path / "checkpoint_mate")
+        save_simulation_checkpoint(sim, dir_path)
+        loaded = load_simulation_checkpoint(dir_path)
+
+        assert loaded['mating_regime'] is not None
+        from xftsim.nmate import RandomMating
+        assert isinstance(loaded['mating_regime'], RandomMating)
+        assert loaded['mating_regime'].offspring_per_pair == 2
+
+    def test_checkpoint_resume(self, tmp_path):
+        """Simulation should be resumable from checkpoint via from_checkpoint."""
+        from xftsim.io import save_simulation_checkpoint
+        from xftsim.nsim import NSimulation
+
+        sim = self._make_sim()
+        sim.run(3)
+        dir_path = str(tmp_path / "checkpoint_resume")
+        save_simulation_checkpoint(sim, dir_path)
+
+        # Resume and run 2 more generations
+        resumed = NSimulation.from_checkpoint(dir_path)
+        assert resumed.generation == 2
+        resumed.continue_run(2)
+        assert resumed.generation == 4
+        assert np.all(np.isfinite(resumed.phenotype_history[4]['Y']))
+
+    def test_checkpoint_resume_preserves_gen0_yg(self, tmp_path):
+        """Resumed simulation should have the same gen-0 Y.G (if still in history)."""
+        from xftsim.io import save_simulation_checkpoint
+        from xftsim.nsim import NSimulation
+
+        sim = self._make_sim()
+        sim.run(2)
+        gen0_yg = sim.phenotype_history[0]['Y.G'].copy()
+
+        dir_path = str(tmp_path / "checkpoint_yg")
+        save_simulation_checkpoint(sim, dir_path)
+
+        resumed = NSimulation.from_checkpoint(dir_path)
+        np.testing.assert_array_almost_equal(
+            resumed.phenotype_history[0]['Y.G'], gen0_yg
+        )

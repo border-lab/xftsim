@@ -567,6 +567,41 @@ def load_architecture(dir_path: str) -> "xft.narch.Architecture":
     return arch
 
 
+def _serialize_mating_regime(regime) -> dict:
+    """Serialize a mating regime to a JSON-compatible dict."""
+    from xftsim.nmate import RandomMating, LinearAssortativeMating
+    if isinstance(regime, LinearAssortativeMating):
+        return {
+            'type': 'LinearAssortativeMating',
+            'component_names': regime.component_names,
+            'r': regime.r,
+            'offspring_per_pair': regime.offspring_per_pair,
+        }
+    elif isinstance(regime, RandomMating):
+        return {
+            'type': 'RandomMating',
+            'offspring_per_pair': regime.offspring_per_pair,
+        }
+    else:
+        return {'type': type(regime).__name__}
+
+
+def _deserialize_mating_regime(config: dict):
+    """Deserialize a mating regime from a dict."""
+    from xftsim.nmate import RandomMating, LinearAssortativeMating
+    mtype = config['type']
+    if mtype == 'RandomMating':
+        return RandomMating(offspring_per_pair=config['offspring_per_pair'])
+    elif mtype == 'LinearAssortativeMating':
+        return LinearAssortativeMating(
+            component_names=config['component_names'],
+            r=config['r'],
+            offspring_per_pair=config['offspring_per_pair'],
+        )
+    else:
+        raise ValueError(f"Unknown mating regime type: {mtype}")
+
+
 def save_simulation_checkpoint(sim: "xft.nsim.NSimulation",
                                dir_path: str) -> None:
     """
@@ -587,14 +622,25 @@ def save_simulation_checkpoint(sim: "xft.nsim.NSimulation",
     # Save architecture
     save_architecture(sim.architecture, os.path.join(dir_path, 'architecture'))
 
-    # Save metadata
+    # Save metadata (including mating regime config)
+    mating_config = _serialize_mating_regime(sim.mating_regime)
     meta = {
         'generation': sim.generation,
         'retain_haplotypes': sim.retain_haplotypes,
         'retain_phenotypes': sim.retain_phenotypes,
+        'mating': mating_config,
     }
     with open(os.path.join(dir_path, 'meta.json'), 'w') as f:
         json.dump(meta, f, indent=2)
+
+    # Save recombination map
+    rmap = sim.recombination_map
+    np.savez_compressed(
+        os.path.join(dir_path, 'recombination_map.npz'),
+        probabilities=rmap._probabilities,
+        vid=rmap.vid,
+        chrom=rmap.chrom,
+    )
 
     # Save RNG state
     rng_state = sim.rng.get_state()
@@ -715,6 +761,24 @@ def load_simulation_checkpoint(dir_path: str) -> dict:
             parent_n=int(ped_data['parent_n'][0]),
         )
 
+    # Load recombination map
+    recombination_map = None
+    rmap_path = os.path.join(dir_path, 'recombination_map.npz')
+    if os.path.exists(rmap_path):
+        from xftsim.reproduce import RecombinationMap
+        rmap_data = np.load(rmap_path, allow_pickle=True)
+        recombination_map = RecombinationMap(
+            p=rmap_data['probabilities'],
+            m=len(rmap_data['probabilities']),
+            vid=rmap_data['vid'],
+            chrom=rmap_data['chrom'],
+        )
+
+    # Load mating regime
+    mating_regime = None
+    if 'mating' in meta:
+        mating_regime = _deserialize_mating_regime(meta['mating'])
+
     return {
         'architecture': architecture,
         'generation': meta['generation'],
@@ -724,6 +788,8 @@ def load_simulation_checkpoint(dir_path: str) -> dict:
         'haplotype_history': haplotype_history,
         'phenotype_history': phenotype_history,
         'pedigree_history': pedigree_history,
+        'recombination_map': recombination_map,
+        'mating_regime': mating_regime,
     }
 
 

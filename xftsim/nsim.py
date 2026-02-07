@@ -81,6 +81,82 @@ class NSimulation:
 
         self.generation = 0
 
+    @classmethod
+    def from_checkpoint(cls, dir_path: str,
+                        mating_regime=None,
+                        recombination_map: RecombinationMap = None,
+                        callbacks=None,
+                        filters=None,
+                        statistics=None) -> "NSimulation":
+        """
+        Reconstruct a simulation from a checkpoint directory.
+
+        Parameters
+        ----------
+        dir_path : str
+            Path to checkpoint directory (created by save_simulation_checkpoint).
+        mating_regime : optional
+            Override the saved mating regime. If None, uses the saved one.
+        recombination_map : RecombinationMap, optional
+            Override the saved recombination map. If None, uses the saved one.
+        callbacks : list[callable], optional
+            Callbacks for continued execution.
+        filters : dict, optional
+            Filters for continued execution.
+        statistics : list, optional
+            Statistics for continued execution.
+
+        Returns
+        -------
+        NSimulation
+            A simulation ready for continued execution via run().
+        """
+        from xftsim.io import load_simulation_checkpoint
+
+        checkpoint = load_simulation_checkpoint(dir_path)
+
+        # Use saved values unless overridden
+        if mating_regime is None:
+            mating_regime = checkpoint['mating_regime']
+        if recombination_map is None:
+            recombination_map = checkpoint['recombination_map']
+
+        if mating_regime is None:
+            raise ValueError(
+                "No mating regime in checkpoint and none provided. "
+                "Pass mating_regime= explicitly."
+            )
+        if recombination_map is None:
+            raise ValueError(
+                "No recombination map in checkpoint and none provided. "
+                "Pass recombination_map= explicitly."
+            )
+
+        # Find the earliest generation haplotypes as "founders" for construction
+        min_gen = min(checkpoint['haplotype_history'].keys())
+        founder = checkpoint['haplotype_history'][min_gen]
+
+        sim = cls(
+            founder_haplotypes=founder,
+            architecture=checkpoint['architecture'],
+            mating_regime=mating_regime,
+            recombination_map=recombination_map,
+            retain_haplotypes=checkpoint['retain_haplotypes'],
+            retain_phenotypes=checkpoint['retain_phenotypes'],
+            callbacks=callbacks,
+            filters=filters,
+            statistics=statistics,
+        )
+
+        # Restore state
+        sim.haplotype_history = checkpoint['haplotype_history']
+        sim.phenotype_history = checkpoint['phenotype_history']
+        sim.pedigree_history = checkpoint['pedigree_history']
+        sim.rng = checkpoint['rng']
+        sim.generation = checkpoint['generation']
+
+        return sim
+
     @property
     def haplotypes(self) -> HaplotypeOperator:
         """Current generation's haplotypes."""
@@ -167,6 +243,70 @@ class NSimulation:
                 self._mate_assignments[gen] = assignment
 
             # Enforce retention policy
+            self._enforce_retention(gen)
+
+            self._run_callbacks()
+            if self.stop:
+                return
+
+    def continue_run(self, n_additional: int):
+        """
+        Continue a simulation for n_additional generations from current state.
+
+        Used after loading from a checkpoint via from_checkpoint().
+
+        Parameters
+        ----------
+        n_additional : int
+            Number of additional generations to simulate.
+        """
+        start_gen = self.generation
+        self.stop = False
+
+        # Mate assignment for current generation (needed for meiosis to next gen)
+        if n_additional > 0 and start_gen not in self._mate_assignments:
+            hap = self.haplotype_history[start_gen]
+            assignment = self.mating_regime.mate(
+                hap.samples, rng=self.rng,
+                phenotypes=self.phenotype_history.get(start_gen),
+            )
+            self._mate_assignments[start_gen] = assignment
+
+        for gen in range(start_gen + 1, start_gen + 1 + n_additional):
+            prev_assignment = self._mate_assignments[gen - 1]
+            prev_hap = self.haplotype_history[gen - 1]
+
+            offspring_hap = prev_hap.meiosis(
+                prev_assignment, self.recombination_map
+            )
+            self.haplotype_history[gen] = offspring_hap
+            self.generation = gen
+
+            ped = PedigreeArray(
+                offspring_samples=prev_assignment.offspring_samples,
+                maternal_idx=prev_assignment.maternal_idx,
+                paternal_idx=prev_assignment.paternal_idx,
+                parent_n=prev_hap.n,
+            )
+            self.pedigree_history[gen] = ped
+
+            pheno = self.architecture.compute(
+                offspring_hap, rng=self.rng,
+                phenotype_history=self.phenotype_history,
+                pedigree_history=self.pedigree_history,
+                generation=gen,
+            )
+            self.phenotype_history[gen] = pheno
+
+            self._run_filters_and_stats(gen)
+
+            if gen < start_gen + n_additional:
+                assignment = self.mating_regime.mate(
+                    offspring_hap.samples, rng=self.rng,
+                    phenotypes=self.phenotype_history.get(gen),
+                )
+                self._mate_assignments[gen] = assignment
+
             self._enforce_retention(gen)
 
             self._run_callbacks()
