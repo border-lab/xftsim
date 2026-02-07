@@ -98,6 +98,35 @@ class MVGeneticComponent(GeneticComponent):
         return f"MVGeneticComponent(effects={self.effects})"
 
 
+class HaplotypeGeneticComponent(ArchComponent):
+    """
+    Haplotype-specific genetic component: computes hap[:,:,0] @ effects (maternal)
+    or hap[:,:,1] @ effects (paternal).
+
+    Enables indirect genetic effects (IGE) formulas.
+    """
+    name = "haplotypeGenetic"
+    kind = "genetic"
+    accepts_grouping = False
+
+    def __init__(self, effects: EffectSpec, haplotype: str = 'maternal'):
+        if haplotype not in ('maternal', 'paternal'):
+            raise ValueError(
+                f"haplotype must be 'maternal' or 'paternal', got '{haplotype}'"
+            )
+        self.effects = effects
+        self.haplotype = haplotype
+
+    def compute(self, node, haplotypes, phenotypes, **kwargs):
+        if self.haplotype == 'maternal':
+            return haplotypes.matvec_maternal(self.effects.effects)
+        else:
+            return haplotypes.matvec_paternal(self.effects.effects)
+
+    def __repr__(self):
+        return f"HaplotypeGeneticComponent(effects={self.effects}, haplotype='{self.haplotype}')"
+
+
 def _resolve_grouping(grouping, haplotypes, **kwargs):
     """
     Resolve a grouping variable to an (n,) label array.
@@ -448,6 +477,128 @@ class ParentComponent(_ParentalComponent):
         return 0.5 * (parent_values[ped.maternal_idx] + parent_values[ped.paternal_idx])
 
 
+# ---------------------------------------------------------------------------
+# Sibling aggregation components
+# ---------------------------------------------------------------------------
+
+class _SiblingComponent(ArchComponent):
+    """
+    Base class for sibling aggregation components.
+
+    Groups by FID (default) or explicit grouping via ``|``, aggregates
+    a source phenotype within each group, and broadcasts back to all members.
+    """
+    kind = "aggregating"
+    accepts_grouping = True
+
+    def __init__(self, source_name: str):
+        self.source_name = source_name
+
+    def compute(self, node, haplotypes, phenotypes, **kwargs):
+        if self.source_name not in phenotypes:
+            raise ValueError(
+                f"{type(self).__name__}: source '{self.source_name}' not found "
+                f"in phenotypes. Available: {list(phenotypes.keys)}"
+            )
+        values = phenotypes[self.source_name]
+        labels = _resolve_grouping(node.grouping or 'FID', haplotypes, **kwargs)
+        if labels is None:
+            # Per-individual: aggregation is trivially itself
+            return values.copy()
+        return self._aggregate_groups(values, labels)
+
+    @abstractmethod
+    def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
+        ...
+
+    def __repr__(self):
+        return f"{type(self).__name__}('{self.source_name}')"
+
+
+class SiblingMeanComponent(_SiblingComponent):
+    """Sibling mean: average of source phenotype within group."""
+    name = "sibling_mean"
+
+    def _aggregate_groups(self, values, labels):
+        unique, inverse = np.unique(labels, return_inverse=True)
+        sums = np.bincount(inverse, weights=values, minlength=len(unique))
+        counts = np.bincount(inverse, minlength=len(unique)).astype(np.float64)
+        means = sums / np.maximum(counts, 1)
+        return means[inverse]
+
+
+class SiblingSumComponent(_SiblingComponent):
+    """Sibling sum: sum of source phenotype within group."""
+    name = "sibling_sum"
+
+    def _aggregate_groups(self, values, labels):
+        unique, inverse = np.unique(labels, return_inverse=True)
+        sums = np.bincount(inverse, weights=values, minlength=len(unique))
+        return sums[inverse]
+
+
+class SiblingAnyComponent(_SiblingComponent):
+    """Sibling any: 1.0 if any member in group has value > 0, else 0.0."""
+    name = "sibling_any"
+
+    def _aggregate_groups(self, values, labels):
+        unique, inverse = np.unique(labels, return_inverse=True)
+        # any: max > 0 within group
+        pos = (values > 0).astype(np.float64)
+        any_vals = np.zeros(len(unique), dtype=np.float64)
+        np.maximum.at(any_vals, inverse, pos)
+        return any_vals[inverse]
+
+
+class SiblingCountComponent(_SiblingComponent):
+    """Sibling count: number of individuals in each group."""
+    name = "sibling_count"
+
+    def _aggregate_groups(self, values, labels):
+        unique, inverse = np.unique(labels, return_inverse=True)
+        counts = np.bincount(inverse, minlength=len(unique)).astype(np.float64)
+        return counts[inverse]
+
+
+class SiblingEldestComponent(_SiblingComponent):
+    """Sibling eldest: value of the first (lowest IID) member in each group."""
+    name = "sibling_eldest"
+
+    def _aggregate_groups(self, values, labels):
+        unique, inverse = np.unique(labels, return_inverse=True)
+        # First occurrence in array order (lowest index = eldest)
+        eldest_vals = np.empty(len(unique), dtype=np.float64)
+        seen = np.zeros(len(unique), dtype=bool)
+        for i, g in enumerate(inverse):
+            if not seen[g]:
+                eldest_vals[g] = values[i]
+                seen[g] = True
+        return eldest_vals[inverse]
+
+
+class SiblingYoungestComponent(_SiblingComponent):
+    """Sibling youngest: value of the last (highest IID) member in each group."""
+    name = "sibling_youngest"
+
+    def _aggregate_groups(self, values, labels):
+        unique, inverse = np.unique(labels, return_inverse=True)
+        # Last occurrence in array order (highest index = youngest)
+        youngest_vals = np.empty(len(unique), dtype=np.float64)
+        for i, g in enumerate(inverse):
+            youngest_vals[g] = values[i]
+        return youngest_vals[inverse]
+
+
+_SIBLING_COMPONENTS = {
+    'sibling_mean': SiblingMeanComponent,
+    'sibling_sum': SiblingSumComponent,
+    'sibling_any': SiblingAnyComponent,
+    'sibling_count': SiblingCountComponent,
+    'sibling_eldest': SiblingEldestComponent,
+    'sibling_youngest': SiblingYoungestComponent,
+}
+
+
 @dataclass
 class ArchNode:
     """
@@ -481,11 +632,13 @@ class ArchNode:
 BUILTINS = {
     'genetic': GeneticComponent,
     'mvGenetic': MVGeneticComponent,
+    'haplotypeGenetic': HaplotypeGeneticComponent,
     'noise': NoiseComponent,
     'cnoise': CNoiseComponent,
     'parent': ParentComponent,
     'mother': MotherComponent,
     'father': FatherComponent,
+    **_SIBLING_COMPONENTS,
 }
 
 

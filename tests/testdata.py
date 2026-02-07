@@ -11,7 +11,7 @@ from xftsim.narch import (
     Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent,
     AggregationComponent, ParentComponent,
 )
-from xftsim.nmate import RandomMating
+from xftsim.nmate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
 
 
@@ -177,3 +177,14 @@ class TestSimulation:
         arch.add('Y.E', NoiseComponent(variance=residual_var))
         arch.add('Y', AggregationComponent(f'Y.G + {vt_weight} * Y.VT + Y.E'))
         return arch
+
+    @staticmethod
+    def assortative_mating_regime(component_names=None, r=0.5,
+                                  offspring_per_pair=2) -> LinearAssortativeMating:
+        """Assortative mating regime for test fixtures."""
+        if component_names is None:
+            component_names = ['Y']
+        return LinearAssortativeMating(
+            component_names=component_names, r=r,
+            offspring_per_pair=offspring_per_pair,
+        )

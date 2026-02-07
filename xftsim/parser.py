@@ -17,8 +17,10 @@ from typing import Optional
 
 from xftsim.narch import (
     ArchNode, ArchComponent, GeneticComponent, MVGeneticComponent,
+    HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent,
     MotherComponent, FatherComponent, ParentComponent,
+    _SIBLING_COMPONENTS,
     BUILTINS,
 )
 from xftsim.neffect import EffectSpec
@@ -175,12 +177,16 @@ def _try_parse_function(outputs: list, rhs: str, effects: dict,
         return _parse_genetic(outputs, args_str, effects, lineno, grouping)
     elif func_name == 'mvGenetic':
         return _parse_mvGenetic(outputs, args_str, effects, lineno, grouping)
+    elif func_name == 'haplotypeGenetic':
+        return _parse_haplotypeGenetic(outputs, args_str, effects, lineno, grouping)
     elif func_name == 'noise':
         return _parse_noise(outputs, args_str, lineno, grouping)
     elif func_name == 'cnoise':
         return _parse_cnoise(outputs, args_str, lineno, grouping)
     elif func_name in ('parent', 'mother', 'father'):
         return _parse_parental(func_name, outputs, args_str, effects, lineno)
+    elif func_name in _SIBLING_COMPONENTS:
+        return _parse_sibling(func_name, outputs, args_str, lineno, grouping)
     else:
         raise ValueError(f"Line {lineno}: unhandled function '{func_name}'")
 
@@ -227,6 +233,40 @@ def _parse_mvGenetic(outputs: list, args_str: str, effects: dict,
             f"LHS has {len(outputs)} outputs"
         )
     component = MVGeneticComponent(effects=effect)
+    return ArchNode(outputs=outputs, component=component, inputs=[], grouping=grouping)
+
+
+def _parse_haplotypeGenetic(outputs: list, args_str: str, effects: dict,
+                            lineno: int, grouping: str = None) -> ArchNode:
+    """Parse haplotypeGenetic(eff) or haplotypeGenetic(eff, haplotype='maternal')."""
+    # Split args on comma, respecting that haplotype= value has quotes
+    parts = [p.strip() for p in args_str.split(',')]
+    effect_name = parts[0].strip()
+    haplotype = 'maternal'  # default
+
+    for part in parts[1:]:
+        part = part.strip()
+        if part.startswith('haplotype='):
+            val = part[len('haplotype='):].strip().strip("'\"")
+            haplotype = val
+        elif part:
+            raise ValueError(
+                f"Line {lineno}: unexpected argument '{part}' in haplotypeGenetic()"
+            )
+
+    if not effect_name:
+        raise ValueError(f"Line {lineno}: haplotypeGenetic() requires an effect name")
+    if effect_name not in effects:
+        raise ValueError(
+            f"Line {lineno}: effect '{effect_name}' not found in effects dict. "
+            f"Available: {list(effects.keys())}"
+        )
+    effect = effects[effect_name]
+    if not isinstance(effect, EffectSpec):
+        raise ValueError(
+            f"Line {lineno}: effects['{effect_name}'] is not an EffectSpec"
+        )
+    component = HaplotypeGeneticComponent(effects=effect, haplotype=haplotype)
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=grouping)
 
 
@@ -329,6 +369,22 @@ def _parse_founder_component(founder_str: str, lineno: int):
             f"Line {lineno}: unsupported function '{func_name}' in founder= "
             f"(currently only noise is supported)"
         )
+
+
+def _parse_sibling(func_name: str, outputs: list, args_str: str,
+                   lineno: int, grouping: str = None) -> ArchNode:
+    """Parse sibling_mean(source_name), etc."""
+    source_name = args_str.strip()
+    if not source_name:
+        raise ValueError(
+            f"Line {lineno}: {func_name}() requires a source component name"
+        )
+    cls = _SIBLING_COMPONENTS[func_name]
+    component = cls(source_name)
+    return ArchNode(
+        outputs=outputs, component=component,
+        inputs=[source_name], grouping=grouping,
+    )
 
 
 def _parse_aggregation(outputs: list, rhs: str, lineno: int) -> ArchNode:

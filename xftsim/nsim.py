@@ -116,7 +116,10 @@ class NSimulation:
         self._run_filters_and_stats(0)
 
         if n_generations > 1:
-            assignment = self.mating_regime.mate(hap.samples, rng=self.rng)
+            assignment = self.mating_regime.mate(
+                hap.samples, rng=self.rng,
+                phenotypes=self.phenotype_history.get(0),
+            )
             self._mate_assignments[0] = assignment
 
         self._run_callbacks()
@@ -158,7 +161,8 @@ class NSimulation:
             # Assign mates for next generation (unless this is the last gen)
             if gen < n_generations - 1:
                 assignment = self.mating_regime.mate(
-                    offspring_hap.samples, rng=self.rng
+                    offspring_hap.samples, rng=self.rng,
+                    phenotypes=self.phenotype_history.get(gen),
                 )
                 self._mate_assignments[gen] = assignment
 
