@@ -1,6 +1,6 @@
 import numpy as np
 
-__version__="0.3.0.dev58"
+__version__="0.3.0.dev59"
 
 
 class Config:
