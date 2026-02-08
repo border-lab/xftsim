@@ -68,3 +68,18 @@ class TestGeneticCorrelation:
         ry_obs = np.corrcoef(y1, y2)[0, 1]
         # Phenotypic corr should be attenuated by noise
         assert ry_obs < rg_obs or abs(ry_obs - rg_obs) < 0.2
+
+    def test_monotone_rg(self):
+        """Higher rg_design should produce higher rg_realized."""
+        results = {}
+        for rg in [0.0, 0.3, 0.6, 0.9]:
+            g1, g2, _, _ = _run_bivariate(rg=rg, seed=42)
+            results[rg] = np.corrcoef(g1, g2)[0, 1]
+        assert results[0.0] < results[0.3] < results[0.6] < results[0.9], \
+            f"Genetic correlation should be monotone in rg_design: {results}"
+
+    def test_high_rg_produces_strong_corr(self):
+        """rg=0.9 should produce high genetic correlation."""
+        g1, g2, _, _ = _run_bivariate(rg=0.9)
+        corr = np.corrcoef(g1, g2)[0, 1]
+        assert corr > 0.4, f"Genetic corr = {corr:.3f}, expected > 0.4 with rg=0.9"
