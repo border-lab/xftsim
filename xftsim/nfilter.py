@@ -6,8 +6,8 @@ and pedigree histories, used by statistics modules.
 """
 import numpy as np
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Dict, Optional
+from dataclasses import dataclass, field
+from typing import Dict, Optional, Union
 
 from xftsim.struct import NPhenotypeArray, PedigreeArray
 
@@ -184,4 +184,211 @@ class SibPairFilter(Filter):
             n_pairs=len(idx1),
             sib1_idx=idx1,
             sib2_idx=idx2,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Unrelated sample filter
+# ---------------------------------------------------------------------------
+
+@dataclass
+class UnrelatedView(FilteredView):
+    """
+    View of one individual per family (unrelated subsample).
+
+    Attributes
+    ----------
+    indices : np.ndarray
+        Indices into the original sample array (one per family).
+    phenotypes : NPhenotypeArray
+        Subset of phenotypes for the selected individuals.
+    """
+    indices: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.intp))
+    phenotypes: NPhenotypeArray = None
+
+
+class UnrelatedFilter(Filter):
+    """
+    Select one individual per family (first occurrence per FID).
+
+    Produces an UnrelatedView with the first individual encountered
+    for each unique FID value.
+    """
+
+    def apply(self, generation, phenotype_history, pedigree_history):
+        if generation not in phenotype_history:
+            return None
+
+        pheno = phenotype_history[generation]
+        fids = pheno.samples.fid
+
+        # np.unique with return_index gives the first occurrence of each FID
+        _, first_idx = np.unique(fids, return_index=True)
+        first_idx = np.sort(first_idx)
+
+        return UnrelatedView(
+            indices=first_idx,
+            phenotypes=pheno.subset(first_idx),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Ascertainment filter
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AscertainedView(FilteredView):
+    """
+    View of individuals passing an ascertainment threshold.
+
+    Attributes
+    ----------
+    indices : np.ndarray
+        Indices into the original sample array.
+    phenotypes : NPhenotypeArray
+        Subset of phenotypes for selected individuals.
+    ascertainment_key : str
+        The phenotype key used for ascertainment.
+    threshold : float
+        The quantile threshold value(s) used.
+    """
+    indices: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.intp))
+    phenotypes: NPhenotypeArray = None
+    ascertainment_key: str = ""
+    threshold: float = 0.0
+
+
+class AscertainmentFilter(Filter):
+    """
+    Select individuals from the tails of a phenotype distribution.
+
+    Parameters
+    ----------
+    phenotype_key : str
+        Which phenotype to ascertain on (e.g. 'Y', 'Y.G').
+    quantile : float
+        Proportion of the distribution to select. E.g. 0.1 selects
+        the top 10%, bottom 10%, or both (depending on ``tail``).
+    tail : str
+        Which tail(s) to select: 'upper', 'lower', or 'both'.
+        - 'upper': individuals above the (1 - quantile) percentile
+        - 'lower': individuals below the quantile percentile
+        - 'both': individuals in either tail (union of upper and lower)
+    """
+
+    def __init__(self, phenotype_key: str, quantile: float, tail: str = 'both'):
+        if not 0.0 < quantile < 1.0:
+            raise ValueError(f"quantile must be in (0, 1), got {quantile}")
+        if tail not in ('upper', 'lower', 'both'):
+            raise ValueError(f"tail must be 'upper', 'lower', or 'both', got '{tail}'")
+        self.phenotype_key = phenotype_key
+        self.quantile = quantile
+        self.tail = tail
+
+    def apply(self, generation, phenotype_history, pedigree_history):
+        if generation not in phenotype_history:
+            return None
+
+        pheno = phenotype_history[generation]
+
+        if self.phenotype_key not in pheno:
+            return None
+
+        values = pheno[self.phenotype_key]
+
+        if self.tail == 'upper':
+            threshold = np.quantile(values, 1.0 - self.quantile)
+            mask = values >= threshold
+        elif self.tail == 'lower':
+            threshold = np.quantile(values, self.quantile)
+            mask = values <= threshold
+        else:  # 'both'
+            lower_thresh = np.quantile(values, self.quantile)
+            upper_thresh = np.quantile(values, 1.0 - self.quantile)
+            mask = (values <= lower_thresh) | (values >= upper_thresh)
+            threshold = self.quantile  # store the quantile itself for 'both'
+
+        indices = np.where(mask)[0]
+
+        return AscertainedView(
+            indices=indices,
+            phenotypes=pheno.subset(indices),
+            ascertainment_key=self.phenotype_key,
+            threshold=float(threshold),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Subsample filter
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SubsampleView(FilteredView):
+    """
+    View of a random subsample of individuals.
+
+    Attributes
+    ----------
+    indices : np.ndarray
+        Indices into the original sample array.
+    phenotypes : NPhenotypeArray
+        Subset of phenotypes for selected individuals.
+    n_subsample : int
+        Number of individuals in the subsample.
+    """
+    indices: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.intp))
+    phenotypes: NPhenotypeArray = None
+    n_subsample: int = 0
+
+
+class SubsampleFilter(Filter):
+    """
+    Randomly subsample individuals.
+
+    Exactly one of ``n`` or ``fraction`` must be provided.
+
+    Parameters
+    ----------
+    n : int, optional
+        Exact number of individuals to sample. If larger than the
+        population, all individuals are returned.
+    fraction : float, optional
+        Fraction of individuals to sample, in (0, 1].
+    seed : int, optional
+        Random seed for reproducibility.
+    """
+
+    def __init__(self, n: Optional[int] = None, fraction: Optional[float] = None,
+                 seed: Optional[int] = None):
+        if n is not None and fraction is not None:
+            raise ValueError("Specify exactly one of 'n' or 'fraction', not both")
+        if n is None and fraction is None:
+            raise ValueError("Must specify one of 'n' or 'fraction'")
+        if n is not None and n < 1:
+            raise ValueError(f"n must be >= 1, got {n}")
+        if fraction is not None and not (0.0 < fraction <= 1.0):
+            raise ValueError(f"fraction must be in (0, 1], got {fraction}")
+        self._n = n
+        self._fraction = fraction
+        self._seed = seed
+
+    def apply(self, generation, phenotype_history, pedigree_history):
+        if generation not in phenotype_history:
+            return None
+
+        pheno = phenotype_history[generation]
+        n_total = pheno.samples.n
+
+        if self._n is not None:
+            n_sub = min(self._n, n_total)
+        else:
+            n_sub = max(1, int(np.round(self._fraction * n_total)))
+
+        rng = np.random.RandomState(self._seed)
+        indices = np.sort(rng.choice(n_total, size=n_sub, replace=False))
+
+        return SubsampleView(
+            indices=indices,
+            phenotypes=pheno.subset(indices),
+            n_subsample=n_sub,
         )

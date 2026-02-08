@@ -1,0 +1,448 @@
+"""
+Numerical validation tests for HasemanElstonEstimator and ParentOffspringRegression.
+
+These tests run actual simulations with known h2 values and verify that the
+estimators recover approximately correct heritability estimates.
+
+Tests:
+1. HE sibling estimator recovers h2 in a simple additive model
+2. PO regression recovers h2 in a simple additive model
+3. HE estimator is approximately unbiased across h2 values
+4. PO estimator is approximately unbiased across h2 values
+5. MatingStatistics integration: correct pair counts in simulation
+6. MatingStatistics with assortative mating: detects spouse correlation
+7. Multi-trait: both estimators work with bivariate architecture
+"""
+import numpy as np
+import pytest
+
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from testdata import TestSimulation
+
+from xftsim.neffect import AdditiveEffects
+from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.reproduce import RecombinationMap
+from xftsim.nsim import NSimulation
+from xftsim.nstats import (
+    HasemanElstonEstimator,
+    ParentOffspringRegression,
+    MatingStatistics,
+    SampleStatistics,
+)
+from xftsim.nfilter import TrioFilter, SibPairFilter
+
+
+def _make_sim(n=1000, m=50, h2=0.5, offspring_per_pair=2,
+              statistics=None, filters=None, mating=None, seed=42):
+    """Build a simple single-trait NSimulation."""
+    hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=seed)
+    eff = AdditiveEffects.from_h2(h2=h2, m=m, seed=seed + 1)
+    arch = Architecture()
+    arch.add('Y.G', GeneticComponent(eff))
+    arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
+    arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+    if mating is None:
+        mating = RandomMating(offspring_per_pair=offspring_per_pair)
+
+    return NSimulation(
+        founder_haplotypes=hap,
+        architecture=arch,
+        mating_regime=mating,
+        recombination_map=RecombinationMap.constant_map(m=m),
+        seed=seed,
+        statistics=statistics or [],
+        filters=filters or {},
+        retain_phenotypes=10,
+        retain_haplotypes=10,
+    )
+
+
+class TestHESimulation:
+    """Numerical validation of HasemanElstonEstimator in simulation."""
+
+    def test_he_recovers_h2_moderate(self):
+        """HE estimator should recover h2~0.5 within tolerance."""
+        sim = _make_sim(
+            n=2000, m=100, h2=0.5, offspring_per_pair=2,
+            statistics=[HasemanElstonEstimator(filter_name='sibpair')],
+            filters={'sibpair': SibPairFilter()},
+            seed=42,
+        )
+        sim.run(3)
+
+        # Collect HE estimates from generations 1+ (gen 0 may have different FID structure)
+        h2_estimates = []
+        for result in sim.results:
+            stats = result.statistics.get('HasemanElstonEstimator')
+            if stats is not None and 'Y' in stats:
+                h2_estimates.append(stats['Y']['h2'])
+
+        assert len(h2_estimates) >= 2, "Should have HE results for at least 2 generations"
+        mean_h2 = np.mean(h2_estimates)
+        # Tolerant check: within 0.3 of true h2=0.5
+        assert abs(mean_h2 - 0.5) < 0.3, f"Mean HE h2={mean_h2:.3f}, expected ~0.5"
+
+    def test_he_recovers_h2_high(self):
+        """HE with higher h2=0.8 should give larger estimates."""
+        sim = _make_sim(
+            n=2000, m=100, h2=0.8, offspring_per_pair=2,
+            statistics=[HasemanElstonEstimator(filter_name='sibpair')],
+            filters={'sibpair': SibPairFilter()},
+            seed=123,
+        )
+        sim.run(3)
+
+        h2_estimates = []
+        for result in sim.results:
+            stats = result.statistics.get('HasemanElstonEstimator')
+            if stats is not None and 'Y' in stats:
+                h2_estimates.append(stats['Y']['h2'])
+
+        assert len(h2_estimates) >= 2
+        mean_h2 = np.mean(h2_estimates)
+        assert mean_h2 > 0.3, f"HE h2={mean_h2:.3f} should be notably > 0 for h2=0.8"
+
+    def test_he_recovers_h2_low(self):
+        """HE with low h2=0.1 should give small estimates."""
+        sim = _make_sim(
+            n=2000, m=100, h2=0.1, offspring_per_pair=2,
+            statistics=[HasemanElstonEstimator(filter_name='sibpair')],
+            filters={'sibpair': SibPairFilter()},
+            seed=77,
+        )
+        sim.run(3)
+
+        h2_estimates = []
+        for result in sim.results:
+            stats = result.statistics.get('HasemanElstonEstimator')
+            if stats is not None and 'Y' in stats:
+                h2_estimates.append(stats['Y']['h2'])
+
+        assert len(h2_estimates) >= 2
+        mean_h2 = np.mean(h2_estimates)
+        assert mean_h2 < 0.5, f"HE h2={mean_h2:.3f} should be < 0.5 for h2=0.1"
+
+    def test_he_ordering_across_h2(self):
+        """Higher true h2 should produce higher estimated h2 on average."""
+        estimates_by_h2 = {}
+        for h2_true in [0.2, 0.6]:
+            sim = _make_sim(
+                n=2000, m=100, h2=h2_true, offspring_per_pair=2,
+                statistics=[HasemanElstonEstimator(filter_name='sibpair')],
+                filters={'sibpair': SibPairFilter()},
+                seed=42,
+            )
+            sim.run(3)
+            vals = []
+            for result in sim.results:
+                stats = result.statistics.get('HasemanElstonEstimator')
+                if stats is not None and 'Y' in stats:
+                    vals.append(stats['Y']['h2'])
+            estimates_by_h2[h2_true] = np.mean(vals) if vals else 0.0
+
+        assert estimates_by_h2[0.6] > estimates_by_h2[0.2], (
+            f"h2=0.6 estimate ({estimates_by_h2[0.6]:.3f}) should exceed "
+            f"h2=0.2 estimate ({estimates_by_h2[0.2]:.3f})"
+        )
+
+    def test_he_n_pairs_reasonable(self):
+        """Number of sibling pairs should be reasonable for the population size."""
+        n = 1000
+        opp = 2
+        sim = _make_sim(
+            n=n, m=50, h2=0.5, offspring_per_pair=opp,
+            statistics=[HasemanElstonEstimator(filter_name='sibpair')],
+            filters={'sibpair': SibPairFilter()},
+            seed=42,
+        )
+        sim.run(2)
+
+        for result in sim.results:
+            stats = result.statistics.get('HasemanElstonEstimator')
+            if stats is not None and 'Y' in stats:
+                n_pairs = stats['Y']['n_pairs']
+                # With offspring_per_pair=2 and n parents → n/2 pairs × C(2,2)=1
+                assert n_pairs > 0
+                assert n_pairs <= n * (n - 1) // 2  # upper bound
+
+
+class TestPORSimulation:
+    """Numerical validation of ParentOffspringRegression in simulation."""
+
+    def test_por_recovers_h2_moderate(self):
+        """PO regression should recover h2~0.5 within tolerance."""
+        sim = _make_sim(
+            n=2000, m=100, h2=0.5, offspring_per_pair=2,
+            statistics=[ParentOffspringRegression(filter_name='trio')],
+            filters={'trio': TrioFilter()},
+            seed=42,
+        )
+        sim.run(3)
+
+        h2_estimates = []
+        for result in sim.results:
+            stats = result.statistics.get('ParentOffspringRegression')
+            if stats is not None and 'Y' in stats:
+                h2_estimates.append(stats['Y']['h2'])
+
+        # PO regression needs gen >= 1 (gen 0 has no parents)
+        assert len(h2_estimates) >= 2, "Should have PO results for gens 1+"
+        mean_h2 = np.mean(h2_estimates)
+        assert abs(mean_h2 - 0.5) < 0.3, f"Mean PO h2={mean_h2:.3f}, expected ~0.5"
+
+    def test_por_recovers_h2_high(self):
+        """PO regression with h2=0.8."""
+        sim = _make_sim(
+            n=2000, m=100, h2=0.8, offspring_per_pair=2,
+            statistics=[ParentOffspringRegression(filter_name='trio')],
+            filters={'trio': TrioFilter()},
+            seed=123,
+        )
+        sim.run(3)
+
+        h2_estimates = []
+        for result in sim.results:
+            stats = result.statistics.get('ParentOffspringRegression')
+            if stats is not None and 'Y' in stats:
+                h2_estimates.append(stats['Y']['h2'])
+
+        assert len(h2_estimates) >= 2
+        mean_h2 = np.mean(h2_estimates)
+        assert mean_h2 > 0.3, f"PO h2={mean_h2:.3f} should be notably > 0 for h2=0.8"
+
+    def test_por_ordering_across_h2(self):
+        """Higher true h2 should produce higher estimated h2 on average."""
+        estimates_by_h2 = {}
+        for h2_true in [0.2, 0.6]:
+            sim = _make_sim(
+                n=2000, m=100, h2=h2_true, offspring_per_pair=2,
+                statistics=[ParentOffspringRegression(filter_name='trio')],
+                filters={'trio': TrioFilter()},
+                seed=42,
+            )
+            sim.run(3)
+            vals = []
+            for result in sim.results:
+                stats = result.statistics.get('ParentOffspringRegression')
+                if stats is not None and 'Y' in stats:
+                    vals.append(stats['Y']['h2'])
+            estimates_by_h2[h2_true] = np.mean(vals) if vals else 0.0
+
+        assert estimates_by_h2[0.6] > estimates_by_h2[0.2], (
+            f"h2=0.6 estimate ({estimates_by_h2[0.6]:.3f}) should exceed "
+            f"h2=0.2 estimate ({estimates_by_h2[0.2]:.3f})"
+        )
+
+    def test_por_se_decreases_with_n(self):
+        """SE of PO regression should decrease with more samples."""
+        se_by_n = {}
+        for pop_n in [500, 2000]:
+            sim = _make_sim(
+                n=pop_n, m=50, h2=0.5, offspring_per_pair=2,
+                statistics=[ParentOffspringRegression(filter_name='trio')],
+                filters={'trio': TrioFilter()},
+                seed=42,
+            )
+            sim.run(2)
+            ses = []
+            for result in sim.results:
+                stats = result.statistics.get('ParentOffspringRegression')
+                if stats is not None and 'Y' in stats:
+                    se = stats['Y']['se']
+                    if not np.isnan(se):
+                        ses.append(se)
+            se_by_n[pop_n] = np.mean(ses) if ses else np.inf
+
+        # SE should be smaller for larger n
+        assert se_by_n[2000] < se_by_n[500], (
+            f"SE(n=2000)={se_by_n[2000]:.4f} should be < SE(n=500)={se_by_n[500]:.4f}"
+        )
+
+    def test_por_n_trios_matches_population(self):
+        """n_trios should match the offspring population size at gen >= 1."""
+        n = 1000
+        sim = _make_sim(
+            n=n, m=50, h2=0.5, offspring_per_pair=2,
+            statistics=[ParentOffspringRegression(filter_name='trio')],
+            filters={'trio': TrioFilter()},
+            seed=42,
+        )
+        sim.run(2)
+
+        for result in sim.results:
+            stats = result.statistics.get('ParentOffspringRegression')
+            if stats is not None and 'Y' in stats:
+                n_trios = stats['Y']['n_trios']
+                assert n_trios > 0
+                # Should be close to population size
+                assert n_trios <= n * 2  # generous upper bound
+
+
+class TestMatingStatsSimulation:
+    """Numerical validation of MatingStatistics in simulation."""
+
+    def test_mating_stats_pair_count(self):
+        """n_mating_pairs should reflect actual population structure."""
+        sim = _make_sim(
+            n=1000, m=50, h2=0.5, offspring_per_pair=2,
+            statistics=[MatingStatistics(filter_name='trio')],
+            filters={'trio': TrioFilter()},
+            seed=42,
+        )
+        sim.run(2)
+
+        for result in sim.results:
+            stats = result.statistics.get('MatingStatistics')
+            if stats is not None:
+                assert stats['n_mating_pairs'] > 0
+                assert stats['mean_offspring_count'] > 0
+
+    def test_mating_stats_offspring_count_with_known_opp(self):
+        """mean_offspring_count should be close to offspring_per_pair for gen > 0."""
+        opp = 3
+        sim = _make_sim(
+            n=1000, m=50, h2=0.5, offspring_per_pair=opp,
+            statistics=[MatingStatistics(filter_name='trio')],
+            filters={'trio': TrioFilter()},
+            seed=42,
+        )
+        sim.run(2)
+
+        # Check generations after the first (gen 0 may have founder FID structure)
+        for result in sim.results:
+            if result.generation >= 1:
+                stats = result.statistics.get('MatingStatistics')
+                if stats is not None:
+                    assert stats['mean_offspring_count'] == pytest.approx(opp, abs=0.5)
+
+    def test_assortative_mating_spouse_correlation(self):
+        """Assortative mating should produce detectable spouse correlation."""
+        n = 2000
+        hap = TestSimulation.founder_haplotypes(n=n, m=50, seed=42)
+        eff = AdditiveEffects.from_h2(h2=0.5, m=50, seed=43)
+        arch = Architecture()
+        arch.add('Y.G', GeneticComponent(eff))
+        arch.add('Y.E', NoiseComponent(variance=0.5))
+        arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+        mating = LinearAssortativeMating(
+            component_names=['Y'], r=0.5, offspring_per_pair=2,
+        )
+
+        sim = NSimulation(
+            founder_haplotypes=hap,
+            architecture=arch,
+            mating_regime=mating,
+            recombination_map=RecombinationMap.constant_map(m=50),
+            seed=42,
+            statistics=[MatingStatistics(filter_name='trio')],
+            filters={'trio': TrioFilter()},
+            retain_phenotypes=10,
+            retain_haplotypes=10,
+        )
+        sim.run(3)
+
+        # Check that spouse correlation is detected for gen >= 1
+        spouse_cors = []
+        for result in sim.results:
+            if result.generation >= 1:
+                stats = result.statistics.get('MatingStatistics')
+                if stats is not None and 'Y' in stats.get('spouse_correlations', {}):
+                    spouse_cors.append(stats['spouse_correlations']['Y'])
+
+        assert len(spouse_cors) >= 1, "Should have spouse correlations for gen >= 1"
+        mean_cor = np.mean(spouse_cors)
+        assert mean_cor > 0.1, (
+            f"Mean spouse correlation={mean_cor:.3f} should be > 0.1 with r=0.5"
+        )
+
+    def test_random_mating_zero_spouse_correlation(self):
+        """Random mating should produce near-zero spouse correlation."""
+        sim = _make_sim(
+            n=2000, m=50, h2=0.5, offspring_per_pair=2,
+            statistics=[MatingStatistics(filter_name='trio')],
+            filters={'trio': TrioFilter()},
+            seed=42,
+        )
+        sim.run(3)
+
+        spouse_cors = []
+        for result in sim.results:
+            if result.generation >= 1:
+                stats = result.statistics.get('MatingStatistics')
+                if stats is not None and 'Y' in stats.get('spouse_correlations', {}):
+                    spouse_cors.append(stats['spouse_correlations']['Y'])
+
+        if spouse_cors:
+            mean_cor = np.mean(spouse_cors)
+            assert abs(mean_cor) < 0.15, (
+                f"Mean spouse correlation={mean_cor:.3f} should be near 0 for random mating"
+            )
+
+
+class TestCombinedEstimators:
+    """Test running HE, PO, and MatingStatistics together."""
+
+    def test_all_three_in_one_sim(self):
+        """All three statistics should run without conflict."""
+        sim = _make_sim(
+            n=1000, m=50, h2=0.5, offspring_per_pair=2,
+            statistics=[
+                HasemanElstonEstimator(filter_name='sibpair'),
+                ParentOffspringRegression(filter_name='trio'),
+                MatingStatistics(filter_name='trio'),
+                SampleStatistics(),
+            ],
+            filters={
+                'sibpair': SibPairFilter(),
+                'trio': TrioFilter(),
+            },
+            seed=42,
+        )
+        sim.run(3)
+
+        assert len(sim.results) == 3
+        for result in sim.results:
+            assert 'SampleStatistics' in result.statistics
+            # HE and PO may be None for gen 0 but should be present as keys
+            assert 'HasemanElstonEstimator' in result.statistics
+            assert 'ParentOffspringRegression' in result.statistics
+            assert 'MatingStatistics' in result.statistics
+
+    def test_he_and_por_agree_roughly(self):
+        """HE and PO should give roughly concordant h2 estimates."""
+        sim = _make_sim(
+            n=2000, m=100, h2=0.5, offspring_per_pair=2,
+            statistics=[
+                HasemanElstonEstimator(filter_name='sibpair'),
+                ParentOffspringRegression(filter_name='trio'),
+            ],
+            filters={
+                'sibpair': SibPairFilter(),
+                'trio': TrioFilter(),
+            },
+            seed=42,
+        )
+        sim.run(4)
+
+        he_vals = []
+        por_vals = []
+        for result in sim.results:
+            he_s = result.statistics.get('HasemanElstonEstimator')
+            por_s = result.statistics.get('ParentOffspringRegression')
+            if he_s is not None and 'Y' in he_s:
+                he_vals.append(he_s['Y']['h2'])
+            if por_s is not None and 'Y' in por_s:
+                por_vals.append(por_s['Y']['h2'])
+
+        if he_vals and por_vals:
+            he_mean = np.mean(he_vals)
+            por_mean = np.mean(por_vals)
+            # Both should be in the same ballpark (within 0.4)
+            assert abs(he_mean - por_mean) < 0.4, (
+                f"HE mean={he_mean:.3f}, POR mean={por_mean:.3f} should be roughly concordant"
+            )

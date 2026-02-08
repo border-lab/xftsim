@@ -50,20 +50,20 @@ class Config:
 
 config = Config()
 
-from . import utils       ## utility functions   
-from . import data        ## download recombination maps etc
-from . import index       ## indexing
+from . import utils       ## utility functions
+from . import data        ## download recombination maps etc (legacy shim)
+from . import index       ## indexing (legacy shim)
 from . import struct      ## data structures
-from . import effect      ## genetic effects
-from . import arch        ## phenogenetic architectures
-from . import filters     ## sample filtering
-from . import mate        ## mate assignment
+from . import effect      ## genetic effects (legacy shim)
+from . import arch        ## phenogenetic architectures (legacy shim)
+from . import filters     ## sample filtering (legacy shim)
+from . import mate        ## mate assignment (legacy shim)
 from . import reproduce   ## sexual reproduction and phenotypic transmission
 from . import founders    ## creation / import of founder haplotypes
 from . import ped         ## pedigree objects
-from . import sim         ## simulation object
-from . import stats       ## estimation
-from . import proc        ## post-processing
+from . import sim         ## simulation object (legacy shim)
+from . import stats       ## estimation (legacy shim)
+from . import proc        ## post-processing (legacy shim)
 from . import io          ## input/output
 from . import neffect     ## new effect specs
 from . import narch       ## new architecture system
@@ -72,4 +72,5 @@ from . import nmate       ## new mate assignment
 from . import nfilter     ## new filters (trio, sib-pair)
 from . import nstats      ## new statistics
 from . import nsim        ## new simulation loop
+from . import legacy      ## legacy modules (arch, sim, mate, etc.)
 
