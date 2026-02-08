@@ -521,54 +521,86 @@ class Simulation():
         with open(path+'.pickle', 'wb') as f:
             pickle.dump(obj=to_pickle, file=f)
 
-class DemoSimulation(Simulation):
-    demo_routines = dict(UGRM = 'Univariate GCTA with balanced random mating demo\n',
-                         BGRM = 'Bivariate GCTA with balanced random mating demo\n')
-    _demo_long = dict(BGRM = 'Two phenotypes, height and bone mineral denisty (BMD)\n'
-                             'assuming bivariate GCTA infinitessimal archtecture\n'
-                             'with h2 values set to 0.5 and 0.4 for height and BMD\n'
-                             'respectively and a genetic effect correlation of 0.0.',
-                      UGRM = 'A single phenotype, height, assuming univariate GCTA\n'
-                             'infinitessimal archtecture with h2 = 0.5.')
-    def __init__(self, 
+class DemoSimulation:
+    """Demo simulation using the new NSimulation system."""
+    demo_routines = dict(UGRM='Univariate GCTA with balanced random mating demo',
+                         BGRM='Bivariate GCTA with balanced random mating demo')
+    _demo_long = dict(BGRM='Two phenotypes, height and bone mineral density (BMD)\n'
+                            'assuming bivariate GCTA infinitesimal architecture\n'
+                            'with h2 values set to 0.5 and 0.4 for height and BMD\n'
+                            'respectively and a genetic effect correlation of 0.0.',
+                      UGRM='A single phenotype, height, assuming univariate GCTA\n'
+                            'infinitesimal architecture with h2 = 0.5.')
+
+    def __init__(self,
                  routine: str = 'BGRM',
-                 n: int = 2000, 
+                 n: int = 2000,
                  m: int = 400) -> None:
+        if routine not in self.demo_routines:
+            raise NotImplementedError(
+                f"Routine `{routine}` not implemented. "
+                f"See `DemoSimulation.demo_routines` for supported routines"
+            )
+
+        founder_haplotypes = xft.founders.founder_haplotypes_uniform_AFs(n=n, m=m)
+        recombination_map = xft.reproduce.RecombinationMap.from_haplotypes(
+            founder_haplotypes, p=.1)
+        mating_regime = xft.nmate.RandomMating(offspring_per_pair=2)
+
         if routine == 'UGRM':
-            founder_haplotypes = xft.founders.founder_haplotypes_uniform_AFs(n=n, m=m)
-            architecture = xft.arch.GCTA_Architecture(h2=[.5], phenotype_name=['height'], 
-                                                      haplotypes=founder_haplotypes)
-            recombination_map = xft.reproduce.RecombinationMap.from_haplotypes(founder_haplotypes, 
-                                                                                            p =.1)
-            mating_regime = xft.mate.RandomMatingRegime(mates_per_female=1,
-                                                        offspring_per_pair=2)
+            effects = {'eff': xft.neffect.AdditiveEffects.from_h2(h2=0.5, m=m)}
+            architecture = xft.narch.Architecture(
+                formula="height.G ~ genetic(eff)\nheight.E ~ noise(0.5)\nheight ~ height.G + height.E",
+                effects=effects,
+            )
         elif routine == 'BGRM':
-            founder_haplotypes = xft.founders.founder_haplotypes_uniform_AFs(n=n, m=m)
-            architecture = xft.arch.GCTA_Architecture(h2=[.5,.4], phenotype_name=['height', 'BMD'], 
-                                                      haplotypes=founder_haplotypes)
-            recombination_map = xft.reproduce.RecombinationMap.from_haplotypes(founder_haplotypes, 
-                                                                                            p =.1)
-            mating_regime = xft.mate.RandomMatingRegime(mates_per_female=1,
-                                                        offspring_per_pair=2)
-        else:
-            raise NotImplementedError(f"Routine `{routine}` not implemented. See `DemoSimulation.demo_routines` for supported routines")
-        ## ensure silence
-        old_config = xft.config
-        xft.config.print_durations_threshold = np.inf
-        super().__init__(founder_haplotypes=founder_haplotypes,
-                         mating_regime=mating_regime,
-                         recombination_map=recombination_map,
-                         architecture=architecture,
-                         statistics=[xft.stats.SampleStatistics(),
-                            xft.stats.MatingStatistics(full=True)])
-        self.run(2)
-        ## revert to user specified config
-        xft.config.print_durations_threshold = old_config.print_durations_threshold
+            effects = {'eff': xft.neffect.MultivariateEffects.from_h2_rg(
+                h2=np.array([0.5, 0.4]), rg=np.eye(2), m=m)}
+            architecture = xft.narch.Architecture(
+                formula=(
+                    "(height.G, BMD.G) ~ mvGenetic(eff)\n"
+                    "height.E ~ noise(0.5)\n"
+                    "BMD.E ~ noise(0.6)\n"
+                    "height ~ height.G + height.E\n"
+                    "BMD ~ BMD.G + BMD.E"
+                ),
+                effects=effects,
+            )
+
+        self._sim = xft.nsim.NSimulation(
+            founder_haplotypes=founder_haplotypes,
+            architecture=architecture,
+            mating_regime=mating_regime,
+            recombination_map=recombination_map,
+            statistics=[xft.nstats.SampleStatistics()],
+            seed=42,
+        )
+        self._sim.run(2)
+
         self.routine = routine
         self.routine_title = self.demo_routines[routine]
         self.routine_long = self._demo_long[routine]
         self._n = n
         self._m = m
+
+    @property
+    def generation(self):
+        return self._sim.generation
+
+    @property
+    def haplotypes(self):
+        return self._sim.haplotypes
+
+    @property
+    def phenotypes(self):
+        return self._sim.phenotypes
+
+    @property
+    def results(self):
+        return self._sim.results
+
+    def run(self, n_generations: int):
+        self._sim.continue_run(n_generations)
 
     def __repr__(self):
         return '\n'.join(["<DemoSimulation>",

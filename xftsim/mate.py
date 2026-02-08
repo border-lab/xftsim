@@ -762,6 +762,7 @@ class RandomMatingRegime(MatingRegime):
             An object containing the maternal and paternal sample indices, the number of offspring per pair,
             and the number of female offspring per pair.
         """
+        self._sample_indexer = haplotypes.samples.to_sample_index()
         female_indices, male_indices = self.get_potential_mates(haplotypes, phenotypes)
 
         female_indices = np.random.permutation(female_indices)

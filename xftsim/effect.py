@@ -84,8 +84,12 @@ class AdditiveEffects:
 
         self.variant_indexer = variant_indexer
 
-        self._tiledAF = xft.utils.ensure2D(self.variant_indexer.af)
-        self.AF = xft.utils.ensure2D(self.variant_indexer.af)[::2, :]
+        if isinstance(variant_indexer, xft.index.HaploidVariantIndex):
+            self._tiledAF = xft.utils.ensure2D(self.variant_indexer.af)
+            self.AF = self._tiledAF[::2, :]
+        else:
+            self.AF = xft.utils.ensure2D(self.variant_indexer.af)
+            self._tiledAF = np.repeat(self.AF, 2, axis=0)
         if np.any(np.isnan(self.AF)):
             raise RuntimeError('Must provided allele frequencies')
 

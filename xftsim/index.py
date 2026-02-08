@@ -142,8 +142,8 @@ class XftIndex:
     
     @property
     def coords(self):
-        coords = {self._dimension:self.unique_identifier}
-        coords.update({variable:self.frame[variable].values for variable in self._coord_variables})
+        coords = {self._dimension:np.asarray(self.unique_identifier)}
+        coords.update({variable:np.asarray(self.frame[variable].values) for variable in self._coord_variables})
         return coords
 
     @property
@@ -846,6 +846,10 @@ class ComponentIndex(XftIndex):
         frame = self.frame_copy()
         frame.vorigin_relative = origin
         return ComponentIndex.from_frame(frame)
+
+    def to_haploid(self):
+        """No-op for ComponentIndex (phenotype components have no ploidy concept)."""
+        return self
 
     def to_proband(self):
         if len(np.unique(self.vorigin_relative)) > 1 or np.any(self.vorigin_relative==-1):
