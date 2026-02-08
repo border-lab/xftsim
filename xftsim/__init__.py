@@ -71,6 +71,8 @@ from . import parser      ## formula parser
 from . import nmate       ## new mate assignment
 from . import nfilter     ## new filters (trio, sib-pair)
 from . import nstats      ## new statistics
+from . import ngwas       ## GWAS and PGS
 from . import nsim        ## new simulation loop
 from . import legacy      ## legacy modules (arch, sim, mate, etc.)
+from . import cli         ## command-line interface
 

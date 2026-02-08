@@ -30,7 +30,11 @@ class GenerationResult:
 
 
 class Statistic(ABC):
-    """Abstract base class for per-generation statistics."""
+    """Abstract base class for per-generation statistics.
+
+    Subclasses implement ``estimate()`` to compute a summary statistic
+    from phenotype history and filtered views each generation.
+    """
 
     @abstractmethod
     def estimate(self, phenotype_history: dict,

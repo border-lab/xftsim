@@ -14,7 +14,7 @@ from xftsim.struct import NPhenotypeArray, PedigreeArray
 
 @dataclass
 class FilteredView:
-    """Base class for filtered data views."""
+    """Base class for filtered data views produced by Filter.apply()."""
     pass
 
 

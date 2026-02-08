@@ -16,17 +16,21 @@ from xftsim.nstats import GenerationResult
 
 
 class NSimulation:
-    """
-    Forward-time genetics simulation.
+    """Forward-time genetics simulation.
+
+    Orchestrates the simulation loop: for each generation, performs meiosis
+    (recombination), computes phenotypes via the architecture DAG, applies
+    filters, computes statistics, and runs callbacks. History dicts are
+    pruned according to configurable retention policies.
 
     Parameters
     ----------
     founder_haplotypes : HaplotypeOperator
-        Generation-0 haplotypes.
+        Generation-0 haplotypes (DenseHaplotypeArray or GraphHaplotypeOperator).
     architecture : Architecture
         Phenogenetic architecture (DAG of ArchNodes).
-    mating_regime : RandomMating
-        Mating strategy that produces NMateAssignment.
+    mating_regime : RandomMating or LinearAssortativeMating
+        Mating strategy that produces NMateAssignment each generation.
     recombination_map : RecombinationMap
         Recombination probabilities for meiosis.
     retain_haplotypes : int
@@ -42,6 +46,41 @@ class NSimulation:
         Statistics to compute after each generation.
     seed : int, optional
         Random seed for reproducibility.
+
+    Attributes
+    ----------
+    generation : int
+        Current generation number.
+    haplotype_history : dict[int, HaplotypeOperator]
+        Generation -> haplotype data mapping (pruned by retention policy).
+    phenotype_history : dict[int, NPhenotypeArray]
+        Generation -> phenotype data mapping (pruned by retention policy).
+    pedigree_history : dict[int, PedigreeArray]
+        Generation -> pedigree mapping (pruned by retention policy).
+    results : list[GenerationResult]
+        Statistics results for each completed generation.
+    stop : bool
+        Set to True inside a callback to halt the simulation.
+
+    Examples
+    --------
+    >>> from xftsim.founders import founder_haplotypes_uniform_AFs
+    >>> from xftsim.neffect import AdditiveEffects
+    >>> from xftsim.narch import Architecture, GeneticComponent, NoiseComponent
+    >>> from xftsim.nmate import RandomMating
+    >>> from xftsim.reproduce import RecombinationMap
+    >>> import numpy as np
+    >>> hap = founder_haplotypes_uniform_AFs(n=100, m=50)
+    >>> eff = AdditiveEffects.from_h2(h2=0.5, m=50, seed=42)
+    >>> arch = Architecture()
+    >>> arch.add('Y.G', GeneticComponent(eff))
+    >>> arch.add('Y.E', NoiseComponent(0.5))
+    >>> arch.add('Y', AggregationComponent('Y.G + Y.E'))
+    >>> rmap = RecombinationMap.uniform(m=50, p=0.01)
+    >>> sim = NSimulation(hap, arch, RandomMating(), rmap, seed=1)
+    >>> sim.run(n_generations=3)
+    >>> sim.generation
+    2
     """
 
     def __init__(

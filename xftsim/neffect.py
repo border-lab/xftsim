@@ -52,13 +52,33 @@ class EffectSpec(ABC):
 
 
 class AdditiveEffects(EffectSpec):
-    """Univariate additive genetic effects."""
+    """Univariate additive genetic effects.
+
+    All variants are causal (variant_mask is all-True). Effect sizes
+    are stored as a 1D array of shape (m,).
+
+    Examples
+    --------
+    Generate effects targeting h2 = 0.5 across 100 variants:
+
+    >>> eff = AdditiveEffects.from_h2(h2=0.5, m=100, seed=42)
+    >>> eff.m
+    100
+    >>> eff.k
+    1
+
+    Create from a known effect array:
+
+    >>> import numpy as np
+    >>> eff = AdditiveEffects.from_array(np.array([0.1, -0.2, 0.05]))
+    >>> eff.m
+    3
+    """
 
     @classmethod
     def from_h2(cls, h2: float, m: int, standardized: bool = True,
                 seed: Optional[int] = None) -> "AdditiveEffects":
-        """
-        Generate additive effects to target a given heritability.
+        """Generate additive effects to target a given heritability.
 
         Under standardized genotypes, Var(G) = sum(beta^2).
         We draw beta ~ N(0, h2/m) so E[sum(beta^2)] = h2.
@@ -73,6 +93,10 @@ class AdditiveEffects(EffectSpec):
             Whether effects are for standardized genotypes.
         seed : int, optional
             Random seed for reproducibility.
+
+        Returns
+        -------
+        AdditiveEffects
         """
         rng = np.random.RandomState(seed)
         effects = rng.normal(0, np.sqrt(h2 / m), size=m)
@@ -81,8 +105,7 @@ class AdditiveEffects(EffectSpec):
 
     @classmethod
     def from_array(cls, effects: np.ndarray, standardized: bool = True) -> "AdditiveEffects":
-        """
-        Create from a pre-specified effect array.
+        """Create from a pre-specified effect array.
 
         Parameters
         ----------
@@ -90,6 +113,10 @@ class AdditiveEffects(EffectSpec):
             (m,) array of effect sizes.
         standardized : bool
             Whether effects are for standardized genotypes.
+
+        Returns
+        -------
+        AdditiveEffects
         """
         effects = np.asarray(effects, dtype=np.float64)
         variant_mask = np.ones(len(effects), dtype=bool)
@@ -101,7 +128,11 @@ class AdditiveEffects(EffectSpec):
 
 
 class MultivariateEffects(EffectSpec):
-    """Multivariate correlated effects across k traits."""
+    """Multivariate correlated effects across k traits.
+
+    Effect sizes are stored as a 2D array of shape (m, k) where k is the
+    number of traits. All variants are causal.
+    """
 
     @classmethod
     def from_h2_rg(cls, h2: list, rg: float, m: int,
@@ -122,6 +153,10 @@ class MultivariateEffects(EffectSpec):
             Whether effects are for standardized genotypes.
         seed : int, optional
             Random seed.
+
+        Returns
+        -------
+        MultivariateEffects
         """
         h2 = np.asarray(h2, dtype=np.float64)
         k = len(h2)
@@ -139,19 +174,22 @@ class MultivariateEffects(EffectSpec):
     def from_covg(cls, covg: np.ndarray, m: int,
                   standardized: bool = True,
                   seed: Optional[int] = None) -> "MultivariateEffects":
-        """
-        Generate multivariate effects from a full genetic covariance matrix.
+        """Generate multivariate effects from a full genetic covariance matrix.
 
         Parameters
         ----------
         covg : np.ndarray
-            (k, k) genetic covariance matrix. sum(beta @ beta.T) ≈ covg.
+            (k, k) genetic covariance matrix. sum(beta @ beta.T) approx covg.
         m : int
             Number of variants.
         standardized : bool
             Whether effects are for standardized genotypes.
         seed : int, optional
             Random seed.
+
+        Returns
+        -------
+        MultivariateEffects
         """
         covg = np.asarray(covg, dtype=np.float64)
         cov_snp = covg / m
@@ -164,8 +202,18 @@ class MultivariateEffects(EffectSpec):
     @classmethod
     def from_array(cls, effects: np.ndarray,
                    standardized: bool = True) -> "MultivariateEffects":
-        """
-        Create from a pre-specified (m, k) effect matrix.
+        """Create from a pre-specified (m, k) effect matrix.
+
+        Parameters
+        ----------
+        effects : np.ndarray
+            (m, k) array of effect sizes.
+        standardized : bool
+            Whether effects are for standardized genotypes.
+
+        Returns
+        -------
+        MultivariateEffects
         """
         effects = np.asarray(effects, dtype=np.float64)
         variant_mask = np.ones(effects.shape[0], dtype=bool)
@@ -177,7 +225,11 @@ class MultivariateEffects(EffectSpec):
 
 
 class SparseEffects(EffectSpec):
-    """Sparse causal effects — only a subset of variants are causal."""
+    """Sparse causal effects -- only a subset of variants are causal.
+
+    Non-causal variants have zero effect sizes. The ``variant_mask``
+    indicates which variants are causal.
+    """
 
     @classmethod
     def from_h2(cls, h2: float, m: int, k_causal: int,
@@ -198,6 +250,15 @@ class SparseEffects(EffectSpec):
             Whether effects are for standardized genotypes.
         seed : int, optional
             Random seed.
+
+        Returns
+        -------
+        SparseEffects
+
+        Raises
+        ------
+        ValueError
+            If ``k_causal > m``.
         """
         if k_causal > m:
             raise ValueError(f"k_causal ({k_causal}) > m ({m})")

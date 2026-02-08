@@ -48,6 +48,7 @@ class NMateAssignment:
 
     @property
     def n_offspring(self) -> int:
+        """Number of offspring in this assignment."""
         return self.offspring_samples.n
 
     def __repr__(self):
@@ -56,13 +57,27 @@ class NMateAssignment:
 
 
 class RandomMating:
-    """
-    Random mating: shuffle individuals, pair them up, produce offspring.
+    """Random mating: shuffle individuals, pair them up, produce offspring.
+
+    Individuals are separated by sex (0=female, 1=male), each group is
+    shuffled, and min(n_female, n_male) pairs are formed. Each pair
+    produces ``offspring_per_pair`` offspring with sequential IIDs,
+    pair-based FIDs, and alternating sex.
 
     Parameters
     ----------
     offspring_per_pair : int
         Number of offspring per mating pair. Default 2.
+
+    Examples
+    --------
+    >>> from xftsim.struct import SampleMeta
+    >>> import numpy as np
+    >>> samples = SampleMeta(iid=np.arange(10))
+    >>> mating = RandomMating(offspring_per_pair=2)
+    >>> assignment = mating.mate(samples, rng=np.random.RandomState(0))
+    >>> assignment.n_offspring
+    10
     """
 
     def __init__(self, offspring_per_pair: int = 2):
@@ -171,10 +186,22 @@ class LinearAssortativeMating:
         self.offspring_per_pair = offspring_per_pair
 
     def mate(self, samples: SampleMeta, rng=None, phenotypes=None) -> NMateAssignment:
-        """
-        Produce a mate assignment with phenotypic assortment.
+        """Produce a mate assignment with phenotypic assortment.
 
-        Falls back to random mating if r==0 or phenotypes is None.
+        Falls back to random mating if ``r == 0`` or ``phenotypes`` is None.
+
+        Parameters
+        ----------
+        samples : SampleMeta
+            Current generation's sample metadata.
+        rng : np.random.RandomState, optional
+            Random state for reproducibility.
+        phenotypes : NPhenotypeArray, optional
+            Current phenotypes (needed for assortment scoring).
+
+        Returns
+        -------
+        NMateAssignment
         """
         if rng is None:
             rng = np.random.RandomState()

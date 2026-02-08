@@ -64,8 +64,16 @@ class ArchComponent(ABC):
 
 
 class GeneticComponent(ArchComponent):
-    """
-    Genetic component: computes G @ effects (or standardized_matvec).
+    """Univariate genetic component: computes diploid G @ effects.
+
+    Uses ``standardized_matvec`` when ``effects.standardized`` is True,
+    otherwise plain ``matvec``.
+
+    Parameters
+    ----------
+    effects : EffectSpec
+        Effect sizes (shape (m,) for univariate). Typically an
+        ``AdditiveEffects`` or ``SparseEffects`` instance.
     """
     name = "genetic"
     kind = "genetic"
@@ -85,12 +93,16 @@ class GeneticComponent(ArchComponent):
 
 
 class MVGeneticComponent(GeneticComponent):
-    """
-    Multivariate genetic component: computes G @ effects for k traits.
+    """Multivariate genetic component: computes G @ effects for k traits.
 
-    effects should be an EffectSpec with shape (m, k).
-    Returns (n, k) array. Inherits compute() from GeneticComponent
-    since numpy matvec handles both 1D and 2D effect arrays.
+    Inherits ``compute()`` from GeneticComponent since numpy's matvec
+    handles both 1D and 2D effect arrays.
+
+    Parameters
+    ----------
+    effects : EffectSpec
+        Effect sizes with shape (m, k). Typically a
+        ``MultivariateEffects`` instance.
     """
     name = "mvGenetic"
 
@@ -99,11 +111,24 @@ class MVGeneticComponent(GeneticComponent):
 
 
 class HaplotypeGeneticComponent(ArchComponent):
-    """
-    Haplotype-specific genetic component: computes hap[:,:,0] @ effects (maternal)
-    or hap[:,:,1] @ effects (paternal).
+    """Haplotype-specific genetic component.
 
-    Enables indirect genetic effects (IGE) formulas.
+    Computes ``hap[:,:,0] @ effects`` (maternal) or
+    ``hap[:,:,1] @ effects`` (paternal). Enables indirect genetic
+    effects (IGE) formulas where maternal and paternal contributions
+    are modeled separately.
+
+    Parameters
+    ----------
+    effects : EffectSpec
+        Effect sizes (shape (m,)).
+    haplotype : str
+        Which haplotype copy to use: ``'maternal'`` or ``'paternal'``.
+
+    Raises
+    ------
+    ValueError
+        If ``haplotype`` is not ``'maternal'`` or ``'paternal'``.
     """
     name = "haplotypeGenetic"
     kind = "genetic"
@@ -179,9 +204,16 @@ def _resolve_grouping(grouping, haplotypes, **kwargs):
 
 
 class NoiseComponent(ArchComponent):
-    """
-    Noise component: draws iid N(0, variance) per individual,
-    or one value per group when grouping is set.
+    """Univariate noise component.
+
+    Draws iid N(0, variance) per individual. When grouping is active
+    (e.g., ``| FID``), draws one shared value per group and broadcasts
+    to all members.
+
+    Parameters
+    ----------
+    variance : float
+        Noise variance (used as the variance of the normal distribution).
     """
     name = "noise"
     kind = "generative"
@@ -206,10 +238,20 @@ class NoiseComponent(ArchComponent):
 
 
 class CNoiseComponent(ArchComponent):
-    """
-    Correlated multivariate noise: draws N(0, cov) per individual or group.
+    """Correlated multivariate noise component.
 
-    Returns (n, k) array.
+    Draws N(0, cov) per individual. When grouping is active, draws one
+    shared vector per group and broadcasts. Returns an (n, k) array.
+
+    Parameters
+    ----------
+    cov : np.ndarray
+        (k, k) covariance matrix. Must be square.
+
+    Raises
+    ------
+    ValueError
+        If ``cov`` is not a square matrix.
     """
     name = "cnoise"
     kind = "generative"
@@ -222,6 +264,7 @@ class CNoiseComponent(ArchComponent):
 
     @property
     def k(self) -> int:
+        """Number of correlated traits."""
         return self.cov.shape[0]
 
     def compute(self, node, haplotypes, phenotypes, **kwargs):
@@ -242,11 +285,17 @@ class CNoiseComponent(ArchComponent):
 
 
 class AggregationComponent(ArchComponent):
-    """
-    Aggregation component: evaluates arithmetic expressions over phenotype values.
+    """Aggregation component: evaluates arithmetic expressions over phenotype values.
 
-    Uses a custom tokenizer + shunting-yard evaluator (no eval()).
-    Supports: +, -, *, /, scalar multiplication, dotted names.
+    Uses a custom tokenizer + shunting-yard evaluator (no ``eval()``).
+    Supports ``+``, ``-``, ``*``, ``/``, scalar multiplication,
+    parentheses, and dotted names (e.g., ``'Y.G + Y.E'``).
+
+    Parameters
+    ----------
+    expression : str
+        Arithmetic expression referencing phenotype names, e.g.
+        ``'height.G + height.E'`` or ``'0.5 * (Y.G + Y.E)'``.
     """
     name = "aggregation"
     kind = "aggregating"
@@ -398,11 +447,20 @@ def _evaluate_expression(expr: str, phenotypes: NPhenotypeArray, n: int) -> np.n
 # ---------------------------------------------------------------------------
 
 class _ParentalComponent(ArchComponent):
-    """
-    Base class for vertical transmission components.
+    """Base class for vertical transmission components.
 
     Handles gen-0 founder fallback and phenotype_history lookup.
-    Subclasses implement _extract_values() to select the parent index(es).
+    Subclasses implement ``_extract_values()`` to select the parent
+    index(es).
+
+    Parameters
+    ----------
+    phenotype_name : str
+        Name of the phenotype to look up in the previous generation's
+        phenotype array.
+    founder_component : ArchComponent, optional
+        Component to use at generation 0 when no parents exist.
+        If None, returns zeros at gen 0.
     """
     kind = "reference"
     accepts_grouping = False
@@ -482,11 +540,17 @@ class ParentComponent(_ParentalComponent):
 # ---------------------------------------------------------------------------
 
 class _SiblingComponent(ArchComponent):
-    """
-    Base class for sibling aggregation components.
+    """Base class for sibling aggregation components.
 
-    Groups by FID (default) or explicit grouping via ``|``, aggregates
-    a source phenotype within each group, and broadcasts back to all members.
+    Groups by FID (default) or explicit grouping via the ``|`` operator,
+    aggregates a source phenotype within each group, and broadcasts the
+    result back to all group members.
+
+    Parameters
+    ----------
+    source_name : str
+        Name of the source phenotype to aggregate (must already be
+        computed by the time this node executes).
     """
     kind = "aggregating"
     accepts_grouping = True
@@ -647,17 +711,42 @@ BUILTINS = {
 # ---------------------------------------------------------------------------
 
 class Architecture:
-    """
-    Phenogenetic architecture: a DAG of ArchNodes executed each generation.
+    """Phenogenetic architecture: a DAG of ArchNodes executed each generation.
 
-    Can be constructed programmatically via add() or from a formula string.
+    Can be constructed programmatically via ``add()`` or from a formula
+    string (parsed by the ``parser`` module). Nodes are topologically
+    sorted so that dependencies are resolved before dependents.
 
     Parameters
     ----------
     formula : str, optional
-        Formula string (parsed into ArchNodes).
+        Multi-line formula string (parsed into ArchNodes). See
+        ``parser.parse_formula`` for the grammar.
     effects : dict, optional
-        Name → EffectSpec mapping for formula resolution.
+        Name -> EffectSpec mapping for resolving effect references
+        in the formula.
+
+    Examples
+    --------
+    Programmatic construction:
+
+    >>> from xftsim.neffect import AdditiveEffects
+    >>> eff = AdditiveEffects.from_h2(h2=0.5, m=100, seed=1)
+    >>> arch = Architecture()
+    >>> arch.add('Y.G', GeneticComponent(eff))
+    >>> arch.add('Y.E', NoiseComponent(0.5))
+    >>> arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+    Formula construction:
+
+    >>> arch = Architecture(
+    ...     formula=\"\"\"
+    ...     Y.G ~ genetic(eff)
+    ...     Y.E ~ noise(0.5)
+    ...     Y ~ Y.G + Y.E
+    ...     \"\"\",
+    ...     effects={'eff': eff},
+    ... )
     """
 
     def __init__(self, formula: str = None, effects: dict = None):

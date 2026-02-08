@@ -1921,66 +1921,147 @@ class VariantMeta:
 # ---------------------------------------------------------------------------
 
 class HaplotypeOperator(ABC):
-    """
-    Abstract base class for all genotype representations.
+    """Abstract base class for all genotype representations.
+
+    Defines the interface for matrix-vector operations on haplotype data,
+    used by the architecture's genetic components. All implementations
+    must provide ``samples`` (SampleMeta) and ``variants`` (VariantMeta)
+    attributes.
 
     Concrete implementations:
-    - DenseHaplotypeArray — NumPy-backed (n, m, 2) array
-    - GraphHaplotypeOperator — GRG wrapper (pygrgl graph traversal)
-    """
 
-    # samples: SampleMeta  — set by concrete implementations
-    # variants: VariantMeta — set by concrete implementations
+    - ``DenseHaplotypeArray`` -- NumPy-backed (n, m, 2) array
+    - ``GraphHaplotypeOperator`` -- GRG wrapper (pygrgl graph traversal)
+
+    Attributes
+    ----------
+    samples : SampleMeta
+        Sample metadata (set by concrete implementations).
+    variants : VariantMeta
+        Variant metadata (set by concrete implementations).
+    """
 
     @property
     @abstractmethod
     def n(self) -> int:
+        """Number of samples (individuals)."""
         ...
 
     @property
     @abstractmethod
     def m(self) -> int:
+        """Number of diploid variants."""
         ...
 
     @abstractmethod
     def matvec(self, v: np.ndarray) -> np.ndarray:
-        """Diploid G @ v."""
+        """Diploid genotype-vector product: G @ v.
+
+        Parameters
+        ----------
+        v : np.ndarray
+            Effect vector of shape (m,) or (m, k).
+
+        Returns
+        -------
+        np.ndarray
+            Result of shape (n,) or (n, k).
+        """
         ...
 
     @abstractmethod
     def rmatvec(self, v: np.ndarray) -> np.ndarray:
-        """G.T @ v."""
+        """Transpose genotype-vector product: G.T @ v.
+
+        Parameters
+        ----------
+        v : np.ndarray
+            Vector of shape (n,) or (n, k).
+
+        Returns
+        -------
+        np.ndarray
+            Result of shape (m,) or (m, k).
+        """
         ...
 
     @abstractmethod
     def matvec_maternal(self, v: np.ndarray) -> np.ndarray:
-        """hap[:,:,0] @ v."""
+        """Maternal haplotype matvec: hap[:,:,0] @ v.
+
+        Parameters
+        ----------
+        v : np.ndarray
+            Effect vector of shape (m,).
+
+        Returns
+        -------
+        np.ndarray
+            Result of shape (n,).
+        """
         ...
 
     @abstractmethod
     def matvec_paternal(self, v: np.ndarray) -> np.ndarray:
-        """hap[:,:,1] @ v."""
+        """Paternal haplotype matvec: hap[:,:,1] @ v.
+
+        Parameters
+        ----------
+        v : np.ndarray
+            Effect vector of shape (m,).
+
+        Returns
+        -------
+        np.ndarray
+            Result of shape (n,).
+        """
         ...
 
     @abstractmethod
     def standardized_matvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
-        """Standardized diploid matvec."""
+        """Standardized (mean-centered) diploid matvec.
+
+        Computes (G - 2p) @ v where p is the allele frequency vector.
+
+        Parameters
+        ----------
+        v : np.ndarray
+            Effect vector of shape (m,).
+        af : np.ndarray, optional
+            Allele frequencies. If None, recomputed from data.
+
+        Returns
+        -------
+        np.ndarray
+            Result of shape (n,).
+        """
         ...
 
     @abstractmethod
     def recompute_af(self) -> np.ndarray:
-        """Recompute empirical allele frequencies from current data."""
+        """Recompute empirical allele frequencies from current data.
+
+        Returns
+        -------
+        np.ndarray
+            Allele frequencies of shape (m,).
+        """
         ...
 
     @abstractmethod
     def to_dense(self) -> "DenseHaplotypeArray":
-        """Materialize as a DenseHaplotypeArray."""
+        """Materialize as a DenseHaplotypeArray.
+
+        Returns
+        -------
+        DenseHaplotypeArray
+            Dense representation of the haplotype data.
+        """
         ...
 
     @abstractmethod
     def meiosis(self, assignment, recombination_map) -> "HaplotypeOperator":
-        """
-        Perform meiosis to produce offspring haplotypes.
+        """Perform meiosis to produce offspring haplotypes.
 
         Parameters
         ----------

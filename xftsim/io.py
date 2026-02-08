@@ -1,3 +1,28 @@
+"""I/O functions for xftsim data structures.
+
+Provides serialization (save/load) for haplotypes, phenotypes, effects,
+architectures, and full simulation checkpoints. Also provides import
+functions for PLINK and sgkit datasets, and GRG loading.
+
+Public API
+----------
+save_haplotypes_npz / load_haplotypes_npz
+    Round-trip DenseHaplotypeArray to/from compressed .npz.
+save_phenotypes_npz / load_phenotypes_npz
+    Round-trip NPhenotypeArray to/from compressed .npz.
+save_effects_npz / load_effects_npz
+    Round-trip any EffectSpec subclass to/from compressed .npz.
+save_architecture / load_architecture
+    Round-trip Architecture to/from a directory (JSON + .npz).
+save_simulation_checkpoint / load_simulation_checkpoint
+    Round-trip full simulation state to/from a directory.
+load_grg
+    Load a GRG file as a GraphHaplotypeOperator.
+read_plink1_as_pseudohaplotypes
+    Import PLINK 1 binary files as DenseHaplotypeArray.
+haplotypes_from_sgkit_dataset
+    Import sgkit Dataset as DenseHaplotypeArray.
+"""
 import warnings
 import json
 import os
