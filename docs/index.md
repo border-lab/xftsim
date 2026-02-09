@@ -42,8 +42,35 @@ Advanced genetic architectures <userguide/advgen>
 ```
 
 ```{toctree}
+:maxdepth: 2
+:caption: Guides (New)
+
+Guides <guides/index>
+Quick Start <guides/quickstart>
+Formula DSL <guides/formula>
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: API Reference (New)
+
+Overview <api/index>
+NSimulation <api/nsim>
+Architecture & Components <api/narch>
+Effects <api/neffect>
+Mating <api/nmate>
+Filters <api/nfilter>
+Statistics <api/nstats>
+GWAS & PGS <api/ngwas>
+I/O <api/io>
+Data Structures <api/struct>
+Formula Parser <api/parser>
+CLI <api/cli>
+```
+
+```{toctree}
 :maxdepth: 4
-:caption: API reference
+:caption: API reference (Legacy)
 
 Submodule organization <api_ref/submodules>
 arch module <api_ref/arch>

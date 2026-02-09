@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [ajay, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install runtime deps manually (setup.py pins numba==0.56.4 which
+          # is incompatible with Python 3.12; sgkit is unused in new code).
+          pip install \
+            numpy \
+            scipy \
+            pandas \
+            numba \
+            nptyping \
+            networkx \
+            funcy \
+            pandas_plink \
+            xarray
+          # Install test dependencies
+          pip install pytest
+          # Install the package itself without pulling setup.py deps
+          pip install --no-deps -e .
+
+      - name: Run tests
+        run: |
+          python -m pytest --tb=short -q
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install flake8
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+
+      - name: Lint with flake8 (errors only)
+        run: |
+          # Fail on real errors: syntax errors, undefined names, redefined unused
+          flake8 xftsim/ \
+            --select=E999,F821,F811 \
+            --max-line-length=120 \
+            --count --show-source --statistics
+
+      - name: Lint with flake8 (warnings, non-blocking)
+        if: always()
+        run: |
+          # Report style issues but do not fail the build
+          flake8 xftsim/ \
+            --max-line-length=120 \
+            --ignore=E501,W503,E203 \
+            --count --statistics \
+            --exit-zero

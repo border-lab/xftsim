@@ -23,6 +23,8 @@ read_plink1_as_pseudohaplotypes
 haplotypes_from_sgkit_dataset
     Import sgkit Dataset as DenseHaplotypeArray.
 """
+from __future__ import annotations
+
 import warnings
 import json
 import os
@@ -592,7 +594,7 @@ def load_architecture(dir_path: str) -> "xft.narch.Architecture":
     return arch
 
 
-def _serialize_mating_regime(regime) -> dict:
+def _serialize_mating_regime(regime: object) -> dict[str, object]:
     """Serialize a mating regime to a JSON-compatible dict."""
     from xftsim.nmate import RandomMating, LinearAssortativeMating
     if isinstance(regime, LinearAssortativeMating):
@@ -611,7 +613,7 @@ def _serialize_mating_regime(regime) -> dict:
         return {'type': type(regime).__name__}
 
 
-def _deserialize_mating_regime(config: dict):
+def _deserialize_mating_regime(config: dict[str, object]) -> object:
     """Deserialize a mating regime from a dict."""
     from xftsim.nmate import RandomMating, LinearAssortativeMating
     mtype = config['type']
@@ -711,7 +713,7 @@ def save_simulation_checkpoint(sim: "xft.nsim.NSimulation",
              pedigree_gens=np.array(list(sim.pedigree_history.keys())))
 
 
-def load_simulation_checkpoint(dir_path: str) -> dict:
+def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     """
     Load a simulation checkpoint from a directory.
 

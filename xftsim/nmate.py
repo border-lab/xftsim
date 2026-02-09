@@ -4,10 +4,12 @@ New mate assignment and random mating for the refactored simulation loop.
 NMateAssignment: dataclass linking offspring to parents by index.
 RandomMating: shuffles and pairs individuals to produce offspring.
 """
+from __future__ import annotations
+
 import numpy as np
 from dataclasses import dataclass
 
-from xftsim.struct import SampleMeta
+from xftsim.struct import SampleMeta, NPhenotypeArray
 
 
 @dataclass
@@ -28,7 +30,7 @@ class NMateAssignment:
     maternal_idx: np.ndarray
     paternal_idx: np.ndarray
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.maternal_idx = np.asarray(self.maternal_idx, dtype=np.int64)
         self.paternal_idx = np.asarray(self.paternal_idx, dtype=np.int64)
         n = self.offspring_samples.n
@@ -51,7 +53,7 @@ class NMateAssignment:
         """Number of offspring in this assignment."""
         return self.offspring_samples.n
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f"NMateAssignment(n_offspring={self.n_offspring}, "
                 f"generation={self.offspring_samples.generation})")
 
@@ -80,12 +82,14 @@ class RandomMating:
     10
     """
 
-    def __init__(self, offspring_per_pair: int = 2):
+    def __init__(self, offspring_per_pair: int = 2) -> None:
         if offspring_per_pair < 1:
             raise ValueError("offspring_per_pair must be >= 1")
-        self.offspring_per_pair = offspring_per_pair
+        self.offspring_per_pair: int = offspring_per_pair
 
-    def mate(self, samples: SampleMeta, rng=None, phenotypes=None) -> NMateAssignment:
+    def mate(self, samples: SampleMeta,
+             rng: np.random.RandomState | None = None,
+             phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
         """
         Produce a mate assignment from the current generation.
 
@@ -151,7 +155,7 @@ class RandomMating:
             paternal_idx=paternal_idx,
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"RandomMating(offspring_per_pair={self.offspring_per_pair})"
 
 
@@ -176,16 +180,19 @@ class LinearAssortativeMating:
         Number of offspring per mating pair.
     """
 
-    def __init__(self, component_names, r=0.0, offspring_per_pair=2):
+    def __init__(self, component_names: list[str], r: float = 0.0,
+                 offspring_per_pair: int = 2) -> None:
         if not -1 < r < 1:
             raise ValueError(f"r must be in (-1, 1), got {r}")
         if offspring_per_pair < 1:
             raise ValueError("offspring_per_pair must be >= 1")
-        self.component_names = list(component_names)
-        self.r = float(r)
-        self.offspring_per_pair = offspring_per_pair
+        self.component_names: list[str] = list(component_names)
+        self.r: float = float(r)
+        self.offspring_per_pair: int = offspring_per_pair
 
-    def mate(self, samples: SampleMeta, rng=None, phenotypes=None) -> NMateAssignment:
+    def mate(self, samples: SampleMeta,
+             rng: np.random.RandomState | None = None,
+             phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
         """Produce a mate assignment with phenotypic assortment.
 
         Falls back to random mating if ``r == 0`` or ``phenotypes`` is None.
@@ -268,6 +275,6 @@ class LinearAssortativeMating:
             paternal_idx=paternal_idx,
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f"LinearAssortativeMating(components={self.component_names}, "
                 f"r={self.r}, offspring_per_pair={self.offspring_per_pair})")

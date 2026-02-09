@@ -6,6 +6,8 @@ EffectSpec ABC and concrete implementations:
 - MultivariateEffects: multivariate correlated effects across traits
 - SparseEffects: sparse causal effects (subset of variants)
 """
+from __future__ import annotations
+
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional

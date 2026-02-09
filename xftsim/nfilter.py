@@ -4,6 +4,8 @@ Filters for extracting structured views from simulation history.
 Filters produce FilteredViews (trios, sib-pairs, etc.) from phenotype
 and pedigree histories, used by statistics modules.
 """
+from __future__ import annotations
+
 import numpy as np
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -85,7 +87,9 @@ class TrioFilter(Filter):
     At generation > 0, indexes parent phenotypes from gen-1 by pedigree indices.
     """
 
-    def apply(self, generation, phenotype_history, pedigree_history):
+    def apply(self, generation: int,
+              phenotype_history: dict[int, NPhenotypeArray],
+              pedigree_history: dict[int, PedigreeArray]) -> TrioView | None:
         if generation == 0 or generation not in pedigree_history:
             return None
 
@@ -100,9 +104,9 @@ class TrioFilter(Filter):
         n = offspring_pheno.samples.n
         keys = list(offspring_pheno.keys)
 
-        offspring_dict = {}
-        mother_dict = {}
-        father_dict = {}
+        offspring_dict: dict[str, np.ndarray] = {}
+        mother_dict: dict[str, np.ndarray] = {}
+        father_dict: dict[str, np.ndarray] = {}
 
         for key in keys:
             offspring_dict[key] = offspring_pheno[key].copy()
@@ -125,7 +129,9 @@ class SibPairFilter(Filter):
     Groups offspring by FID and forms all unique within-family pairs.
     """
 
-    def apply(self, generation, phenotype_history, pedigree_history):
+    def apply(self, generation: int,
+              phenotype_history: dict[int, NPhenotypeArray],
+              pedigree_history: dict[int, PedigreeArray]) -> SibPairView | None:
         if generation not in phenotype_history:
             return None
 
@@ -215,7 +221,9 @@ class UnrelatedFilter(Filter):
     for each unique FID value.
     """
 
-    def apply(self, generation, phenotype_history, pedigree_history):
+    def apply(self, generation: int,
+              phenotype_history: dict[int, NPhenotypeArray],
+              pedigree_history: dict[int, PedigreeArray]) -> UnrelatedView | None:
         if generation not in phenotype_history:
             return None
 
@@ -276,16 +284,19 @@ class AscertainmentFilter(Filter):
         - 'both': individuals in either tail (union of upper and lower)
     """
 
-    def __init__(self, phenotype_key: str, quantile: float, tail: str = 'both'):
+    def __init__(self, phenotype_key: str, quantile: float,
+                 tail: str = 'both') -> None:
         if not 0.0 < quantile < 1.0:
             raise ValueError(f"quantile must be in (0, 1), got {quantile}")
         if tail not in ('upper', 'lower', 'both'):
             raise ValueError(f"tail must be 'upper', 'lower', or 'both', got '{tail}'")
-        self.phenotype_key = phenotype_key
-        self.quantile = quantile
-        self.tail = tail
+        self.phenotype_key: str = phenotype_key
+        self.quantile: float = quantile
+        self.tail: str = tail
 
-    def apply(self, generation, phenotype_history, pedigree_history):
+    def apply(self, generation: int,
+              phenotype_history: dict[int, NPhenotypeArray],
+              pedigree_history: dict[int, PedigreeArray]) -> AscertainedView | None:
         if generation not in phenotype_history:
             return None
 
@@ -358,8 +369,8 @@ class SubsampleFilter(Filter):
         Random seed for reproducibility.
     """
 
-    def __init__(self, n: Optional[int] = None, fraction: Optional[float] = None,
-                 seed: Optional[int] = None):
+    def __init__(self, n: int | None = None, fraction: float | None = None,
+                 seed: int | None = None) -> None:
         if n is not None and fraction is not None:
             raise ValueError("Specify exactly one of 'n' or 'fraction', not both")
         if n is None and fraction is None:
@@ -372,7 +383,9 @@ class SubsampleFilter(Filter):
         self._fraction = fraction
         self._seed = seed
 
-    def apply(self, generation, phenotype_history, pedigree_history):
+    def apply(self, generation: int,
+              phenotype_history: dict[int, NPhenotypeArray],
+              pedigree_history: dict[int, PedigreeArray]) -> SubsampleView | None:
         if generation not in phenotype_history:
             return None
 

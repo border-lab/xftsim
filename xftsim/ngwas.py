@@ -5,6 +5,8 @@ Provides:
 - GWAS: per-variant association statistics (beta, SE, t, p) for each phenotype
 - PGS: polygenic score calculation from external weights
 """
+from __future__ import annotations
+
 import numpy as np
 from scipy import stats
 from typing import Dict, List, Optional, Union
@@ -70,12 +72,12 @@ class GWAS:
 
     def __init__(self, haplotypes: HaplotypeOperator,
                  phenotypes: NPhenotypeArray,
-                 sample_indices: Optional[np.ndarray] = None):
-        self.haplotypes = haplotypes
-        self.phenotypes = phenotypes
-        self.sample_indices = sample_indices
+                 sample_indices: np.ndarray | None = None) -> None:
+        self.haplotypes: HaplotypeOperator = haplotypes
+        self.phenotypes: NPhenotypeArray = phenotypes
+        self.sample_indices: np.ndarray | None = sample_indices
 
-    def run(self, keys: Optional[List[str]] = None) -> Dict[str, GWASResult]:
+    def run(self, keys: list[str] | None = None) -> dict[str, GWASResult]:
         """
         Run GWAS for specified phenotype keys.
 
@@ -199,10 +201,10 @@ class PGS:
     """
 
     def __init__(self, haplotypes: HaplotypeOperator,
-                 weights: Union[np.ndarray, Dict],
-                 standardized: bool = False):
-        self.haplotypes = haplotypes
-        self.standardized = standardized
+                 weights: np.ndarray | dict[str, float],
+                 standardized: bool = False) -> None:
+        self.haplotypes: HaplotypeOperator = haplotypes
+        self.standardized: bool = standardized
 
         if isinstance(weights, dict):
             # Look up variant IDs and build weight vector

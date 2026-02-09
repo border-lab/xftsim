@@ -11,76 +11,108 @@ import os
 project = 'xftsim'
 copyright = '2024, Richard Border'
 author = 'Richard Border'
-release = '0.2.0'
+release = '0.3.0'
+
+# -- Path setup --------------------------------------------------------------
+# Add the project root so autodoc can import xftsim
+sys.path.insert(0, os.path.abspath(".."))
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
-sys.path.insert(0, os.path.abspath(".."))
-
 
 #html_logo = "_static/xftsimlogomedium.svg"
 html_logo = "_static/xftsimlogomediumwhite.svg"
-#html_logo = "_static/xftsimlogo.svg"
 
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "sphinx_rtd_theme",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.intersphinx",
-    "myst_parser",
-    #"sphinx_autosummary_accessors",
-    #"sphinxawesome_theme",
     "sphinx.ext.extlinks",
     "sphinx.ext.mathjax",
-    "sphinx.ext.napoleon",
+    "sphinx_autodoc_typehints",
+]
+
+# Optionally enable extensions that may not be installed everywhere
+_optional_extensions = [
+    "sphinx_rtd_theme",
+    "myst_parser",
     "IPython.sphinxext.ipython_directive",
     "IPython.sphinxext.ipython_console_highlighting",
     "nbsphinx",
-#    "sphinx_autosummary_accessors",
-#    "sphinx.ext.linkcode",
-#    "sphinx_copybutton",
-    #"sphinxext.rediraffe",
-    #"sphinx_design",
 ]
+for _ext in _optional_extensions:
+    try:
+        __import__(_ext.split(".")[0])
+        extensions.append(_ext)
+    except ImportError:
+        pass
 
 templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints',
+                    'plans', 'devtools', 'requirements.in', 'requirements.txt']
 
-myst_enable_extensions = ['attrs_inline', 'substitution']
+# -- nbsphinx settings -------------------------------------------------------
+nbsphinx_allow_errors = True
+nbsphinx_execute = 'never'
+
+# Support both reStructuredText and Markdown (if myst_parser is available)
+source_suffix = {
+    '.rst': 'restructuredtext',
+}
+if "myst_parser" in extensions:
+    source_suffix['.md'] = 'markdown'
+    myst_enable_extensions = ['attrs_inline', 'substitution']
 
 autosectionlabel_prefix_document = True
 autosummary_generate = True
-autodoc_typehints = "none"
 
+# -- Autodoc settings --------------------------------------------------------
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': True,
+    'show-inheritance': True,
+}
+autodoc_member_order = 'bysource'
+autodoc_typehints = 'description'
 
-# Napoleon configurations
-
+# -- Napoleon (NumPy docstrings) ---------------------------------------------
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 napoleon_use_param = False
 napoleon_use_rtype = False
 napoleon_preprocess_types = True
 
-master_doc = "index"
-exclude_patterns = ["_build", "**.ipynb_checkpoints"]
-source_suffix = {
-    '.rst': 'restructuredtext',
-    '.md': 'markdown',
+# -- sphinx-autodoc-typehints ------------------------------------------------
+always_document_param_types = True
+typehints_fully_qualified = False
+
+# -- Intersphinx mapping -----------------------------------------------------
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3/', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
 }
+
+master_doc = "index"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
-#html_theme='press'
-html_theme = 'sphinx_rtd_theme'
-#html_theme = 'sphinx_book_theme'
-#html_theme = 'sphinxawesome_theme'
+
+# Use sphinx_rtd_theme if available, fall back to alabaster
+try:
+    import sphinx_rtd_theme  # noqa: F401
+    html_theme = 'sphinx_rtd_theme'
+except ImportError:
+    html_theme = 'alabaster'
+
 html_static_path = ['_static']
 html_theme_options = {
-        'logo_only':True,
-            "show_navbar_depth": 2,
-    "repository_url": "https://github.com/rborder/xftsim/docs",
+    'logo_only': True,
+    "show_navbar_depth": 2,
+    "repository_url": "https://github.com/rborder/xftsim",
     "use_repository_button": True,
-        }
+}
 html_css_files = ['custom.css']

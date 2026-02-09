@@ -11,6 +11,8 @@ Grammar:
 - (a, b) ~ cnoise(cov=[[1,0.2],[0.2,1]])  multivariate correlated noise
 - Functions: genetic, mvGenetic, noise, cnoise, parent, mother, father
 """
+from __future__ import annotations
+
 import ast
 import re
 from typing import Optional
@@ -26,7 +28,8 @@ from xftsim.narch import (
 from xftsim.neffect import EffectSpec
 
 
-def parse_formula(formula: str, effects: dict = None) -> list:
+def parse_formula(formula: str,
+                  effects: dict[str, EffectSpec] | None = None) -> list[ArchNode]:
     """
     Parse a formula string into a list of ArchNode objects.
 
@@ -108,7 +111,7 @@ def parse_formula(formula: str, effects: dict = None) -> list:
     return nodes
 
 
-def _extract_grouping(rhs: str):
+def _extract_grouping(rhs: str) -> tuple[str, str | None]:
     """
     Extract trailing | IDENTIFIER from RHS, respecting parentheses.
 
@@ -145,8 +148,10 @@ _FUNC_RE = re.compile(
 )
 
 
-def _try_parse_function(outputs: list, rhs: str, effects: dict,
-                        lineno: int, grouping: str = None) -> Optional[ArchNode]:
+def _try_parse_function(outputs: list[str], rhs: str,
+                        effects: dict[str, EffectSpec],
+                        lineno: int,
+                        grouping: str | None = None) -> ArchNode | None:
     """
     Try to parse RHS as a function call.
 
@@ -191,8 +196,9 @@ def _try_parse_function(outputs: list, rhs: str, effects: dict,
         raise ValueError(f"Line {lineno}: unhandled function '{func_name}'")
 
 
-def _parse_genetic(outputs: list, args_str: str, effects: dict,
-                   lineno: int, grouping: str = None) -> ArchNode:
+def _parse_genetic(outputs: list[str], args_str: str,
+                   effects: dict[str, EffectSpec],
+                   lineno: int, grouping: str | None = None) -> ArchNode:
     """Parse genetic(effect_name) → GeneticComponent."""
     effect_name = args_str.strip()
     if not effect_name:
@@ -211,8 +217,9 @@ def _parse_genetic(outputs: list, args_str: str, effects: dict,
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=grouping)
 
 
-def _parse_mvGenetic(outputs: list, args_str: str, effects: dict,
-                     lineno: int, grouping: str = None) -> ArchNode:
+def _parse_mvGenetic(outputs: list[str], args_str: str,
+                     effects: dict[str, EffectSpec],
+                     lineno: int, grouping: str | None = None) -> ArchNode:
     """Parse mvGenetic(effect_name) → MVGeneticComponent."""
     effect_name = args_str.strip()
     if not effect_name:
@@ -236,8 +243,9 @@ def _parse_mvGenetic(outputs: list, args_str: str, effects: dict,
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=grouping)
 
 
-def _parse_haplotypeGenetic(outputs: list, args_str: str, effects: dict,
-                            lineno: int, grouping: str = None) -> ArchNode:
+def _parse_haplotypeGenetic(outputs: list[str], args_str: str,
+                            effects: dict[str, EffectSpec],
+                            lineno: int, grouping: str | None = None) -> ArchNode:
     """Parse haplotypeGenetic(eff) or haplotypeGenetic(eff, haplotype='maternal')."""
     # Split args on comma, respecting that haplotype= value has quotes
     parts = [p.strip() for p in args_str.split(',')]
@@ -270,8 +278,8 @@ def _parse_haplotypeGenetic(outputs: list, args_str: str, effects: dict,
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=grouping)
 
 
-def _parse_noise(outputs: list, args_str: str, lineno: int,
-                 grouping: str = None) -> ArchNode:
+def _parse_noise(outputs: list[str], args_str: str, lineno: int,
+                 grouping: str | None = None) -> ArchNode:
     """Parse noise(variance) → NoiseComponent."""
     try:
         variance = float(args_str)
@@ -283,8 +291,8 @@ def _parse_noise(outputs: list, args_str: str, lineno: int,
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=grouping)
 
 
-def _parse_cnoise(outputs: list, args_str: str, lineno: int,
-                  grouping: str = None) -> ArchNode:
+def _parse_cnoise(outputs: list[str], args_str: str, lineno: int,
+                  grouping: str | None = None) -> ArchNode:
     """Parse cnoise(cov=[[...]]) → CNoiseComponent."""
     import numpy as np
 
@@ -315,8 +323,8 @@ def _parse_cnoise(outputs: list, args_str: str, lineno: int,
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=grouping)
 
 
-def _parse_parental(func_name: str, outputs: list, args_str: str,
-                    effects: dict, lineno: int) -> ArchNode:
+def _parse_parental(func_name: str, outputs: list[str], args_str: str,
+                    effects: dict[str, EffectSpec], lineno: int) -> ArchNode:
     """Parse parent(phenotype, founder=...), mother(...), father(...)."""
     # Parse args: phenotype_name, optional founder=...
     args_str = args_str.strip()
@@ -345,7 +353,7 @@ def _parse_parental(func_name: str, outputs: list, args_str: str,
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=None)
 
 
-def _parse_founder_component(founder_str: str, lineno: int):
+def _parse_founder_component(founder_str: str, lineno: int) -> ArchComponent:
     """Parse a founder= value like noise(0.3) into a component."""
     match = _FUNC_RE.match(founder_str)
     if not match:
@@ -371,8 +379,8 @@ def _parse_founder_component(founder_str: str, lineno: int):
         )
 
 
-def _parse_sibling(func_name: str, outputs: list, args_str: str,
-                   lineno: int, grouping: str = None) -> ArchNode:
+def _parse_sibling(func_name: str, outputs: list[str], args_str: str,
+                   lineno: int, grouping: str | None = None) -> ArchNode:
     """Parse sibling_mean(source_name), etc."""
     source_name = args_str.strip()
     if not source_name:
@@ -387,7 +395,7 @@ def _parse_sibling(func_name: str, outputs: list, args_str: str,
     )
 
 
-def _parse_aggregation(outputs: list, rhs: str, lineno: int) -> ArchNode:
+def _parse_aggregation(outputs: list[str], rhs: str, lineno: int) -> ArchNode:
     """Parse an arithmetic expression → AggregationComponent."""
     component = AggregationComponent(expression=rhs)
     inputs = component._input_names

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 import numpy as np
 import pandas as pd
@@ -36,12 +38,13 @@ def founder_haplotypes_from_AFs(n: int,
     afs = np.asarray(afs).ravel()
     m = len(afs)
 
-    # Generate 3D genotypes array (n, m, 2)
-    # Each haplotype copy is sampled independently from Binomial(1, af)
-    genotypes = np.zeros((n, m, 2), dtype=np.int8)
-    for j in range(m):
-        genotypes[:, j, 0] = np.random.binomial(1, afs[j], n).astype(np.int8)
-        genotypes[:, j, 1] = np.random.binomial(1, afs[j], n).astype(np.int8)
+    # Generate 3D genotypes array (n, m, 2) using fully vectorized sampling.
+    # Each haplotype copy is sampled independently from Bernoulli(af).
+    # Broadcasting af over the sample dimension avoids a Python-level loop.
+    af_row = afs[np.newaxis, :]  # shape (1, m)
+    genotypes = np.empty((n, m, 2), dtype=np.int8)
+    genotypes[:, :, 0] = (np.random.random((n, m)) < af_row).astype(np.int8)
+    genotypes[:, :, 1] = (np.random.random((n, m)) < af_row).astype(np.int8)
 
     # Create sample metadata
     iid = np.arange(n, dtype=np.int64)

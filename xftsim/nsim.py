@@ -4,6 +4,10 @@ New simulation loop for the refactored xftsim.
 NSimulation: forward-time genetics simulation using the new data structures,
 architecture DAG, and mate assignment system.
 """
+from __future__ import annotations
+
+from typing import Callable
+
 import numpy as np
 
 from xftsim.struct import (
@@ -12,7 +16,8 @@ from xftsim.struct import (
 from xftsim.narch import Architecture
 from xftsim.nmate import NMateAssignment, RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nstats import GenerationResult
+from xftsim.nfilter import Filter, FilteredView
+from xftsim.nstats import GenerationResult, Statistic
 
 
 class NSimulation:
@@ -87,25 +92,25 @@ class NSimulation:
         self,
         founder_haplotypes: HaplotypeOperator,
         architecture: Architecture,
-        mating_regime,
+        mating_regime: RandomMating,
         recombination_map: RecombinationMap,
         retain_haplotypes: int = 1,
         retain_phenotypes: int = 2,
-        callbacks=None,
-        filters=None,
-        statistics=None,
-        seed=None,
-    ):
-        self.architecture = architecture
-        self.mating_regime = mating_regime
-        self.recombination_map = recombination_map
-        self.retain_haplotypes = retain_haplotypes
-        self.retain_phenotypes = retain_phenotypes
-        self.callbacks = callbacks or []
-        self.filters = filters or {}
-        self.statistics = statistics or []
-        self.rng = np.random.RandomState(seed)
-        self.stop = False
+        callbacks: list[Callable[[NSimulation], None]] | None = None,
+        filters: dict[str, Filter] | None = None,
+        statistics: list[Statistic] | None = None,
+        seed: int | None = None,
+    ) -> None:
+        self.architecture: Architecture = architecture
+        self.mating_regime: RandomMating = mating_regime
+        self.recombination_map: RecombinationMap = recombination_map
+        self.retain_haplotypes: int = retain_haplotypes
+        self.retain_phenotypes: int = retain_phenotypes
+        self.callbacks: list[Callable[[NSimulation], None]] = callbacks or []
+        self.filters: dict[str, Filter] = filters or {}
+        self.statistics: list[Statistic] = statistics or []
+        self.rng: np.random.RandomState = np.random.RandomState(seed)
+        self.stop: bool = False
 
         # History dicts keyed by generation
         self.haplotype_history: dict[int, HaplotypeOperator] = {
@@ -118,15 +123,15 @@ class NSimulation:
         # Results from statistics
         self.results: list[GenerationResult] = []
 
-        self.generation = 0
+        self.generation: int = 0
 
     @classmethod
     def from_checkpoint(cls, dir_path: str,
-                        mating_regime=None,
-                        recombination_map: RecombinationMap = None,
-                        callbacks=None,
-                        filters=None,
-                        statistics=None) -> "NSimulation":
+                        mating_regime: RandomMating | None = None,
+                        recombination_map: RecombinationMap | None = None,
+                        callbacks: list[Callable[[NSimulation], None]] | None = None,
+                        filters: dict[str, Filter] | None = None,
+                        statistics: list[Statistic] | None = None) -> NSimulation:
         """
         Reconstruct a simulation from a checkpoint directory.
 
@@ -206,7 +211,7 @@ class NSimulation:
         """Current generation's phenotypes."""
         return self.phenotype_history[self.generation]
 
-    def _validate(self):
+    def _validate(self) -> None:
         """Check that architecture effect dimensions match haplotype dimensions."""
         from xftsim.narch import GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent
         hap = self.haplotype_history[0]
@@ -221,7 +226,7 @@ class NSimulation:
                         f"effects have m={eff_m} but founder haplotypes have m={m}"
                     )
 
-    def run(self, n_generations: int):
+    def run(self, n_generations: int) -> None:
         """
         Run the simulation for n_generations.
 
@@ -305,7 +310,7 @@ class NSimulation:
             if self.stop:
                 return
 
-    def continue_run(self, n_additional: int):
+    def continue_run(self, n_additional: int) -> None:
         """
         Continue a simulation for n_additional generations from current state.
 
@@ -369,7 +374,7 @@ class NSimulation:
             if self.stop:
                 return
 
-    def _run_filters_and_stats(self, gen: int):
+    def _run_filters_and_stats(self, gen: int) -> None:
         """Run filters and statistics for the given generation."""
         # Run filters
         filtered_views = {}
@@ -393,7 +398,7 @@ class NSimulation:
                 stats[key] = result
             self.results.append(GenerationResult(generation=gen, statistics=stats))
 
-    def _enforce_retention(self, current_gen: int):
+    def _enforce_retention(self, current_gen: int) -> None:
         """Drop old generations from history dicts per retention policy."""
         # Haplotypes
         for g in list(self.haplotype_history.keys()):
@@ -415,11 +420,11 @@ class NSimulation:
             if g < current_gen - 1:
                 del self._mate_assignments[g]
 
-    def _run_callbacks(self):
+    def _run_callbacks(self) -> None:
         """Execute all registered callbacks."""
         for cb in self.callbacks:
             cb(self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f"NSimulation(generation={self.generation}, "
                 f"n={self.haplotypes.n}, m={self.haplotypes.m})")

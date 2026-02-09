@@ -50,10 +50,10 @@ def _make_haplotypes(n, m, seed=42):
     """Create DenseHaplotypeArray with balanced sex."""
     rng = np.random.RandomState(seed)
     af = rng.uniform(0.1, 0.9, size=m)
-    geno = np.zeros((n, m, 2), dtype=np.int8)
-    for j in range(m):
-        geno[:, j, 0] = rng.binomial(1, af[j], size=n)
-        geno[:, j, 1] = rng.binomial(1, af[j], size=n)
+    af_row = af[np.newaxis, :]  # shape (1, m)
+    geno = np.empty((n, m, 2), dtype=np.int8)
+    geno[:, :, 0] = (rng.random_sample((n, m)) < af_row).astype(np.int8)
+    geno[:, :, 1] = (rng.random_sample((n, m)) < af_row).astype(np.int8)
     sex = np.tile([0, 1], (n + 1) // 2)[:n]
     samples = SampleMeta(iid=np.arange(n), sex=sex)
     variants = VariantMeta(vid=np.arange(m), af=af)

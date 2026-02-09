@@ -4,6 +4,8 @@ Architecture system for the new xftsim design.
 ArchComponent ABC, concrete components, ArchNode, and Architecture class.
 Supports both programmatic construction (arch.add()) and formula parsing.
 """
+from __future__ import annotations
+
 import re
 import warnings
 import numpy as np
@@ -12,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Union
 from collections import OrderedDict
 
-from xftsim.struct import HaplotypeOperator, NPhenotypeArray
+from xftsim.struct import HaplotypeOperator, NPhenotypeArray, PedigreeArray
 from xftsim.neffect import EffectSpec
 
 
@@ -82,13 +84,14 @@ class GeneticComponent(ArchComponent):
     def __init__(self, effects: EffectSpec):
         self.effects = effects
 
-    def compute(self, node, haplotypes, phenotypes, **kwargs):
+    def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
+                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
         if self.effects.standardized:
             return haplotypes.standardized_matvec(self.effects.effects)
         else:
             return haplotypes.matvec(self.effects.effects)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"GeneticComponent(effects={self.effects})"
 
 
@@ -106,7 +109,7 @@ class MVGeneticComponent(GeneticComponent):
     """
     name = "mvGenetic"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"MVGeneticComponent(effects={self.effects})"
 
 
@@ -142,17 +145,19 @@ class HaplotypeGeneticComponent(ArchComponent):
         self.effects = effects
         self.haplotype = haplotype
 
-    def compute(self, node, haplotypes, phenotypes, **kwargs):
+    def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
+                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
         if self.haplotype == 'maternal':
             return haplotypes.matvec_maternal(self.effects.effects)
         else:
             return haplotypes.matvec_paternal(self.effects.effects)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"HaplotypeGeneticComponent(effects={self.effects}, haplotype='{self.haplotype}')"
 
 
-def _resolve_grouping(grouping, haplotypes, **kwargs):
+def _resolve_grouping(grouping: str | None, haplotypes: HaplotypeOperator,
+                      **kwargs: object) -> np.ndarray | None:
     """
     Resolve a grouping variable to an (n,) label array.
 
@@ -222,7 +227,8 @@ class NoiseComponent(ArchComponent):
     def __init__(self, variance: float):
         self.variance = float(variance)
 
-    def compute(self, node, haplotypes, phenotypes, **kwargs):
+    def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
+                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
         n = haplotypes.n
         rng = kwargs.get('rng', np.random.RandomState())
         labels = _resolve_grouping(node.grouping, haplotypes, **kwargs)
@@ -233,7 +239,7 @@ class NoiseComponent(ArchComponent):
         group_values = rng.normal(0, np.sqrt(self.variance), size=len(unique_labels))
         return group_values[inverse]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"NoiseComponent(variance={self.variance})"
 
 
@@ -267,7 +273,8 @@ class CNoiseComponent(ArchComponent):
         """Number of correlated traits."""
         return self.cov.shape[0]
 
-    def compute(self, node, haplotypes, phenotypes, **kwargs):
+    def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
+                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
         n = haplotypes.n
         rng = kwargs.get('rng', np.random.RandomState())
         labels = _resolve_grouping(node.grouping, haplotypes, **kwargs)
@@ -280,7 +287,7 @@ class CNoiseComponent(ArchComponent):
         )
         return group_values[inverse]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"CNoiseComponent(cov={self.cov.shape})"
 
 
@@ -307,7 +314,7 @@ class AggregationComponent(ArchComponent):
         self._input_names = self._extract_names(expression)
 
     @staticmethod
-    def _extract_names(expr: str) -> list:
+    def _extract_names(expr: str) -> list[str]:
         """Extract variable names from an arithmetic expression."""
         # Match identifiers (possibly dotted like height.G) but not pure numbers
         tokens = re.findall(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', expr)
@@ -320,12 +327,13 @@ class AggregationComponent(ArchComponent):
                 result.append(t)
         return result
 
-    def compute(self, node, haplotypes, phenotypes, **kwargs):
+    def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
+                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
         n = haplotypes.n
         result = _evaluate_expression(self.expression, phenotypes, n)
         return result
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"AggregationComponent('{self.expression}')"
 
 
@@ -341,7 +349,7 @@ _TOKEN_RE = re.compile(
 )
 
 
-def _tokenize(expr: str) -> list:
+def _tokenize(expr: str) -> list[tuple[str, object]]:
     """Tokenize an arithmetic expression into (type, value) pairs."""
     tokens = []
     for m in _TOKEN_RE.finditer(expr):
@@ -354,7 +362,7 @@ def _tokenize(expr: str) -> list:
     return tokens
 
 
-def _shunting_yard(tokens: list) -> list:
+def _shunting_yard(tokens: list[tuple[str, object]]) -> list[tuple[str, object]]:
     """Convert infix tokens to postfix (Reverse Polish Notation)."""
     output = []
     op_stack = []
@@ -465,11 +473,13 @@ class _ParentalComponent(ArchComponent):
     kind = "reference"
     accepts_grouping = False
 
-    def __init__(self, phenotype_name: str, founder_component=None):
-        self.phenotype_name = phenotype_name
-        self.founder_component = founder_component
+    def __init__(self, phenotype_name: str,
+                 founder_component: ArchComponent | None = None) -> None:
+        self.phenotype_name: str = phenotype_name
+        self.founder_component: ArchComponent | None = founder_component
 
-    def compute(self, node, haplotypes, phenotypes, **kwargs):
+    def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
+                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
         generation = kwargs.get('generation', 0)
         phenotype_history = kwargs.get('phenotype_history', {})
         pedigree_history = kwargs.get('pedigree_history', {})
@@ -503,11 +513,11 @@ class _ParentalComponent(ArchComponent):
         return self._extract_values(prev_pheno[self.phenotype_name], ped)
 
     @abstractmethod
-    def _extract_values(self, parent_values: np.ndarray, ped) -> np.ndarray:
+    def _extract_values(self, parent_values: np.ndarray, ped: PedigreeArray) -> np.ndarray:
         """Select parent values using pedigree indices."""
         ...
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{type(self).__name__}('{self.phenotype_name}')"
 
 
@@ -515,7 +525,7 @@ class MotherComponent(_ParentalComponent):
     """Vertical transmission: mother's phenotype from previous generation."""
     name = "mother"
 
-    def _extract_values(self, parent_values, ped):
+    def _extract_values(self, parent_values: np.ndarray, ped: PedigreeArray) -> np.ndarray:
         return parent_values[ped.maternal_idx]
 
 
@@ -523,7 +533,7 @@ class FatherComponent(_ParentalComponent):
     """Vertical transmission: father's phenotype from previous generation."""
     name = "father"
 
-    def _extract_values(self, parent_values, ped):
+    def _extract_values(self, parent_values: np.ndarray, ped: PedigreeArray) -> np.ndarray:
         return parent_values[ped.paternal_idx]
 
 
@@ -531,7 +541,7 @@ class ParentComponent(_ParentalComponent):
     """Vertical transmission: midparent (average of mother and father)."""
     name = "parent"
 
-    def _extract_values(self, parent_values, ped):
+    def _extract_values(self, parent_values: np.ndarray, ped: PedigreeArray) -> np.ndarray:
         return 0.5 * (parent_values[ped.maternal_idx] + parent_values[ped.paternal_idx])
 
 
@@ -558,7 +568,8 @@ class _SiblingComponent(ArchComponent):
     def __init__(self, source_name: str):
         self.source_name = source_name
 
-    def compute(self, node, haplotypes, phenotypes, **kwargs):
+    def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
+                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
         if self.source_name not in phenotypes:
             raise ValueError(
                 f"{type(self).__name__}: source '{self.source_name}' not found "
@@ -575,7 +586,7 @@ class _SiblingComponent(ArchComponent):
     def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         ...
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{type(self).__name__}('{self.source_name}')"
 
 
@@ -583,7 +594,7 @@ class SiblingMeanComponent(_SiblingComponent):
     """Sibling mean: average of source phenotype within group."""
     name = "sibling_mean"
 
-    def _aggregate_groups(self, values, labels):
+    def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         unique, inverse = np.unique(labels, return_inverse=True)
         sums = np.bincount(inverse, weights=values, minlength=len(unique))
         counts = np.bincount(inverse, minlength=len(unique)).astype(np.float64)
@@ -595,7 +606,7 @@ class SiblingSumComponent(_SiblingComponent):
     """Sibling sum: sum of source phenotype within group."""
     name = "sibling_sum"
 
-    def _aggregate_groups(self, values, labels):
+    def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         unique, inverse = np.unique(labels, return_inverse=True)
         sums = np.bincount(inverse, weights=values, minlength=len(unique))
         return sums[inverse]
@@ -605,7 +616,7 @@ class SiblingAnyComponent(_SiblingComponent):
     """Sibling any: 1.0 if any member in group has value > 0, else 0.0."""
     name = "sibling_any"
 
-    def _aggregate_groups(self, values, labels):
+    def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         unique, inverse = np.unique(labels, return_inverse=True)
         # any: max > 0 within group
         pos = (values > 0).astype(np.float64)
@@ -618,7 +629,7 @@ class SiblingCountComponent(_SiblingComponent):
     """Sibling count: number of individuals in each group."""
     name = "sibling_count"
 
-    def _aggregate_groups(self, values, labels):
+    def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         unique, inverse = np.unique(labels, return_inverse=True)
         counts = np.bincount(inverse, minlength=len(unique)).astype(np.float64)
         return counts[inverse]
@@ -628,7 +639,7 @@ class SiblingEldestComponent(_SiblingComponent):
     """Sibling eldest: value of the first (lowest IID) member in each group."""
     name = "sibling_eldest"
 
-    def _aggregate_groups(self, values, labels):
+    def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         unique, inverse = np.unique(labels, return_inverse=True)
         # First occurrence in array order (lowest index = eldest)
         eldest_vals = np.empty(len(unique), dtype=np.float64)
@@ -644,7 +655,7 @@ class SiblingYoungestComponent(_SiblingComponent):
     """Sibling youngest: value of the last (highest IID) member in each group."""
     name = "sibling_youngest"
 
-    def _aggregate_groups(self, values, labels):
+    def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         unique, inverse = np.unique(labels, return_inverse=True)
         # Last occurrence in array order (highest index = youngest)
         youngest_vals = np.empty(len(unique), dtype=np.float64)
@@ -679,12 +690,12 @@ class ArchNode:
     grouping : str or None
         Grouping variable for | operator, or None (implicit | IID).
     """
-    outputs: list
+    outputs: list[str]
     component: ArchComponent
-    inputs: list = field(default_factory=list)
-    grouping: Optional[str] = None
+    inputs: list[str] = field(default_factory=list)
+    grouping: str | None = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f"ArchNode(outputs={self.outputs}, component={self.component}, "
                 f"inputs={self.inputs}, grouping={self.grouping})")
 
@@ -749,9 +760,10 @@ class Architecture:
     ... )
     """
 
-    def __init__(self, formula: str = None, effects: dict = None):
+    def __init__(self, formula: str | None = None,
+                 effects: dict[str, EffectSpec] | None = None) -> None:
         self._nodes: list[ArchNode] = []
-        self._sorted: list[ArchNode] = None
+        self._sorted: list[ArchNode] | None = None
         self._output_map: dict[str, ArchNode] = {}
 
         if formula is not None:
@@ -762,7 +774,8 @@ class Architecture:
             self._sorted = self._toposort()
 
     @classmethod
-    def from_formula(cls, formula: str, effects: dict = None) -> "Architecture":
+    def from_formula(cls, formula: str,
+                     effects: dict[str, EffectSpec] | None = None) -> Architecture:
         """Construct an Architecture from a DSL formula string.
 
         Parameters
@@ -778,8 +791,8 @@ class Architecture:
         """
         return cls(formula=formula, effects=effects)
 
-    def add(self, outputs: Union[str, list], component: ArchComponent,
-            inputs: list = None, grouping: str = None):
+    def add(self, outputs: str | list[str], component: ArchComponent,
+            inputs: list[str] | None = None, grouping: str | None = None) -> None:
         """
         Programmatically add a node to the architecture.
 
@@ -812,7 +825,7 @@ class Architecture:
         self._register_node(node)
         self._sorted = None  # invalidate cache
 
-    def _register_node(self, node: ArchNode):
+    def _register_node(self, node: ArchNode) -> None:
         """Register a node, checking for duplicate outputs."""
         for out in node.outputs:
             if out in self._output_map:
@@ -821,13 +834,13 @@ class Architecture:
         self._nodes.append(node)
 
     @property
-    def nodes(self) -> list:
+    def nodes(self) -> list[ArchNode]:
         """Return the topologically sorted node list."""
         if self._sorted is None:
             self._sorted = self._toposort()
         return self._sorted
 
-    def _toposort(self) -> list:
+    def _toposort(self) -> list[ArchNode]:
         """
         Topological sort via Kahn's algorithm.
         Validates no cycles and no undefined references.
@@ -878,9 +891,9 @@ class Architecture:
         return [id_to_node[nid] for nid in sorted_ids]
 
     def compute(self, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray = None,
-                rng: np.random.RandomState = None,
-                **kwargs) -> NPhenotypeArray:
+                phenotypes: NPhenotypeArray | None = None,
+                rng: np.random.RandomState | None = None,
+                **kwargs: object) -> NPhenotypeArray:
         """
         Execute all nodes in topological order.
 
@@ -920,7 +933,7 @@ class Architecture:
 
         return phenotypes
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         n_nodes = len(self._nodes)
         outputs = [out for n in self._nodes for out in n.outputs]
         return f"Architecture(nodes={n_nodes}, outputs={outputs})"

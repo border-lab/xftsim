@@ -5,12 +5,15 @@ Statistic ABC and concrete implementations. Each statistic receives
 the phenotype history and any filtered views, and returns a result
 stored in GenerationResult.
 """
+from __future__ import annotations
+
 import numpy as np
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
-from xftsim.nfilter import TrioView, SibPairView
+from xftsim.nfilter import TrioView, SibPairView, FilteredView
+from xftsim.struct import NPhenotypeArray
 
 
 @dataclass
@@ -37,8 +40,8 @@ class Statistic(ABC):
     """
 
     @abstractmethod
-    def estimate(self, phenotype_history: dict,
-                 filtered_views: dict,
+    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+                 filtered_views: dict[str, FilteredView],
                  generation: int) -> Any:
         """
         Compute the statistic for a given generation.
@@ -67,7 +70,9 @@ class SampleStatistics(Statistic):
     Returns a dict with 'cov' (k x k matrix), 'var' (diagonal), and 'keys'.
     """
 
-    def estimate(self, phenotype_history, filtered_views, generation):
+    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+                 filtered_views: dict[str, FilteredView],
+                 generation: int) -> dict[str, Any] | None:
         if generation not in phenotype_history:
             return None
 
@@ -109,10 +114,12 @@ class HasemanElstonEstimator(Statistic):
         Default is ``'sibpair'``.
     """
 
-    def __init__(self, filter_name: str = 'sibpair'):
-        self.filter_name = filter_name
+    def __init__(self, filter_name: str = 'sibpair') -> None:
+        self.filter_name: str = filter_name
 
-    def estimate(self, phenotype_history, filtered_views, generation):
+    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+                 filtered_views: dict[str, FilteredView],
+                 generation: int) -> dict[str, dict[str, Any]] | None:
         view = filtered_views.get(self.filter_name)
         if view is None or not isinstance(view, SibPairView):
             return None
@@ -168,17 +175,19 @@ class ParentOffspringRegression(Statistic):
         Default is ``'trio'``.
     """
 
-    def __init__(self, filter_name: str = 'trio'):
-        self.filter_name = filter_name
+    def __init__(self, filter_name: str = 'trio') -> None:
+        self.filter_name: str = filter_name
 
-    def estimate(self, phenotype_history, filtered_views, generation):
+    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+                 filtered_views: dict[str, FilteredView],
+                 generation: int) -> dict[str, dict[str, Any]] | None:
         view = filtered_views.get(self.filter_name)
         if view is None or not isinstance(view, TrioView):
             return None
         if view.n_trios == 0:
             return None
 
-        results = {}
+        results: dict[str, dict[str, Any]] = {}
         keys = list(view.offspring_phenotypes.keys())
         for key in keys:
             if key not in view.mother_phenotypes or key not in view.father_phenotypes:
@@ -244,10 +253,12 @@ class MatingStatistics(Statistic):
         Default is ``'trio'``.
     """
 
-    def __init__(self, filter_name: str = 'trio'):
-        self.filter_name = filter_name
+    def __init__(self, filter_name: str = 'trio') -> None:
+        self.filter_name: str = filter_name
 
-    def estimate(self, phenotype_history, filtered_views, generation):
+    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+                 filtered_views: dict[str, FilteredView],
+                 generation: int) -> dict[str, Any] | None:
         if generation not in phenotype_history:
             return None
 

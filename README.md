@@ -1,215 +1,236 @@
-<img src="./xftsimlogo.svg" width="20%"> 
+<img src="./xftsimlogo.svg" width="20%">
 
-[![Documentation Status](https://readthedocs.org/projects/xftsim/badge/?version=latest)](https://xftsim.readthedocs.io/en/latest/?badge=latest) [![PyPI version](https://badge.fury.io/py/xftsim.svg)](https://badge.fury.io/py/xftsim)
+# xftsim -- Forward-Time Genetic Simulation Framework
 
-# eXtensible Forward Time SIMulator
-`xftsim` simulates complex phenotype/genotype data with an emphasis on short timescale phenomena. `xftsim` is designed with two primary goals:
+`xftsim` simulates complex phenotype/genotype data with an emphasis on
+short-timescale phenomena relevant to statistical genetics. It provides a
+formula DSL for defining phenogenetic architectures, efficient
+numpy-backed data structures, and a modular simulation loop.
 
- - make it easy for statistical geneticists to perform reproducible and systematic sensitivity analyses to better understand limitations and assumptions
+## Key Features
 
- - enable evaulation of methods for analyzing complex traits under realistically complex generative models
+- **Formula DSL** -- define genetic architectures in a concise, lavaan-style syntax
+- **Modular architecture** -- plug-and-play components (genetic, noise, aggregation, vertical transmission, sibling effects)
+- **Assortative mating** -- rank-order pairing on phenotypic composites with configurable spousal correlation
+- **Vertical transmission** -- parental phenotype effects via `parent()`, `mother()`, `father()` with founder fallbacks
+- **Sibling effects** -- `sibling_mean()`, `sibling_sum()`, and other within-family aggregations
+- **GRG support** -- load graph-based genotype representations via `load_grg()`
+- **GWAS and PGS** -- per-variant association testing and polygenic score computation from simulation output
+- **CLI** -- command-line interface for running simulations, resuming from checkpoints, and demos
+- **Checkpointing** -- save/restore full simulation state to disk
+- **3200+ tests** -- comprehensive unit, integration, and numerical test suite
 
 ## Installation
 
-`xftsim` is on PyPI. It can be installed in a couple minutes using pip and conda:
+Development install from source:
 
 ```bash
-conda create --name xftsim python=3.9.6
-conda activate xftsim
-pip install xftsim
-```
-
-Alternatively, you can install the latest development version from github:
-
-```bash
-git clone https://github/rborder/xftsim
+git clone https://github.com/rborder/xftsim
 cd xftsim
-git checkout dev
-pip -e . install
+pip install -e .
 ```
 
-To enable full functionality (i.e., automatic generation of causal diagrams), you must install [pygraphviz](https://pygraphviz.github.io).
+## Quick Start
 
-`xftsim` has been tested on MacOS 13.4 and the following GNU/Linux distributions: Ubuntu 22.04, Ubuntu 24.04, PopOS 22.04, and RHEL 7 using Python version 3.9.6. 
-
-<details>
-<summary>`xftsim` depends on the following packages...</summary>
- 
-```
-asciitree==0.3.3
-attrs==23.2.0
-cattrs==23.2.3
-certifi==2023.11.17
-cffi==1.17.1
-charset-normalizer==3.3.2
-chembl-webresource-client==0.10.9
-click==8.1.7
-cloudpickle==3.1.0
-contourpy==1.2.0
-csrgraph==0.1.28
-cycler==0.12.1
-dask==2024.8.0
-dask-expr==1.1.10
-dask-glm==0.3.2
-dask-ml==2024.4.4
-Deprecated==1.2.14
-distributed==2024.8.0
-easydict==1.13
-exceptiongroup==1.2.0
-fasteners==0.19
-fonttools==4.46.0
-fsspec==2024.10.0
-funcy==2.0
-gensim==4.3.2
-idna==3.6
-importlib-metadata==8.5.0
-importlib-resources==6.1.1
-iniconfig==2.0.0
-jinja2==3.1.4
-joblib==1.3.2
-kiwisolver==1.4.5
-llvmlite==0.39.1
-locket==1.0.0
-MarkupSafe==3.0.2
-matplotlib==3.8.2
-msgpack==1.1.0
-multipledispatch==1.0.0
-networkx==2.8.8
-node2vec==0.4.6
-nodevectors==0.1.23
-nptyping==2.5.0
-numba==0.56.4
-numcodecs==0.12.1
-numpy==1.23.5
-packaging==23.2
-pandas==2.1.4
-pandas-plink==2.2.9
-partd==1.4.2
-Pillow==10.1.0
-platformdirs==4.2.0
-pluggy==1.5.0
-psutil==6.1.0
-pyarrow==18.0.0
-pycparser==2.22
-pyparsing==3.1.1
-pytest==8.3.3
-python-dateutil==2.8.2
-pytz==2023.3.post1
-PyYAML==6.0.2
-rdkit==2023.9.5
-requests==2.31.0
-requests-cache==1.2.0
-scikit-learn==1.3.2
-scipy==1.11.4
-seaborn==0.13.0
-sgkit==0.9.0
-six==1.16.0
-smart-open==7.0.1
-sortedcontainers==2.4.0
-sparse==0.15.4
-tblib==3.0.0
-threadpoolctl==3.2.0
-tomli==2.0.2
-toolz==1.0.0
-tornado==6.4.1
-tqdm==4.66.2
-typing-extensions==4.10.0
-tzdata==2023.3
-url-normalize==1.4.3
-urllib3==2.1.0
-wrapt==1.16.0
-xarray==2024.7.0
-xftsim==0.2.0
-zarr==2.18.2
-zict==3.0.0
-zipp==3.20.2
-zstandard==0.23.0
-```
-</details>
-
-## Getting started
-
-To get started, [check out the documentation](https://xftsim.readthedocs.io)!
-
-For a minimal test simulation you can run one of the built in demos (runtime < 1min):
-```python3
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
-import xftsim as xft
-
-demo = xft.sim.DemoSimulation('BGRM')
-demo.run(3)
-
-xft.utils.print_tree(demo.results)
-```
-
-## Notice
-
-`xftsim` is under active development. Please let us know if there are features missing or bugs!
-
-<!-- 
-## Quickstart: simulating bivariate cross-assortative mating
-
-Here we simulate 
-
+A minimal simulation: 1000 individuals, 200 variants, h2 = 0.5, random mating,
+5 generations.
 
 ```python
-
-import xftsim as xft
 import numpy as np
+from xftsim.neffect import AdditiveEffects
+from xftsim.narch import Architecture
+from xftsim.nmate import RandomMating
+from xftsim.reproduce import RecombinationMap
+from xftsim.nsim import NSimulation
+from xftsim.nstats import SampleStatistics
+from xftsim.founders import founder_haplotypes_uniform_AFs
 
-N = 8000
-M = 4000
-pnames = ['height', 'wealth', 'eduyears']
-h2 = np.array([.6,.0,.0])
+# 1. Founder haplotypes (n=1000 individuals, m=200 variants)
+hap = founder_haplotypes_uniform_AFs(n=1000, m=200)
 
+# 2. Additive effects targeting h2=0.5
+eff = AdditiveEffects.from_h2(h2=0.5, m=200, seed=42)
 
-founder_haplotypes = xft.founders.founder_haplotypes_uniform_AFs(n = N, 
-                                                                 m = M)
+# 3. Architecture via formula DSL (one component per line)
+arch = Architecture(
+    formula="""
+    Y.G ~ genetic(eff)
+    Y.E ~ noise(0.5)
+    Y ~ Y.G + Y.E
+    """,
+    effects={'eff': eff},
+)
 
-genetic_effects = xft.effect.AdditiveEffects(beta = np.hstack(list(map(lambda x: np.random.normal(0, x, (M,1)), np.sqrt(h2)))),
-                                             phenotype_name = pnames,
-                                             vid = founder_haplotypes.vid,
-                                             AF = founder_haplotypes.xft.af_empirical,
-                                             standardized=True,
-                                             scaled=True,
-                                             m_causal=M)
+# 4. Mating and recombination
+mating = RandomMating(offspring_per_pair=2)
+recomb = RecombinationMap.constant_map(m=200, p=0.5)
 
-arch_genetic = xft.arch.AdditiveGeneticComponent(beta = genetic_effects)
-arch_noise = xft.arch.AdditiveNoiseComponent(variances=[.4, 1/3, 1/3], 
-                                             phenotype_name=pnames)
-arch_sum = xft.arch.SumComponent(pnames, sum_components=['additiveGenetic', 'additiveNoise'])
+# 5. Run simulation
+sim = NSimulation(
+    founder_haplotypes=hap,
+    architecture=arch,
+    mating_regime=mating,
+    recombination_map=recomb,
+    statistics=[SampleStatistics()],
+    seed=42,
+)
+sim.run(n_generations=5)
 
+# 6. Access results
+pheno = sim.phenotypes                          # current generation's phenotypes
+print(list(pheno.keys))                         # ['Y.G', 'Y.E', 'Y']
+print(f"Var(Y) = {np.var(pheno['Y']):.3f}")
 
-
-
-amr = xft.mate.LinearAssortativeMatingRegime(r = .3, 
-                                             component_index = xft.index.ComponentIndex_from_product(pnames,
-                                              ['phenotype'],
-                                              [-1]),
-                                             offspring_per_pair=xft.utils.ZeroTruncatedPoissonCount(2))
-
-rmap = xft.reproduce.RecombinationMap(p=.25,
-                                      vid=founder_haplotypes.vid,
-                                      chrom=founder_haplotypes.chrom)
-
-sim = xft.sim.Simulation(founder_haplotypes = founder_haplotypes,
-                         mating_regime = amr,
-                         recombination_map = rmap,
-                         architecture=xft.arch.Architecture([arch_genetic, arch_noise, arch_sum]),
-                         statistics = [xft.stats.MatingStatistics(),
-                                       xft.stats.SampleStatistics(),
-                                       xft.stats.HasemanElstonEstimator(),
-                                       ],  
-                         post_processors = [lambda sim: print(sim.results['mating_statistics']),
-                                            xft.proc.LimitMemory(n_haplotype_generations=2)],
-                         reproduction_method=xft.reproduce.Meiosis)
-
+for r in sim.results:
+    stats = r.statistics['SampleStatistics']
+    idx = stats['keys'].index('Y')
+    print(f"Gen {r.generation}: Var(Y) = {stats['var'][idx]:.3f}")
 ```
 
+## Formula DSL
 
+The architecture is defined with a multi-line formula string where each line
+specifies one component. The parser expects **exactly one component per line**.
 
+### Syntax
 
+```
+LHS ~ function(args)
+LHS ~ function(args) | GROUPING
+LHS ~ arithmetic_expression
+```
 
- -->
+### Components
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| `genetic(eff)` | Additive genetic value (genotypes x effects) | `Y.G ~ genetic(eff)` |
+| `mvGenetic(eff)` | Multivariate genetic value (k traits) | `(h.G, b.G) ~ mvGenetic(eff)` |
+| `haplotypeGenetic(eff)` | Single-haplotype genetic value | `Y.mat ~ haplotypeGenetic(eff, haplotype='maternal')` |
+| `noise(var)` | Independent N(0, var) noise | `Y.E ~ noise(0.5)` |
+| `cnoise(cov=...)` | Correlated multivariate noise | `(h.E, b.E) ~ cnoise(cov=[[0.3,0.1],[0.1,0.4]])` |
+| `parent(pheno)` | Midparent vertical transmission | `Y.VT ~ parent(Y, founder=noise(0.2))` |
+| `mother(pheno)` | Maternal vertical transmission | `Y.mat ~ mother(Y, founder=noise(0.1))` |
+| `father(pheno)` | Paternal vertical transmission | `Y.pat ~ father(Y, founder=noise(0.1))` |
+| `sibling_mean(pheno)` | Mean of sibling phenotypes | `Y.sib ~ sibling_mean(Y)` |
+| arithmetic | Sum, difference, product of components | `Y ~ Y.G + Y.E + Y.VT` |
+
+### Grouping
+
+The `|` operator specifies grouping for noise components. Grouped noise draws
+one shared value per group (e.g., per family) and broadcasts to all members:
+
+```
+Y.shared ~ noise(0.3) | FID
+```
+
+Available grouping variables: `FID`, `sex`, `mother`, `father`, or custom
+fields on `SampleMeta.extra`.
+
+### Multivariate Example
+
+```python
+from xftsim.neffect import MultivariateEffects
+
+eff = MultivariateEffects.from_h2_rg(h2=[0.6, 0.4], rg=0.3, m=200, seed=1)
+
+arch = Architecture(
+    formula="""
+    (height.G, bmi.G) ~ mvGenetic(eff)
+    height.E ~ noise(0.4)
+    bmi.E ~ noise(0.6)
+    height ~ height.G + height.E
+    bmi ~ bmi.G + bmi.E
+    """,
+    effects={'eff': eff},
+)
+```
+
+### Vertical Transmission Example
+
+The `founder=` keyword provides a fallback component for generation 0
+(when no parental phenotypes exist):
+
+```python
+arch = Architecture(
+    formula="""
+    Y.G ~ genetic(eff)
+    Y.VT ~ parent(Y, founder=noise(0.2))
+    Y.E ~ noise(0.3)
+    Y ~ Y.G + Y.VT + Y.E
+    """,
+    effects={'eff': eff},
+)
+```
+
+## Effect Specifications
+
+| Class | Description | Factory Methods |
+|-------|-------------|-----------------|
+| `AdditiveEffects` | Univariate, all variants causal | `.from_h2(h2, m)`, `.from_array(arr)` |
+| `MultivariateEffects` | k-trait correlated effects | `.from_h2_rg(h2, rg, m)`, `.from_covg(covg, m)`, `.from_array(arr)` |
+| `SparseEffects` | Subset of variants causal | `.from_h2(h2, m, k_causal)` |
+
+## Mating Regimes
+
+| Class | Description |
+|-------|-------------|
+| `RandomMating(offspring_per_pair=2)` | Random pairing by sex |
+| `LinearAssortativeMating(component_names, r, offspring_per_pair=2)` | Rank-order assortative mating on phenotypic composite |
+
+## CLI
+
+```bash
+xftsim run config.yaml          # run a simulation from YAML config
+xftsim resume checkpoint_dir/   # resume from checkpoint
+xftsim info checkpoint_dir/     # inspect checkpoint metadata
+xftsim demo UGRM                # run a built-in demo simulation
+```
+
+## Module Overview
+
+| Module | Description |
+|--------|-------------|
+| `nsim` | `NSimulation` -- forward-time simulation loop |
+| `narch` | `Architecture`, `ArchNode`, component classes |
+| `neffect` | `EffectSpec` hierarchy (additive, multivariate, sparse) |
+| `parser` | Formula DSL parser |
+| `nmate` | Mate assignment (`RandomMating`, `LinearAssortativeMating`) |
+| `nfilter` | Filters (`TrioFilter`, `SibPairFilter`) for structured views |
+| `nstats` | Per-generation statistics (`SampleStatistics`) |
+| `ngwas` | GWAS and PGS computation |
+| `struct` | Core data structures (`DenseHaplotypeArray`, `NPhenotypeArray`, `SampleMeta`, `PedigreeArray`) |
+| `founders` | Founder haplotype generation |
+| `reproduce` | Meiosis and `RecombinationMap` |
+| `io` | Save/load haplotypes, phenotypes, effects, architectures, checkpoints, GRG |
+| `cli` | Command-line interface |
+
+## Gotchas
+
+- **Formula parser**: one component per line. Do NOT write `genetic(eff) + noise(0.5)` on a single line.
+- **`filters` parameter**: `NSimulation(filters=...)` takes a `dict[str, Filter]`, not a list. Example: `filters={'trio': TrioFilter()}`.
+- **`TrioFilter()` and `SampleStatistics()`**: take no constructor arguments.
+- **`pheno.keys`**: this is a property, not a method -- use `pheno.keys` not `pheno.keys()`.
+- **Integer indexing**: `hap[0]` produces a 2D array that breaks `subset()` -- use `hap[[0]]` for a single individual.
+- **Retention policy**: `retain_haplotypes=1` means only the most recent generation is kept; older ones are pruned after each generation.
+- **Validation timing**: `_validate()` runs at `sim.run()` time, not in `__init__` -- dimension mismatches raise at run time.
+
+## Examples
+
+See the example notebooks in [`docs/examples/`](docs/examples/):
+
+- `01_simple_simulation.ipynb` -- univariate trait with random mating
+- `02_bivariate_assortative.ipynb` -- bivariate traits with assortative mating
+- `03_vertical_transmission.ipynb` -- vertical transmission and sibling effects
+
+## Testing
+
+```bash
+pytest
+```
+
+The test suite includes 3200+ unit, integration, and numerical tests.
+
+## License
+
+GNU General Public License v3.0. See [LICENSE](LICENSE) for details.
