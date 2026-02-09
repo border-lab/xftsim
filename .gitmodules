@@ -1,0 +1,12 @@
+[submodule "submodules/grapp"]
+	path = submodules/grapp
+	url = git@github.com:aprilweilab/grapp.git
+[submodule "submodules/grgl"]
+	path = submodules/grgl
+	url = git@github.com:aprilweilab/grgl.git
+[submodule "submodules/msprime"]
+	path = submodules/msprime
+	url = git@github.com:tskit-dev/msprime.git
+[submodule "submodules/stdpopsim"]
+	path = submodules/stdpopsim
+	url = git@github.com:popsim-consortium/stdpopsim.git
