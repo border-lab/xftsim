@@ -17,8 +17,7 @@ from xftsim.mate import MateAssignment
 
 
 class RecombinationMap:
-    """
-    A class to represent a diploid recombination map.
+    """A class to represent a diploid recombination map.
 
     Parameters
     ----------
@@ -28,9 +27,9 @@ class RecombinationMap:
         between specified loci.
     m : int, optional
         Number of variants. Required if p is a float.
-    vid : NDArray[Shape["*"], Any], optional
+    vid : numpy.ndarray, optional
         Variant IDs, default is None.
-    chrom : NDArray[Shape["*"], Int64], optional
+    chrom : numpy.ndarray, optional
         Chromosomes, default is None.
     """
 

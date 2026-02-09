@@ -52,7 +52,17 @@ for _ext in _optional_extensions:
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints',
-                    'plans', 'devtools', 'requirements.in', 'requirements.txt']
+                    'plans', 'devtools', 'requirements.in', 'requirements.txt',
+                    # Legacy orphaned documents not included in any toctree.
+                    # These are pre-existing files from the old doc structure;
+                    # excluding them avoids "document isn't included in any
+                    # toctree" warnings without modifying the legacy content.
+                    'api.md',
+                    'examples.md',
+                    'gettingstarted/getting_started.md',
+                    'userguide/user_guide.md',
+                    'userguide/submodules.md',
+                    ]
 
 # -- nbsphinx settings -------------------------------------------------------
 nbsphinx_allow_errors = True
@@ -68,6 +78,11 @@ if "myst_parser" in extensions:
 
 autosectionlabel_prefix_document = True
 autosummary_generate = True
+
+# -- Mock imports for autodoc ------------------------------------------------
+# nptyping is incompatible with newer numpy (removed np.bool8); mock it so
+# autodoc can import the xftsim modules without the nptyping dependency.
+autodoc_mock_imports = ['nptyping']
 
 # -- Autodoc settings --------------------------------------------------------
 autodoc_default_options = {
@@ -111,8 +126,5 @@ except ImportError:
 html_static_path = ['_static']
 html_theme_options = {
     'logo_only': True,
-    "show_navbar_depth": 2,
-    "repository_url": "https://github.com/rborder/xftsim",
-    "use_repository_button": True,
 }
 html_css_files = ['custom.css']

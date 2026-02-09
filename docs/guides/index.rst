@@ -6,3 +6,4 @@ Guides
 
    quickstart
    formula
+   migration

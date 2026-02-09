@@ -6,5 +6,4 @@ from simulation output.
 
 .. automodule:: xftsim.ngwas
    :members:
-   :undoc-members:
    :show-inheritance:

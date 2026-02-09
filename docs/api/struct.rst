@@ -8,3 +8,4 @@ haplotype operators, phenotype arrays, and pedigree arrays.
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:

@@ -42,30 +42,30 @@ Advanced genetic architectures <userguide/advgen>
 ```
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 3
 :caption: Guides (New)
 
-Guides <guides/index>
-Quick Start <guides/quickstart>
-Formula DSL <guides/formula>
+guides/index
+```
+
+```{toctree}
+:maxdepth: 3
+:caption: API Reference (New)
+
+api/index
 ```
 
 ```{toctree}
 :maxdepth: 2
-:caption: API Reference (New)
+:caption: Example Notebooks
 
-Overview <api/index>
-NSimulation <api/nsim>
-Architecture & Components <api/narch>
-Effects <api/neffect>
-Mating <api/nmate>
-Filters <api/nfilter>
-Statistics <api/nstats>
-GWAS & PGS <api/ngwas>
-I/O <api/io>
-Data Structures <api/struct>
-Formula Parser <api/parser>
-CLI <api/cli>
+Simple Simulation <examples/01_simple_simulation>
+Bivariate Assortative Mating <examples/02_bivariate_assortative>
+Vertical Transmission <examples/03_vertical_transmission>
+GWAS and PGS <examples/04_gwas_pgs>
+Checkpoint and Resume <examples/05_checkpoint_resume>
+Sibling Effects <examples/06_sibling_effects>
+GRG Genotypes <examples/07_grg_genotypes>
 ```
 
 ```{toctree}

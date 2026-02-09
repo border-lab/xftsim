@@ -6,5 +6,4 @@ phenotype and pedigree histories, used by the statistics system.
 
 .. automodule:: xftsim.nfilter
    :members:
-   :undoc-members:
    :show-inheritance:

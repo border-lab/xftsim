@@ -160,14 +160,14 @@ class RandomMating:
 
 
 class LinearAssortativeMating:
-    """
-    Assortative mating via rank-order pairing on a phenotypic composite.
+    """Assortative mating via rank-order pairing on a phenotypic composite.
 
     Algorithm:
+
     1. Standardize each component in ``component_names`` to mean 0, sd 1.
     2. Compute composite = average of standardized components.
-    3. Mating score = sqrt(|r|) * composite + sqrt(1-|r|) * noise.
-       If r < 0, negate the composite for one sex (disassortative).
+    3. Mating score = ``sqrt(|r|) * composite + sqrt(1-|r|) * noise``.
+       If ``r < 0``, negate the composite for one sex (disassortative).
     4. Sort each sex by mating score, pair in rank order.
 
     Parameters

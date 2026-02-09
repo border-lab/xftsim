@@ -9,3 +9,4 @@ checkpoints. Also provides import from PLINK/sgkit and GRG loading.
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:

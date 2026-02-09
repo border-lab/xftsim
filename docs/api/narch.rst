@@ -1,5 +1,5 @@
 Architecture & Components
-========================
+=========================
 
 The architecture system defines the phenogenetic architecture as a
 directed acyclic graph (DAG) of ``ArchNode`` objects. Each node wraps an

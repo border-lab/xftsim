@@ -704,7 +704,7 @@ class ArchNode:
 # BUILTINS registry
 # ---------------------------------------------------------------------------
 
-BUILTINS = {
+BUILTINS: dict[str, type[ArchComponent]] = {
     'genetic': GeneticComponent,
     'mvGenetic': MVGeneticComponent,
     'haplotypeGenetic': HaplotypeGeneticComponent,
@@ -715,6 +715,11 @@ BUILTINS = {
     'father': FatherComponent,
     **_SIBLING_COMPONENTS,
 }
+"""Registry mapping DSL function names to ArchComponent subclasses.
+
+Used by the formula parser to resolve function calls like ``genetic(eff)``
+to the corresponding component class.
+"""
 
 
 # ---------------------------------------------------------------------------

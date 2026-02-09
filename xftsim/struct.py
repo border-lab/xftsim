@@ -1106,7 +1106,7 @@ class XftAccessor:
         Raises
         ------
         TypeError
-        If the column dimension is not 'component'.
+            If the column dimension is not 'component'.
         
         Returns
         -------
