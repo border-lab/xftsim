@@ -313,7 +313,9 @@ The codebase follows a modular, extensible architecture:
 - Performance-critical code uses Numba JIT compilation
 - Type hints are used throughout via `nptyping`
 - High-dimensional xAM simulations require Hexaly Optimizer (free academic license)
-- Test environment: `micromamba activate xftsim-test` (Python 3.9, required for numba)
+- Dev environment: `./scripts/setup-dev.sh` creates `.venv` with Python 3.12 (>=3.10 supported)
+- Activate: `source .venv/bin/activate`
+- Lock file: `requirements-lock.txt` ensures consistent deps across machines
 
 ---
 
@@ -324,8 +326,9 @@ The codebase follows a modular, extensible architecture:
 | `claude.md` | This file - AI assistant instructions and project documentation (symlinked to repo root) |
 | `bump_version.py` | Version management script. Usage: `python devtools/bump_version.py [dev|patch|minor|major|show]` |
 | `install_hooks.sh` | Installs git pre-commit hook for automatic dev version bumping |
-| `build_docs.sh` | Build documentation (uses xftsim-test env for API autodoc) |
+| `build_docs.sh` | Build documentation (prefers `.venv`, falls back to xftsim-test) |
 | `CHANGELOG.dev.md` | Changelog for development workflow changes (testing, CI/CD, tooling) |
+| `../scripts/setup-dev.sh` | Create fresh `.venv` dev environment with all dependencies |
 
 ### Building Documentation
 
@@ -335,7 +338,7 @@ The codebase follows a modular, extensible architecture:
 ./devtools/build_docs.sh serve    # Build and serve locally at http://localhost:8000
 ```
 
-**Note:** The script automatically uses the `xftsim-test` micromamba environment for building, which is required for API autodoc to work (it needs to import xftsim and all its dependencies). If xftsim-test is not available, the build will fall back to the current environment but API docs may be incomplete.
+**Note:** The script automatically uses the `.venv` environment (created by `./scripts/setup-dev.sh`). If `.venv` is not available, it falls back to the legacy `xftsim-test` micromamba environment or the current PATH.
 
 ### Version Management
 
