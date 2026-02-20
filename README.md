@@ -22,12 +22,59 @@ numpy-backed data structures, and a modular simulation loop.
 
 ## Installation
 
-Development install from source:
+```bash
+pip install xftsim
+```
+
+## Development Setup
+
+Requires Python >= 3.10 (3.12 recommended).
 
 ```bash
 git clone https://github.com/rborder/xftsim
 cd xftsim
-pip install -e .
+
+# Option A: convenience script (auto-detects Python, creates .venv, installs everything)
+./scripts/setup-dev.sh
+
+# Option B: manual
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-lock.txt    # pinned deps for reproducibility
+pip install --no-deps -e .              # editable install
+```
+
+Activate the environment:
+
+```bash
+source .venv/bin/activate
+```
+
+### Dependency Tiers
+
+| Extra | Contents | Install with |
+|-------|----------|-------------|
+| *(core)* | numpy, scipy, pandas, numba, xarray, typer, rich, pyyaml | `pip install -e .` |
+| `[legacy]` | sgkit, nptyping, funcy, networkx, pandas_plink | `pip install -e ".[legacy]"` |
+| `[docs]` | sphinx, myst-parser, nbsphinx, ipython | `pip install -e ".[docs]"` |
+| `[dev]` | pytest, flake8, pip-tools | `pip install -e ".[dev]"` |
+| `[all]` | everything above | `pip install -e ".[all]"` |
+
+### Updating Dependencies
+
+```bash
+# After changing setup.py constraints:
+pip install -e ".[all]"
+pip freeze --exclude-editable > requirements-lock.txt
+git add requirements-lock.txt && git commit -m "Update dependency lock"
+```
+
+### Building Docs
+
+```bash
+./devtools/build_docs.sh          # build
+./devtools/build_docs.sh clean    # clean + rebuild
+./devtools/build_docs.sh serve    # build + serve at http://localhost:8000
 ```
 
 ## Quick Start
@@ -226,10 +273,11 @@ See the example notebooks in [`docs/examples/`](docs/examples/):
 ## Testing
 
 ```bash
+source .venv/bin/activate
 pytest
 ```
 
-The test suite includes 3200+ unit, integration, and numerical tests.
+The test suite includes 3400+ unit, integration, and numerical tests.
 
 ## License
 
