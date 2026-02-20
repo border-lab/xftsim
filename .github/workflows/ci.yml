@@ -26,22 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install runtime deps manually (setup.py pins numba==0.56.4 which
-          # is incompatible with Python 3.12; sgkit is unused in new code).
-          pip install \
-            numpy \
-            scipy \
-            pandas \
-            numba \
-            nptyping \
-            networkx \
-            funcy \
-            pandas_plink \
-            xarray
-          # Install test dependencies
-          pip install pytest
-          # Install the package itself without pulling setup.py deps
-          pip install --no-deps -e .
+          pip install -e ".[legacy,dev]"
 
       - name: Run tests
         run: |
