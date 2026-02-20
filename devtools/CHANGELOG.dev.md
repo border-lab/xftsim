@@ -4,6 +4,19 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### Dev Environment Overhaul (2026-02-20)
+
+- Replaced micromamba `xftsim-test` env with standard Python venv (`.venv`)
+- Added `scripts/setup-dev.sh` — auto-detects Python >=3.10, creates venv, installs deps
+- Added `requirements-lock.txt` via pip-freeze for reproducible environments
+- Added dependency tiers in `setup.py`: `[legacy]`, `[docs]`, `[dev]`, `[all]`
+- Bumped numba constraint from `>=0.56` to `>=0.58` (Python 3.10+ only)
+- Added Python <3.12 runtime warning in `xftsim/__init__.py`
+- Updated `devtools/build_docs.sh` to prefer `.venv` over micromamba
+- Simplified CI to use `pip install -e ".[legacy,dev]"` instead of manual dep list
+- Fixed `pyproject.toml` build-backend (`setuptools.build_meta` replacing invalid `_legacy`)
+- Replaced deprecated `pkg_resources` with `importlib.resources` in legacy data module
+
 ### Added
 - Test suite with pytest (`tests/` directory)
 - Demo testing framework (`tests/test_demos.py`) covering UGRM and BGRM demos
