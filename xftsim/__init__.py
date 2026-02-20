@@ -1,4 +1,14 @@
+import sys
+import warnings
+
 import numpy as np
+
+if sys.version_info < (3, 12):
+    warnings.warn(
+        f"xftsim recommends Python >= 3.12 (you have {sys.version_info.major}.{sys.version_info.minor}). "
+        "Some features may not work correctly on older versions.",
+        stacklevel=2,
+    )
 
 __version__="0.3.0.dev97"
 
