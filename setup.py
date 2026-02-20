@@ -24,7 +24,7 @@ setup(
         "numpy",
         "scipy",
         "pandas",
-        "numba>=0.56",
+        "numba>=0.58",
         "xarray",
         "typer>=0.9",
         "rich",
@@ -42,10 +42,23 @@ setup(
         'grg': [
             "pygrgl",
         ],
+        'docs': [
+            "sphinx>=7",
+            "sphinx-rtd-theme",
+            "sphinx-autodoc-typehints",
+            "myst-parser",
+            "nbsphinx",
+            "nbconvert",
+            "ipython",
+        ],
         'dev': [
             "pytest",
             "pytest-timeout",
             "flake8",
+            "pip-tools",
+        ],
+        'all': [
+            "xftsim[legacy,docs,dev]",
         ],
     },
 
