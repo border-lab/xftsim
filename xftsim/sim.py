@@ -285,6 +285,54 @@ class Simulation():
         self._current_std_haplotypes = None
         self._generation += 1
 
+    def prune_generation(self, gen):
+        """Remove a generation's data from all stores with proper cleanup.
+
+        xarray's accessor caching creates circular references
+        (DataArray -> _cache -> XftAccessor -> _obj -> DataArray) that
+        prevent garbage collection when entries are simply ``del``-ed
+        from the store dicts.  This method clears the accessor cache on
+        each DataArray before deletion, breaking the reference cycle.
+
+        Parameters
+        ----------
+        gen : int
+            Generation index to remove.
+        """
+        import gc
+        for store in (self.haplotype_store, self.phenotype_store,
+                      self.mating_store):
+            if gen in store:
+                obj = store[gen]
+                if hasattr(obj, '_cache'):
+                    obj._cache.clear()
+                del store[gen]
+        gc.collect()
+
+    def prune_old_generations(self, keep_last=2):
+        """Remove all but the most recent *keep_last* generations.
+
+        Useful in long-running simulations to bound memory usage.
+        The current generation and the previous *keep_last - 1*
+        generations are retained; everything older is pruned.
+
+        Parameters
+        ----------
+        keep_last : int, optional
+            Number of recent generations to keep (default 2, which
+            retains the current and parent generations needed for
+            reproduction).
+        """
+        all_gens = sorted(
+            set(self.haplotype_store)
+            | set(self.phenotype_store)
+            | set(self.mating_store)
+        )
+        cutoff = self.generation - keep_last + 1
+        for gen in all_gens:
+            if gen < cutoff:
+                self.prune_generation(gen)
+
     @property
     def haplotypes(self):
         if self.generation in self.haplotype_store.keys():
