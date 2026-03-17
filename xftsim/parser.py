@@ -325,19 +325,31 @@ def _parse_cnoise(outputs: list[str], args_str: str, lineno: int,
 
 def _parse_parental(func_name: str, outputs: list[str], args_str: str,
                     effects: dict[str, EffectSpec], lineno: int) -> ArchNode:
-    """Parse parent(phenotype, founder=...), mother(...), father(...)."""
-    # Parse args: phenotype_name, optional founder=...
+    """Parse parent(phenotype, founder=..., normalize=true), mother(...), father(...).
+
+    Optional kwargs:
+        founder=noise(var)  — fallback component at generation 0
+        normalize=true      — standardize parental values before lookup
+                              (matches legacy LinearVerticalComponent behavior)
+    """
     args_str = args_str.strip()
     founder_component = None
+    normalize = False
 
-    # Check for founder= kwarg
+    # Extract normalize= kwarg
+    norm_match = re.search(r',\s*normalize\s*=\s*(true|false|True|False|1|0)', args_str)
+    if norm_match:
+        normalize = norm_match.group(1).lower() in ('true', '1')
+        args_str = args_str[:norm_match.start()] + args_str[norm_match.end():]
+
+    # Extract founder= kwarg
     founder_match = re.search(r',\s*founder\s*=\s*(.+)$', args_str)
     if founder_match:
         founder_str = founder_match.group(1).strip()
         phenotype_name = args_str[:founder_match.start()].strip()
         founder_component = _parse_founder_component(founder_str, lineno)
     else:
-        phenotype_name = args_str
+        phenotype_name = args_str.strip()
 
     if not phenotype_name:
         raise ValueError(
@@ -349,7 +361,9 @@ def _parse_parental(func_name: str, outputs: list[str], args_str: str,
         'mother': MotherComponent,
         'father': FatherComponent,
     }
-    component = comp_map[func_name](phenotype_name, founder_component=founder_component)
+    component = comp_map[func_name](
+        phenotype_name, founder_component=founder_component, normalize=normalize,
+    )
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=None)
 
 

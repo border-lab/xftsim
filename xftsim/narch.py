@@ -469,14 +469,22 @@ class _ParentalComponent(ArchComponent):
     founder_component : ArchComponent, optional
         Component to use at generation 0 when no parents exist.
         If None, returns zeros at gen 0.
+    normalize : bool
+        If True, standardize (mean=0, sd=1) the parental phenotype values
+        before indexing by pedigree. This matches the legacy
+        ``LinearVerticalComponent(normalize=True)`` behavior, which prevents
+        variance from growing unboundedly across generations under VT
+        feedback loops. Default False.
     """
     kind = "reference"
     accepts_grouping = False
 
     def __init__(self, phenotype_name: str,
-                 founder_component: ArchComponent | None = None) -> None:
+                 founder_component: ArchComponent | None = None,
+                 normalize: bool = False) -> None:
         self.phenotype_name: str = phenotype_name
         self.founder_component: ArchComponent | None = founder_component
+        self.normalize: bool = normalize
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
                 phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
@@ -509,8 +517,21 @@ class _ParentalComponent(ArchComponent):
                 f"{type(self).__name__}: phenotype '{self.phenotype_name}' not found "
                 f"in generation {prev_gen}. Available: {list(prev_pheno.keys)}"
             )
+        parent_values = prev_pheno[self.phenotype_name]
         ped = pedigree_history[generation]
-        return self._extract_values(prev_pheno[self.phenotype_name], ped)
+        result = self._extract_values(parent_values, ped)
+        if self.normalize:
+            # Normalize AFTER pedigree indexing, matching the legacy
+            # LinearVerticalComponent behavior. Under assortative mating,
+            # the offspring-weighted distribution of parental values differs
+            # from the parental population distribution, so normalizing the
+            # mapped values (what offspring actually see) is correct.
+            sd = np.std(result)
+            if sd > 1e-15:
+                result = (result - np.mean(result)) / sd
+            else:
+                result = result - np.mean(result)
+        return result
 
     @abstractmethod
     def _extract_values(self, parent_values: np.ndarray, ped: PedigreeArray) -> np.ndarray:
@@ -522,7 +543,17 @@ class _ParentalComponent(ArchComponent):
 
 
 class MotherComponent(_ParentalComponent):
-    """Vertical transmission: mother's phenotype from previous generation."""
+    """Vertical transmission: mother's phenotype from previous generation.
+
+    Parameters
+    ----------
+    phenotype_name : str
+        Phenotype to look up in previous generation.
+    founder_component : ArchComponent, optional
+        Fallback at generation 0.
+    normalize : bool
+        Standardize parental values before lookup. Default False.
+    """
     name = "mother"
 
     def _extract_values(self, parent_values: np.ndarray, ped: PedigreeArray) -> np.ndarray:
@@ -530,7 +561,17 @@ class MotherComponent(_ParentalComponent):
 
 
 class FatherComponent(_ParentalComponent):
-    """Vertical transmission: father's phenotype from previous generation."""
+    """Vertical transmission: father's phenotype from previous generation.
+
+    Parameters
+    ----------
+    phenotype_name : str
+        Phenotype to look up in previous generation.
+    founder_component : ArchComponent, optional
+        Fallback at generation 0.
+    normalize : bool
+        Standardize parental values before lookup. Default False.
+    """
     name = "father"
 
     def _extract_values(self, parent_values: np.ndarray, ped: PedigreeArray) -> np.ndarray:
@@ -538,7 +579,17 @@ class FatherComponent(_ParentalComponent):
 
 
 class ParentComponent(_ParentalComponent):
-    """Vertical transmission: midparent (average of mother and father)."""
+    """Vertical transmission: midparent (average of mother and father).
+
+    Parameters
+    ----------
+    phenotype_name : str
+        Phenotype to look up in previous generation.
+    founder_component : ArchComponent, optional
+        Fallback at generation 0.
+    normalize : bool
+        Standardize parental values before lookup. Default False.
+    """
     name = "parent"
 
     def _extract_values(self, parent_values: np.ndarray, ped: PedigreeArray) -> np.ndarray:
