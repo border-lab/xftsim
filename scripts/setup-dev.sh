@@ -89,7 +89,7 @@ if [[ -f "$LOCK_FILE" ]]; then
     pip install --quiet --no-deps -e "$REPO_ROOT"
 else
     info "No lock file found; installing via pip install -e '.[all]'"
-    pip install --quiet -e "$REPO_ROOT[all]"
+    pip install --quiet --prefer-binary -e "$REPO_ROOT[all]"
     info "Generating $LOCK_FILE"
     pip freeze --exclude-editable > "$LOCK_FILE"
     info "Lock file written to $LOCK_FILE"

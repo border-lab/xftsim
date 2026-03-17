@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGELOG.dev.md](devtools/CHANGELOG.dev.md).
 
+## [Unreleased]
+
+### Fixed
+
+- **LinearAssortativeMating**: Fixed mating score computation to match legacy
+  `LinearAssortativeMatingRegime`. The new code was using the mean of
+  standardized traits with r as the direct mixing parameter, producing
+  negligible cross-mate correlations for multi-trait scenarios. Now uses the
+  sum of standardized traits and computes the latent correlation R = K*r
+  (adapting to within-person covariance structure at each generation). This
+  reproduces the manuscript's constant-entry xAM results: e.g., 5 traits with
+  r=0.2 now produces rg ≈ 0.30 at generation 5 (was ~0.02 before fix).
+- **test_simulation.py**: Updated `HasemanElstonEstimator` call to use new
+  GRM-based API (`phenotype_keys=`) instead of removed `filter_name='sibpair'`
+  parameter.
+
+### Added
+
+- **tests/manuscript/**: Manuscript reproduction test suite that validates the
+  refactored simulator against published quantitative results (constant-entry
+  xAM scenarios from Supplementary Figures S5-S6).
+
+---
+
 ## [Unreleased] - ajay branch refactor
 
 Ground-up rewrite of xftsim: new numpy-backed data structures, abstract linear

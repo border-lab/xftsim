@@ -1367,21 +1367,24 @@ class HaplotypeArray:
 
     def standardized_matvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
         """
-        Standardized matrix-vector product using centered (and optionally scaled) genotypes.
+        Per-SNP standardized matrix-vector product.
+
+        Computes ((G - 2p) / sqrt(2p(1-p))) @ v where each column is
+        centered and scaled to unit variance under HWE.
 
         Parameters
         ----------
         v : np.ndarray
             Vector of shape (m,) or (m, k) to multiply.
         af : np.ndarray, optional
-            Allele frequencies for centering. If None, uses empirical frequencies.
+            Allele frequencies for standardization. If None, uses empirical frequencies.
 
         Returns
         -------
         np.ndarray
             Result of shape (n,) or (n, k).
         """
-        G_std = self.to_diploid_standardized(af=af, scale=False)
+        G_std = self.to_diploid_standardized(af=af, scale=True)
         return G_std @ v
 
     def standardized_rmatvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
@@ -1400,7 +1403,7 @@ class HaplotypeArray:
         np.ndarray
             Result of shape (m,) or (m, k).
         """
-        G_std = self.to_diploid_standardized(af=af, scale=False)
+        G_std = self.to_diploid_standardized(af=af, scale=True)
         return G_std.T @ v
 
     @property
@@ -2019,9 +2022,11 @@ class HaplotypeOperator(ABC):
 
     @abstractmethod
     def standardized_matvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
-        """Standardized (mean-centered) diploid matvec.
+        """Per-SNP standardized diploid matvec.
 
-        Computes (G - 2p) @ v where p is the allele frequency vector.
+        Computes ((G - 2p) / sqrt(2p(1-p))) @ v where p is the allele
+        frequency vector. Each column is centered AND scaled to unit
+        variance under HWE.
 
         Parameters
         ----------
@@ -2683,13 +2688,22 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         return result
 
     def standardized_matvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
-        """Centered diploid matvec: G@v - 2*af@v (no materialization)."""
+        """Per-SNP standardized diploid matvec (no materialization).
+
+        Computes ((G - 2p) / sqrt(2pq)) @ v = (G - 2p) @ (v / sqrt(2pq)).
+        """
         v = np.asarray(v, dtype=np.float64)
         if af is None:
             af = self.recompute_af()
-        raw = self.matvec(v)
-        # centering: E[G_ij] = 2*af_j, so (G - 2p)@v = G@v - 2p@v
-        correction = 2.0 * (af @ v)
+        # Scale v by 1/sqrt(2pq) so that (G-2p) @ v_scaled = ((G-2p)/sqrt(2pq)) @ v
+        denom = np.sqrt(2.0 * af * (1.0 - af))
+        denom[denom == 0] = 1.0
+        if v.ndim == 1:
+            v_scaled = v / denom
+        else:
+            v_scaled = v / denom[:, np.newaxis]
+        raw = self.matvec(v_scaled)
+        correction = 2.0 * (af @ v_scaled)
         return raw - correction
 
     def recompute_af(self) -> np.ndarray:

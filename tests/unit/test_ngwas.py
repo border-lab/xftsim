@@ -338,8 +338,10 @@ class TestPGSComputation:
 
         G = hap.diploid_genotypes.astype(np.float64)
         af = G.mean(axis=0) / 2.0
-        G_centered = G - 2 * af
-        expected = G_centered @ weights
+        denom = np.sqrt(2 * af * (1 - af))
+        denom[denom == 0] = 1.0
+        G_std = (G - 2 * af) / denom
+        expected = G_std @ weights
         np.testing.assert_allclose(scores, expected, atol=1e-10)
 
     def test_pgs_shape(self):

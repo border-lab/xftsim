@@ -80,7 +80,9 @@ class TestMatvec:
         v = np.ones(5)
         af = h.af_empirical
         G = h.diploid_genotypes.astype(np.float64) - 2 * af
-        expected = G @ v
+        denom = np.sqrt(2 * af * (1 - af))
+        denom[denom == 0] = 1.0
+        expected = (G / denom) @ v
         result = h.standardized_matvec(v)
         np.testing.assert_allclose(result, expected)
 

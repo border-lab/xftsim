@@ -253,10 +253,12 @@ class TestDiploidStandardized:
         v = np.random.randn(m)
         result = hap.standardized_matvec(v)
 
-        # Manual computation: (G - 2*af) @ v
+        # Manual computation: ((G - 2*af) / sqrt(2pq)) @ v
         af = hap.af_empirical
         G = hap.diploid_genotypes.astype(np.float64)
-        expected = (G - 2 * af) @ v
+        denom = np.sqrt(2 * af * (1 - af))
+        denom[denom == 0] = 1.0
+        expected = ((G - 2 * af) / denom) @ v
 
         np.testing.assert_allclose(result, expected)
 
@@ -270,9 +272,11 @@ class TestDiploidStandardized:
         v = np.random.randn(m)
         result = hap.standardized_matvec(v, af=custom_af)
 
-        # Manual computation with custom AF
+        # Manual computation with custom AF (per-SNP standardized)
         G = hap.diploid_genotypes.astype(np.float64)
-        expected = (G - 2 * custom_af) @ v
+        denom = np.sqrt(2 * custom_af * (1 - custom_af))
+        denom[denom == 0] = 1.0
+        expected = ((G - 2 * custom_af) / denom) @ v
 
         np.testing.assert_allclose(result, expected)
 

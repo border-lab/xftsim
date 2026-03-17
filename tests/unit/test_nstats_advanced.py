@@ -2,7 +2,7 @@
 Unit tests for HasemanElstonEstimator, ParentOffspringRegression, and MatingStatistics.
 
 Tests cover:
-- HE estimator: basic estimation, zero variance, empty views, known correlation
+- HE estimator: GRM-based h2 estimation, requires haplotype_history
 - PO regression: basic estimation, perfect heritability, zero variance, no trios
 - Mating stats: pair counts, offspring counts, spouse correlations, missing view
 """
@@ -16,6 +16,10 @@ from xftsim.nstats import (
     ParentOffspringRegression,
     MatingStatistics,
 )
+
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from testdata import TestSimulation
 
 
 # ---------------------------------------------------------------------------
@@ -34,22 +38,6 @@ def _make_pheno_with_fid(n, fid, **kwargs):
     return NPhenotypeArray(samples=sm, values=kwargs)
 
 
-def _make_sibpair_view(y1, y2, keys=None):
-    """Construct a SibPairView from paired arrays."""
-    if keys is None:
-        keys = ['Y']
-    n = len(y1)
-    sib1 = {k: np.asarray(y1, dtype=np.float64) for k in keys}
-    sib2 = {k: np.asarray(y2, dtype=np.float64) for k in keys}
-    return SibPairView(
-        sib1_phenotypes=sib1,
-        sib2_phenotypes=sib2,
-        n_pairs=n,
-        sib1_idx=np.arange(n),
-        sib2_idx=np.arange(n, 2 * n),
-    )
-
-
 def _make_trio_view(y_off, y_mom, y_dad, keys=None):
     """Construct a TrioView from offspring/mother/father arrays."""
     if keys is None:
@@ -66,122 +54,116 @@ def _make_trio_view(y_off, y_mom, y_dad, keys=None):
     )
 
 
+def _make_he_sim_data(n=500, m=100, h2=0.5, seed=42):
+    """Create haplotypes + phenotypes for HE unit tests."""
+    from xftsim.neffect import AdditiveEffects
+    from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+
+    hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=seed)
+    eff = AdditiveEffects.from_h2(h2=h2, m=m, seed=seed + 1)
+    arch = Architecture()
+    arch.add('Y.G', GeneticComponent(eff))
+    arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
+    arch.add('Y', AggregationComponent('Y.G + Y.E'))
+
+    rng = np.random.RandomState(seed)
+    pheno = arch.compute(hap, rng=rng, phenotype_history={}, pedigree_history={}, generation=0)
+
+    return hap, pheno
+
+
 # ===========================================================================
 # HasemanElstonEstimator
 # ===========================================================================
 
 class TestHasemanElstonEstimator:
 
-    def test_returns_none_without_sibpair_filter(self):
-        """Returns None when no SibPairView is in filtered_views."""
-        he = HasemanElstonEstimator(filter_name='sibpair')
+    def test_returns_none_without_haplotypes(self):
+        """Returns None when no haplotype_history is passed."""
+        he = HasemanElstonEstimator(phenotype_keys=['Y'])
         result = he.estimate({0: _make_pheno(10, Y=np.ones(10))}, {}, 0)
         assert result is None
 
-    def test_returns_none_for_empty_view(self):
-        """Returns None when SibPairView has zero pairs."""
-        he = HasemanElstonEstimator()
-        view = SibPairView(
-            sib1_phenotypes={'Y': np.array([])},
-            sib2_phenotypes={'Y': np.array([])},
-            n_pairs=0,
+    def test_returns_none_missing_generation(self):
+        """Returns None when generation not in haplotype_history."""
+        he = HasemanElstonEstimator(phenotype_keys=['Y'])
+        hap, pheno = _make_he_sim_data(n=100, m=20)
+        result = he.estimate(
+            {0: pheno}, {}, 5,
+            haplotype_history={0: hap},
         )
-        result = he.estimate({}, {'sibpair': view}, 0)
         assert result is None
 
-    def test_returns_none_wrong_filter_type(self):
-        """Returns None when the filter name maps to a TrioView."""
-        he = HasemanElstonEstimator()
-        trio = _make_trio_view(np.ones(5), np.ones(5), np.ones(5))
-        result = he.estimate({}, {'sibpair': trio}, 0)
-        assert result is None
-
-    def test_known_perfect_correlation(self):
-        """Identical sibs (r=1) should give h2=2 (perfect, capped by theory)."""
-        rng = np.random.RandomState(42)
-        y = rng.randn(200)
-        view = _make_sibpair_view(y, y)
-        he = HasemanElstonEstimator()
-        result = he.estimate({}, {'sibpair': view}, 0)
-        assert result is not None
-        assert result['Y']['h2'] == pytest.approx(2.0, abs=0.01)
-        assert result['Y']['sib_r'] == pytest.approx(1.0, abs=0.01)
-
-    def test_known_zero_correlation(self):
-        """Independent sibs should give h2 near 0."""
-        rng = np.random.RandomState(42)
-        y1 = rng.randn(5000)
-        y2 = rng.randn(5000)
-        view = _make_sibpair_view(y1, y2)
-        he = HasemanElstonEstimator()
-        result = he.estimate({}, {'sibpair': view}, 0)
-        assert result is not None
-        assert abs(result['Y']['h2']) < 0.1
-
-    def test_known_moderate_correlation(self):
-        """Sibs with known r=0.25 should give h2 near 0.5."""
-        rng = np.random.RandomState(42)
-        n = 10000
-        shared = rng.randn(n)
-        y1 = shared * 0.5 + rng.randn(n) * np.sqrt(0.75)
-        y2 = shared * 0.5 + rng.randn(n) * np.sqrt(0.75)
-        # True Cov(y1,y2) = 0.25, Var(y1) = Var(y2) = 1.0, r = 0.25
-        view = _make_sibpair_view(y1, y2)
-        he = HasemanElstonEstimator()
-        result = he.estimate({}, {'sibpair': view}, 0)
-        assert abs(result['Y']['h2'] - 0.5) < 0.1
-
-    def test_constant_phenotype(self):
-        """Constant sibling values should give sib_r=0 (zero variance)."""
-        y = np.ones(50)
-        view = _make_sibpair_view(y, y)
-        he = HasemanElstonEstimator()
-        result = he.estimate({}, {'sibpair': view}, 0)
-        assert result['Y']['sib_r'] == 0.0
-
-    def test_multiple_keys(self):
-        """Should compute h2 for each phenotype key independently."""
-        rng = np.random.RandomState(42)
-        n = 1000
-        view = SibPairView(
-            sib1_phenotypes={'A': rng.randn(n), 'B': rng.randn(n)},
-            sib2_phenotypes={'A': rng.randn(n), 'B': rng.randn(n)},
-            n_pairs=n,
+    def test_recovers_h2_moderate(self):
+        """GRM-based HE should recover h2≈0.5."""
+        hap, pheno = _make_he_sim_data(n=2000, m=200, h2=0.5, seed=42)
+        he = HasemanElstonEstimator(phenotype_keys=['Y'])
+        result = he.estimate(
+            {0: pheno}, {}, 0,
+            haplotype_history={0: hap},
         )
-        he = HasemanElstonEstimator()
-        result = he.estimate({}, {'sibpair': view}, 0)
-        assert 'A' in result
-        assert 'B' in result
-        assert 'h2' in result['A']
-        assert 'h2' in result['B']
-
-    def test_n_pairs_reported(self):
-        """n_pairs should be reported correctly."""
-        rng = np.random.RandomState(42)
-        n = 77
-        view = _make_sibpair_view(rng.randn(n), rng.randn(n))
-        he = HasemanElstonEstimator()
-        result = he.estimate({}, {'sibpair': view}, 0)
-        assert result['Y']['n_pairs'] == 77
-
-    def test_single_pair(self):
-        """Single pair (n=1) should return nan (not enough data)."""
-        view = _make_sibpair_view(np.array([1.0]), np.array([2.0]))
-        he = HasemanElstonEstimator()
-        result = he.estimate({}, {'sibpair': view}, 0)
-        assert np.isnan(result['Y']['h2'])
-
-    def test_custom_filter_name(self):
-        """Custom filter name should be respected."""
-        rng = np.random.RandomState(42)
-        view = _make_sibpair_view(rng.randn(100), rng.randn(100))
-        he = HasemanElstonEstimator(filter_name='my_sibs')
-        # Wrong name → None
-        result = he.estimate({}, {'sibpair': view}, 0)
-        assert result is None
-        # Right name → result
-        result = he.estimate({}, {'my_sibs': view}, 0)
         assert result is not None
+        assert 'Y' in result
+        assert abs(result['Y']['h2'] - 0.5) < 0.15, \
+            f"HE h2={result['Y']['h2']:.3f}, expected ~0.5"
+
+    def test_recovers_h2_high(self):
+        """HE should recover h2≈0.8."""
+        hap, pheno = _make_he_sim_data(n=2000, m=200, h2=0.8, seed=42)
+        he = HasemanElstonEstimator(phenotype_keys=['Y'])
+        result = he.estimate(
+            {0: pheno}, {}, 0,
+            haplotype_history={0: hap},
+        )
+        assert abs(result['Y']['h2'] - 0.8) < 0.15, \
+            f"HE h2={result['Y']['h2']:.3f}, expected ~0.8"
+
+    def test_recovers_h2_low(self):
+        """HE should recover h2≈0.1."""
+        hap, pheno = _make_he_sim_data(n=2000, m=200, h2=0.1, seed=42)
+        he = HasemanElstonEstimator(phenotype_keys=['Y'])
+        result = he.estimate(
+            {0: pheno}, {}, 0,
+            haplotype_history={0: hap},
+        )
+        assert abs(result['Y']['h2'] - 0.1) < 0.15, \
+            f"HE h2={result['Y']['h2']:.3f}, expected ~0.1"
+
+    def test_ordering_across_h2(self):
+        """Higher true h2 should give higher estimated h2."""
+        estimates = {}
+        for h2 in [0.2, 0.7]:
+            hap, pheno = _make_he_sim_data(n=2000, m=200, h2=h2, seed=42)
+            he = HasemanElstonEstimator(phenotype_keys=['Y'])
+            result = he.estimate({0: pheno}, {}, 0, haplotype_history={0: hap})
+            estimates[h2] = result['Y']['h2']
+        assert estimates[0.7] > estimates[0.2]
+
+    def test_auto_selects_toplevel_keys(self):
+        """With phenotype_keys=None, should select keys without dots."""
+        hap, pheno = _make_he_sim_data(n=500, m=50, h2=0.5, seed=42)
+        he = HasemanElstonEstimator()  # phenotype_keys=None
+        result = he.estimate({0: pheno}, {}, 0, haplotype_history={0: hap})
+        assert result is not None
+        assert 'Y' in result
+        # Subcomponents like Y.G, Y.E should be excluded
+        assert 'Y.G' not in result
+        assert 'Y.E' not in result
+
+    def test_reports_n(self):
+        """n should be reported in results."""
+        hap, pheno = _make_he_sim_data(n=500, m=50, h2=0.5, seed=42)
+        he = HasemanElstonEstimator(phenotype_keys=['Y'])
+        result = he.estimate({0: pheno}, {}, 0, haplotype_history={0: hap})
+        assert result['Y']['n'] == 500
+
+    def test_stores_cov_g_matrix(self):
+        """Should store the full genetic covariance matrix."""
+        hap, pheno = _make_he_sim_data(n=500, m=50, h2=0.5, seed=42)
+        he = HasemanElstonEstimator(phenotype_keys=['Y'])
+        result = he.estimate({0: pheno}, {}, 0, haplotype_history={0: hap})
+        assert '_cov_g' in result
+        assert result['_cov_g'].shape == (1, 1)
 
 
 # ===========================================================================
@@ -211,7 +193,11 @@ class TestParentOffspringRegression:
     def test_returns_none_wrong_filter_type(self):
         """Returns None when filter maps to SibPairView instead."""
         por = ParentOffspringRegression()
-        sib = _make_sibpair_view(np.ones(5), np.ones(5))
+        sib = SibPairView(
+            sib1_phenotypes={'Y': np.ones(5)},
+            sib2_phenotypes={'Y': np.ones(5)},
+            n_pairs=5,
+        )
         result = por.estimate({}, {'trio': sib}, 0)
         assert result is None
 
@@ -359,7 +345,6 @@ class TestMatingStatistics:
         pheno = _make_pheno_with_fid(6, fid, Y=np.random.randn(6))
         ms = MatingStatistics()
         result = ms.estimate({0: pheno}, {}, 0)
-        # Families of size 3, 2, 1 → mean = 2.0
         assert result['mean_offspring_count'] == pytest.approx(2.0)
 
     def test_uniform_offspring(self):
@@ -449,7 +434,6 @@ class TestMatingStatistics:
         """Spouse correlations computed independently for each phenotype key."""
         rng = np.random.RandomState(42)
         n = 300
-        # Create TrioView with two keys: A (correlated spouses), B (independent)
         shared = rng.randn(n)
         mom_a = shared + 0.1 * rng.randn(n)
         dad_a = shared + 0.1 * rng.randn(n)

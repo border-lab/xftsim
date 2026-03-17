@@ -223,24 +223,55 @@ class LinearAssortativeMating:
         if len(female_idx) == 0 or len(male_idx) == 0:
             raise ValueError("Need at least one female and one male for mating")
 
-        # Compute composite score from phenotype components
-        composites = np.zeros(samples.n, dtype=np.float64)
-        n_comp = 0
+        # Compute sum of standardized phenotype components (NOT mean).
+        # This matches the legacy LinearAssortativeMatingRegime behavior.
+        n_total = samples.n
+        standardized_cols = []
         for name in self.component_names:
             if name in phenotypes:
-                vals = phenotypes[name].copy()
+                vals = phenotypes[name].copy().astype(np.float64)
                 sd = vals.std()
                 if sd > 0:
                     vals = (vals - vals.mean()) / sd
-                composites += vals
-                n_comp += 1
-        if n_comp > 0:
-            composites /= n_comp
+                standardized_cols.append(vals)
 
-        # Mating score: sqrt(|r|) * composite + sqrt(1-|r|) * noise
-        abs_r = abs(self.r)
-        noise = rng.normal(0, 1, size=samples.n)
-        scores = np.sqrt(abs_r) * composites + np.sqrt(1.0 - abs_r) * noise
+        K = len(standardized_cols)
+        if K == 0:
+            return RandomMating(self.offspring_per_pair).mate(samples, rng=rng)
+
+        # Sum of standardized traits (not mean)
+        trait_sum = np.sum(standardized_cols, axis=0)
+
+        # Compute latent correlation R = K * |r|, matching legacy:
+        #   cross_cov = K^2 * r
+        #   R = K^2 * r / sqrt(sum(within_cov_f) * sum(within_cov_m))
+        # At gen 0 with uncorrelated traits: sum(within_cov) = K, so R = K*r.
+        # At later gens, within-person correlations adapt R automatically.
+        # We compute R from the actual within-person covariance to handle
+        # the case where traits become correlated over generations.
+        if K > 1:
+            data = np.column_stack(standardized_cols)
+            # Separate by sex for within-cov computation
+            f_data = data[np.where(samples.sex == 0)[0]]
+            m_data = data[np.where(samples.sex == 1)[0]]
+            within_cov_f = np.cov(f_data, rowvar=False)
+            within_cov_m = np.cov(m_data, rowvar=False)
+            sum_cov_f = np.sum(within_cov_f)
+            sum_cov_m = np.sum(within_cov_m)
+            denom = np.sqrt(sum_cov_f * sum_cov_m)
+            if denom > 1e-15:
+                R = K * K * abs(self.r) / denom
+            else:
+                R = abs(self.r)
+        else:
+            R = abs(self.r)
+
+        R = min(R, 0.999)  # clamp to valid range
+
+        # Mating score: sqrt(R) * sum + sqrt(1-R) * noise
+        # Noise scaled to std of trait sum (matching legacy)
+        noise = rng.normal(0, trait_sum.std(), size=n_total)
+        scores = np.sqrt(R) * trait_sum + np.sqrt(1.0 - R) * noise
 
         # Disassortative: negate scores for one sex
         if self.r < 0:

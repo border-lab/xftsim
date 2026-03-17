@@ -73,8 +73,10 @@ class TestStandardizedMatvec:
         v = np.ones(5)
         af = np.full(5, 0.5)
         result = hap.standardized_matvec(v, af=af)
-        # G@v - 2*af@v
-        expected = hap.diploid_genotypes.astype(float) @ v - 2 * af @ v
+        G = hap.diploid_genotypes.astype(np.float64)
+        denom = np.sqrt(2 * af * (1 - af))
+        denom[denom == 0] = 1.0
+        expected = ((G - 2 * af) / denom) @ v
         np.testing.assert_allclose(result, expected)
 
 

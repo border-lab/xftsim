@@ -90,9 +90,11 @@ class TestStandardizedMatvec:
         v = np.ones(hap.m)
         af_custom = np.full(hap.m, 0.3)
         result = hap.standardized_matvec(v, af=af_custom)
-        raw = hap.matvec(v)
-        correction = 2.0 * np.sum(af_custom * v)
-        np.testing.assert_allclose(result, raw - correction, atol=1e-10)
+        G = hap.diploid_genotypes.astype(np.float64)
+        denom = np.sqrt(2 * af_custom * (1 - af_custom))
+        denom[denom == 0] = 1.0
+        expected = ((G - 2 * af_custom) / denom) @ v
+        np.testing.assert_allclose(result, expected, atol=1e-10)
 
     def test_formula(self):
         """standardized_matvec = raw - 2*af@v."""
@@ -100,8 +102,10 @@ class TestStandardizedMatvec:
         v = np.random.RandomState(0).randn(hap.m)
         af = hap.recompute_af()
         result = hap.standardized_matvec(v, af=af)
-        raw = hap.matvec(v)
-        expected = raw - 2.0 * (af @ v)
+        G = hap.diploid_genotypes.astype(np.float64)
+        denom = np.sqrt(2 * af * (1 - af))
+        denom[denom == 0] = 1.0
+        expected = ((G - 2 * af) / denom) @ v
         np.testing.assert_allclose(result, expected, atol=1e-10)
 
 

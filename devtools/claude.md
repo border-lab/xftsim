@@ -324,6 +324,8 @@ The codebase follows a modular, extensible architecture:
 | File | Purpose |
 |------|---------|
 | `claude.md` | This file - AI assistant instructions and project documentation (symlinked to repo root) |
+| `math_spec.md` | Mathematical specification — invariants that code must preserve |
+| `adversarial_review.md` | Per-commit adversarial review protocol and checklist |
 | `bump_version.py` | Version management script. Usage: `python devtools/bump_version.py [dev|patch|minor|major|show]` |
 | `install_hooks.sh` | Installs git pre-commit hook for automatic dev version bumping |
 | `build_docs.sh` | Build documentation (prefers `.venv`, falls back to xftsim-test) |
@@ -370,6 +372,40 @@ To skip auto-versioning for a commit: `git commit --no-verify`
   - Dev workflow changes → `devtools/CHANGELOG.dev.md`
 - Use semantic versioning: `X.Y.Z` for releases, `X.Y.Z.devN` for development versions
 - The pre-commit hook auto-bumps dev version; no manual version changes needed for regular commits
+
+---
+
+## Adversarial Review Workflow
+
+**Mathematical specification:** `devtools/math_spec.md`
+**Review protocol:** `devtools/adversarial_review.md`
+
+The manuscript (`current_manu_draft.md`) is the source of mathematical truth.
+`devtools/math_spec.md` extracts the key invariants into a checkable format.
+
+### When to review
+
+Run adversarial review on every commit that touches:
+- `struct.py` (standardization, matvec, haplotype operations)
+- `nstats.py` / `stats.py` (HE estimator, GWAS, statistics)
+- `neffect.py` / `effect.py` (effect sizes, h2 targeting)
+- `narch.py` / `arch.py` (phenotype generation, VT)
+- `tests/numerical/` (numerical validation tests)
+
+### How to run
+
+Ask Claude Code to review against the spec:
+```
+Review the last commit against devtools/math_spec.md adversarially.
+```
+
+### Key invariants (summary)
+
+1. `standardized_matvec` = `((G - 2p) / sqrt(2pq)) @ v` (NOT just centering)
+2. `from_h2(h2)` draws beta ~ N(0, h2/m) matched to standardized genotypes
+3. h2 round-trip: design h2 ≈ realized h2 at generation 0
+4. HE estimator uses GRM formula `cov_g = Y'(KY-Y) / (tr(K²)-n)`, NOT sibling-ICC
+5. Tests must compute expected values from the SPEC, not from the code under test
 
 ---
 

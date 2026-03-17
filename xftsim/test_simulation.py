@@ -19,7 +19,6 @@ from xftsim.founders import founder_haplotypes_uniform_AFs
 from xftsim.neffect import AdditiveEffects
 from xftsim.narch import Architecture
 from xftsim.nmate import LinearAssortativeMating
-from xftsim.nfilter import SibPairFilter
 from xftsim.reproduce import RecombinationMap
 from xftsim.nsim import NSimulation
 from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
@@ -106,12 +105,9 @@ sim = NSimulation(
     recombination_map=rmap,
     retain_haplotypes=1,
     retain_phenotypes=2,
-    filters={
-        'sibpair': SibPairFilter(),
-    },
     statistics=[
         SampleStatistics(),
-        HasemanElstonEstimator(filter_name='sibpair'),
+        HasemanElstonEstimator(phenotype_keys=['height', 'edu', 'wealth']),
     ],
     seed=42,
 )

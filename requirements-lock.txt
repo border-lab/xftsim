@@ -8,7 +8,7 @@ babel==2.18.0
 beautifulsoup4==4.14.3
 bleach==6.3.0
 build==1.4.0
-certifi==2026.1.4
+certifi==2026.2.25
 cffi==2.0.0
 charset-normalizer==3.4.4
 click==8.3.1
@@ -40,7 +40,7 @@ jsonschema-specifications==2025.9.1
 jupyter_client==8.8.0
 jupyter_core==5.9.1
 jupyterlab_pygments==0.3.0
-llvmlite==0.46.0
+llvmlite==0.45.1
 locket==1.0.0
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
@@ -59,11 +59,11 @@ nbformat==5.10.4
 nbsphinx==0.9.8
 networkx==3.6.1
 nptyping==2.5.0
-numba==0.64.0
+numba==0.62.1
 numcodecs==0.15.1
 numpy==1.26.4
 numpy-typing-compat==20251206.1.25
-optype==0.15.0
+optype==0.16.0
 packaging==26.0
 pandas==2.3.3
 pandas-plink==2.3.2
@@ -100,8 +100,8 @@ rich==14.3.3
 roman-numerals==4.1.0
 rpds-py==0.30.0
 scikit-learn==1.8.0
-scipy==1.17.0
-scipy-stubs==1.17.0.2
+scipy==1.17.1
+scipy-stubs==1.17.1.0
 setuptools==82.0.0
 sgkit==0.9.0
 shellingham==1.5.4
@@ -111,7 +111,7 @@ sortedcontainers==2.4.0
 soupsieve==2.8.3
 sparse==0.18.0
 Sphinx==9.1.0
-sphinx-autodoc-typehints==3.6.3
+sphinx-autodoc-typehints==3.9.3
 sphinx_rtd_theme==3.1.0
 sphinxcontrib-applehelp==2.0.0
 sphinxcontrib-devhelp==2.0.0
@@ -129,7 +129,7 @@ tornado==6.5.4
 tqdm==4.67.3
 traitlets==5.14.3
 typeguard==4.5.1
-typer==0.24.0
+typer==0.24.1
 typing-inspect==0.9.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0

@@ -89,7 +89,7 @@ class TestSimWithStats:
         from xftsim.nstats import Statistic
 
         class MeanStatistic(Statistic):
-            def estimate(self, phenotype_history, filtered_views, generation):
+            def estimate(self, phenotype_history, filtered_views, generation, **kwargs):
                 pheno = phenotype_history[generation]
                 return {key: np.mean(pheno[key]) for key in pheno.keys}
 

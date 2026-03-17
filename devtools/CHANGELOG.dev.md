@@ -4,6 +4,17 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### Adversarial Review Workflow (2026-03-16)
+
+- Added `devtools/math_spec.md` — mathematical specification extracted from manuscript
+  - Defines 10 checkable invariants (standardization, h2 round-trip, HE formula, etc.)
+  - Source of truth hierarchy: manuscript → math_spec → code → tests
+- Added `devtools/adversarial_review.md` — per-commit review protocol
+  - Structured checklist covering standardization, effect sizes, estimators, test quality
+  - Red flags section for common bug patterns (tautological tests, wide tolerances)
+  - Output format template for review reports
+- Updated `devtools/claude.md` with adversarial review section and devtools manifest
+
 ### Dev Environment Overhaul (2026-02-20)
 
 - Replaced micromamba `xftsim-test` env with standard Python venv (`.venv`)

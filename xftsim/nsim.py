@@ -389,7 +389,8 @@ class NSimulation:
             name_counts = {}
             for stat in self.statistics:
                 result = stat.estimate(
-                    self.phenotype_history, filtered_views, gen
+                    self.phenotype_history, filtered_views, gen,
+                    haplotype_history=self.haplotype_history,
                 )
                 base_key = type(stat).__name__
                 count = name_counts.get(base_key, 0)

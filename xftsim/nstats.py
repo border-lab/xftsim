@@ -42,7 +42,8 @@ class Statistic(ABC):
     @abstractmethod
     def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
                  filtered_views: dict[str, FilteredView],
-                 generation: int) -> Any:
+                 generation: int,
+                 **kwargs: Any) -> Any:
         """
         Compute the statistic for a given generation.
 
@@ -54,6 +55,9 @@ class Statistic(ABC):
             Named filtered views (from filters).
         generation : int
             Current generation number.
+        **kwargs
+            Additional context. May include:
+            - haplotype_history: dict[int, HaplotypeOperator]
 
         Returns
         -------
@@ -72,7 +76,8 @@ class SampleStatistics(Statistic):
 
     def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
                  filtered_views: dict[str, FilteredView],
-                 generation: int) -> dict[str, Any] | None:
+                 generation: int,
+                 **kwargs: Any) -> dict[str, Any] | None:
         if generation not in phenotype_history:
             return None
 
@@ -98,63 +103,104 @@ class SampleStatistics(Statistic):
 
 class HasemanElstonEstimator(Statistic):
     """
-    Sibling-based Haseman-Elston estimator of heritability.
+    GRM-based Haseman-Elston regression estimator.
 
-    Uses sibling pair covariance to estimate h2 per phenotype.
-    For full sibs under an additive model:  Cov(sib1, sib2) / Var(Y) ~ h2/2,
-    so h2 ~ 2 * r_sib where r_sib is the sibling intraclass correlation.
+    Estimates genetic covariance (and heritability) using the GRM
+    (genomic relationship matrix) computed from standardized genotypes.
+    Works with any sample — does not require siblings, trios, or any
+    specific family structure. Works at generation 0 (founders).
 
-    Requires a SibPairFilter (keyed by ``filter_name``) to be active
-    in the simulation's filters dict.
+    The estimator solves:
+        cov_g = Y' (K Y - Y) / (tr(K^2) - n)
+    where K = G G' / m is the GRM built from per-SNP standardized
+    genotypes, and Y is the (n x k) phenotype matrix (standardized).
+
+    This matches the legacy ``haseman_elston()`` function.
 
     Parameters
     ----------
-    filter_name : str
-        Key in the ``filtered_views`` dict that contains a SibPairView.
-        Default is ``'sibpair'``.
+    phenotype_keys : list[str], optional
+        Phenotype names to estimate heritability for. If None,
+        uses all phenotype keys that do NOT contain a '.'
+        (i.e., top-level phenotypes like 'height', not sub-components
+        like 'height.G').
+    n_probe : int
+        Number of random probes for stochastic trace estimation.
+        Set to 0 for deterministic (exact) trace. Default 0.
     """
 
-    def __init__(self, filter_name: str = 'sibpair') -> None:
-        self.filter_name: str = filter_name
+    def __init__(self, phenotype_keys: list[str] | None = None,
+                 n_probe: int = 0) -> None:
+        self.phenotype_keys = phenotype_keys
+        self.n_probe = n_probe
 
     def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
                  filtered_views: dict[str, FilteredView],
-                 generation: int) -> dict[str, dict[str, Any]] | None:
-        view = filtered_views.get(self.filter_name)
-        if view is None or not isinstance(view, SibPairView):
+                 generation: int,
+                 **kwargs: Any) -> dict[str, dict[str, Any]] | None:
+        haplotype_history = kwargs.get('haplotype_history')
+        if haplotype_history is None or generation not in haplotype_history:
             return None
-        if view.n_pairs == 0:
+        if generation not in phenotype_history:
             return None
+
+        hap = haplotype_history[generation]
+        pheno = phenotype_history[generation]
+
+        # Select phenotype keys
+        if self.phenotype_keys is not None:
+            keys = [k for k in self.phenotype_keys if k in pheno]
+        else:
+            keys = [k for k in pheno.keys if '.' not in k]
+        if not keys:
+            return None
+
+        # Build standardized genotype matrix (n x m), per-SNP standardized
+        G = hap.to_diploid_standardized(scale=True).astype(np.float64)
+        n, m = G.shape
+
+        # Build phenotype matrix (n x k), standardized
+        Y = np.column_stack([pheno[k] for k in keys]).astype(np.float64)
+        Y_mean = Y.mean(axis=0)
+        Y_std = Y.std(axis=0)
+        Y_std[Y_std < 1e-15] = 1.0
+        Y = (Y - Y_mean) / Y_std
+
+        # K Y = G (G' Y) / m  — computed without forming K explicitly
+        GtY = G.T @ Y  # (m, k)
+        KY = G @ GtY / m  # (n, k)
+
+        # tr(K^2)
+        if self.n_probe > 0 and n > 500:
+            # Stochastic trace estimation via Hutchinson's method
+            rng = np.random.RandomState()
+            probes = rng.randn(n, self.n_probe)
+            # tr(K^2) ≈ (1/l) * tr(P' K^2 P) = (1/l) * ||K P||_F^2
+            KP = G @ (G.T @ probes) / m  # (n, n_probe)
+            trK2 = np.sum(KP ** 2) / self.n_probe
+        else:
+            # Deterministic: tr(K^2) = tr(G G' G G' / m^2)
+            # = ||G' G||_F^2 / m^2 (avoids forming n x n matrix)
+            GtG = G.T @ G  # (m, m)
+            trK2 = np.sum(GtG ** 2) / (m * m)
+
+        denom = trK2 - n
+        if abs(denom) < 1e-15:
+            return {k: {'h2': np.nan, 'n': n} for k in keys}
+
+        # HE estimate: cov_g = Y' (K Y - Y) / (tr(K^2) - n)
+        cov_g = Y.T @ (KY - Y) / denom  # (k, k)
 
         results = {}
-        keys = list(view.sib1_phenotypes.keys())
-        for key in keys:
-            y1 = view.sib1_phenotypes[key]
-            y2 = view.sib2_phenotypes[key]
-            if len(y1) < 2:
-                results[key] = {'h2': np.nan, 'sib_r': np.nan, 'n_pairs': len(y1)}
-                continue
-
-            # Sibling intraclass correlation via Pearson r
-            # (equivalent to ICC for paired data)
-            m1 = y1.mean()
-            m2 = y2.mean()
-            cov_12 = np.mean((y1 - m1) * (y2 - m2))
-            var1 = np.var(y1, ddof=0)
-            var2 = np.var(y2, ddof=0)
-            denom = np.sqrt(var1 * var2)
-            if denom < 1e-15:
-                sib_r = 0.0
-            else:
-                sib_r = cov_12 / denom
-
-            # h2 = 2 * sib_r for full sibs (additive model)
-            h2 = 2.0 * sib_r
+        for i, key in enumerate(keys):
+            h2_est = float(cov_g[i, i])
             results[key] = {
-                'h2': float(h2),
-                'sib_r': float(sib_r),
-                'n_pairs': int(len(y1)),
+                'h2': h2_est,
+                'n': int(n),
             }
+        # Also store the full genetic covariance matrix
+        results['_cov_g'] = cov_g
+        results['_keys'] = keys
 
         return results
 
@@ -180,7 +226,8 @@ class ParentOffspringRegression(Statistic):
 
     def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
                  filtered_views: dict[str, FilteredView],
-                 generation: int) -> dict[str, dict[str, Any]] | None:
+                 generation: int,
+                 **kwargs: Any) -> dict[str, dict[str, Any]] | None:
         view = filtered_views.get(self.filter_name)
         if view is None or not isinstance(view, TrioView):
             return None
@@ -258,7 +305,8 @@ class MatingStatistics(Statistic):
 
     def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
                  filtered_views: dict[str, FilteredView],
-                 generation: int) -> dict[str, Any] | None:
+                 generation: int,
+                 **kwargs: Any) -> dict[str, Any] | None:
         if generation not in phenotype_history:
             return None
 
