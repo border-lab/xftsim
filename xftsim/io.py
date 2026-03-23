@@ -271,11 +271,22 @@ def haplotypes_from_sgkit_dataset(gdat: xr.Dataset, generation: int = 0) ->  xr.
         Haplotype array with samples indexed by an xftsim.index.SampleIndex object and variants indexed
         by an xftsim.index.HaploidVariantIndex object.
     """
-    ## sample index
-    sind = xft.index.SampleIndex(iid=gdat.sample_id.values,generation=generation)
+    ## sample index — ensure unique IIDs (sgkit datasets may have duplicates)
+    raw_ids = np.asarray(gdat.sample_id.values, dtype=str)
+    if len(raw_ids) != len(np.unique(raw_ids)):
+        warnings.warn(
+            f"sgkit dataset contains {len(raw_ids)} samples but only "
+            f"{len(np.unique(raw_ids))} unique sample_id values. "
+            "Appending numeric suffixes to make IIDs unique."
+        )
+        raw_ids = np.array([f"{sid}_{i}" for i, sid in enumerate(raw_ids)])
+    sind = xft.index.SampleIndex(iid=raw_ids, generation=generation)
     ## construct variant index
     alleles = gdat.variant_allele.values
-    chrom = np.array(gdat.contigs)[gdat.variant_contig.values]
+    if hasattr(gdat, 'contigs'):
+        chrom = np.array(gdat.contigs)[gdat.variant_contig.values]
+    else:
+        chrom = np.array(gdat.variant_contig.values, dtype=str)
     pos_bp = gdat.variant_position.values
     variant_id = xft.utils.paste([chrom,pos_bp])
     vind = xft.index.DiploidVariantIndex(vid = variant_id,
