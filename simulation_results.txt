@@ -1,0 +1,88 @@
+================================================================================
+xAM Manuscript Simulation Results — xftsim (new API)
+================================================================================
+
+================================================================================
+FIGURE 3: Four Scenarios (K=5 traits, n=8000, m=2000, h²=0.5, θ=0.05)
+================================================================================
+
+Scenario        Gen  |  Mean h²(HE)  Mean rg(HE)  Mean Var(Y)
+-----------------------------------------------------------------
+RM                0  |       0.4925      -0.0011       1.0001
+RM                1  |       0.4968       0.0055       1.0076
+RM                2  |       0.4971       0.0091       1.0038
+RM                3  |       0.5041       0.0124       1.0004
+RM                4  |       0.5141       0.0184       1.0064
+RM                5  |       0.5225       0.0129       1.0164
+
+RM+VT             0  |       0.4972       0.0142       0.9995
+RM+VT             1  |       0.5557       0.1663       1.0850
+RM+VT             2  |       0.5726       0.2553       1.1482
+RM+VT             3  |       0.5825       0.2719       1.1792
+RM+VT             4  |       0.5853       0.2588       1.1710
+RM+VT             5  |       0.5763       0.2752       1.1728
+
+5xAM              0  |       0.4996       0.0121       0.9993
+5xAM              1  |       0.5252       0.0900       1.0166
+5xAM              2  |       0.5773       0.1709       1.0427
+5xAM              3  |       0.6175       0.2276       1.0594
+5xAM              4  |       0.6462       0.2715       1.0752
+5xAM              5  |       0.6600       0.2884       1.0776
+
+5xAM+VT           0  |       0.4879       0.0126       0.9894
+5xAM+VT           1  |       0.6124       0.3454       1.2043
+5xAM+VT           2  |       0.6996       0.4974       1.3483
+5xAM+VT           3  |       0.7541       0.5497       1.4448
+5xAM+VT           4  |       0.7860       0.5891       1.4914
+5xAM+VT           5  |       0.8073       0.5862       1.5298
+
+--- Comparison with Paper Table S6 (generation 5) ---
+
+Scenario      |  Paper h²  Sim h²  |  Paper rg  Sim rg
+------------------------------------------------------
+RM            |    0.500    0.523  |    0.000    0.013
+RM+VT         |    0.552    0.576  |    0.199    0.275
+5xAM          |    0.658    0.660  |    0.296    0.288
+5xAM+VT       |    0.749    0.807  |    0.513    0.586
+
+
+================================================================================
+FIGURE 4: Wealth-Education-Height (n=8000, m=1000, 6 generations)
+  BatchedMating(max_batch_size=1000) wrapping GeneralAssortativeMating (Hexaly QAP)
+================================================================================
+
+Cross-mate correlation matrix (from manuscript):
+         height    edu    wealth
+height  [ 0.246  0.192  0.252 ]
+edu     [ 0.192  0.125  0.183 ]
+wealth  [ 0.252  0.183  0.251 ]
+
+Gen  |   Phenotypic Variance            |   HE-Estimated h²
+     |   height      edu    wealth      |   height      edu    wealth
+---------------------------------------------------------------------
+  0  |   0.9639   0.8339   0.8933      |   0.5275   0.0337  -0.0203
+  1  |   1.0108   0.9744   0.8650      |   0.6021   0.0932   0.0144
+  2  |   1.0351   1.0126   0.9834      |   0.6368   0.0652   0.0249
+  3  |   1.1082   1.0288   0.9916      |   0.7949   0.0886   0.0353
+  4  |   1.1548   1.0350   0.9507      |   0.8002   0.0553   0.0364
+  5  |   1.1560   1.0136   0.9832      |   0.7774   0.0513   0.0126
+
+--- Comparison with Paper (generation 5) ---
+
+Trait    |  Paper HE h²  Sim HE h²
+------------------------------------
+Height   |    0.686        0.777
+Edu      |    0.068        0.051
+Wealth   |    0.036        0.013
+
+Paper reference values (true h² and HE-estimated h² after 5 generations of xAM):
+  Height:  true h² 0.599 -> 0.621  |  HE h² 0.599 -> 0.686
+  Edu:     true h² 0.010 -> 0.005  |  HE h² 0.010 -> 0.068
+  Wealth:  true h² 0.000 -> 0.000  |  HE h² 0.000 -> 0.036
+
+Notes:
+  - Paper used n=128,000; simulation used n=8,000 with batched mating
+  - Batching (8 batches of 1000) approximates the global QAP solution
+  - Stochastic variation expected at smaller sample sizes
+  - All qualitative patterns replicated: height inflation, phantom
+    heritability in edu and wealth

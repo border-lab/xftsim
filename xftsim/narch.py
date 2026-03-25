@@ -291,6 +291,36 @@ class CNoiseComponent(ArchComponent):
         return f"CNoiseComponent(cov={self.cov.shape})"
 
 
+class ThresholdComponent(ArchComponent):
+    """Binarizing threshold component: returns 1 where input exceeds threshold.
+
+    Implements the liability threshold model: given a continuous phenotype
+    (liability) and a threshold, produces a binary indicator (diagnosis).
+
+    Parameters
+    ----------
+    source : str
+        Name of the input phenotype to threshold.
+    threshold : float
+        Threshold value. Output is 1.0 where input > threshold, else 0.0.
+    """
+    name = "threshold"
+    kind = "aggregating"
+    accepts_grouping = False
+
+    def __init__(self, source: str, threshold: float):
+        self.source = source
+        self.threshold = float(threshold)
+
+    def compute(self, node: "ArchNode", haplotypes: HaplotypeOperator,
+                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+        y = phenotypes[self.source]
+        return (y > self.threshold).astype(np.float64)
+
+    def __repr__(self) -> str:
+        return f"ThresholdComponent('{self.source}', {self.threshold})"
+
+
 class AggregationComponent(ArchComponent):
     """Aggregation component: evaluates arithmetic expressions over phenotype values.
 
@@ -761,6 +791,7 @@ BUILTINS: dict[str, type[ArchComponent]] = {
     'haplotypeGenetic': HaplotypeGeneticComponent,
     'noise': NoiseComponent,
     'cnoise': CNoiseComponent,
+    'threshold': ThresholdComponent,
     'parent': ParentComponent,
     'mother': MotherComponent,
     'father': FatherComponent,

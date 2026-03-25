@@ -18,7 +18,7 @@ import numpy as np
 from xftsim.founders import founder_haplotypes_uniform_AFs
 from xftsim.neffect import AdditiveEffects
 from xftsim.narch import Architecture
-from xftsim.nmate import LinearAssortativeMating
+from xftsim.nmate import GeneralAssortativeMating, BatchedMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.nsim import NSimulation
 from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
@@ -91,10 +91,27 @@ arch = Architecture(formula=formula, effects=effects)
 
 
 rmap = RecombinationMap(p=0.5, m=n_loci)
-mating = LinearAssortativeMating(
-    component_names=['height', 'edu', 'wealth'],
-    r=0.3,
-    offspring_per_pair=2,
+
+# Cross-mate correlation matrix from the manuscript (Figure 4)
+# Rows/cols: [height, edu, wealth]
+cross_corr = np.array([
+    [0.246, 0.192, 0.252],
+    [0.192, 0.125, 0.183],
+    [0.252, 0.183, 0.251],
+])
+
+mating = BatchedMating(
+    regime=GeneralAssortativeMating(
+        component_names=['height', 'edu', 'wealth'],
+        cross_corr=cross_corr,
+        offspring_per_pair=2,
+        solver_params=dict(
+            time_limit=30,
+            termination_interval=5,
+            tolerance=1e-3,
+        ),
+    ),
+    max_batch_size=1000,
 )
 
 
@@ -112,7 +129,7 @@ sim = NSimulation(
     seed=42,
 )
 
-n_generations = 10
+n_generations = 6
 sim.run(n_generations=n_generations)
 print(f"Simulation complete. Final generation: {sim.generation}\n")
 

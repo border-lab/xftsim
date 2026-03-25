@@ -23,7 +23,6 @@ from typing import Any, Hashable, List, Iterable, Callable, Union, Dict
 from functools import cached_property
 from dataclasses import dataclass, field
 import math
-
 import xftsim as xft
 
 

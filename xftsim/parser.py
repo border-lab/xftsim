@@ -20,7 +20,7 @@ from typing import Optional
 from xftsim.narch import (
     ArchNode, ArchComponent, GeneticComponent, MVGeneticComponent,
     HaplotypeGeneticComponent,
-    NoiseComponent, CNoiseComponent, AggregationComponent,
+    NoiseComponent, CNoiseComponent, ThresholdComponent, AggregationComponent,
     MotherComponent, FatherComponent, ParentComponent,
     _SIBLING_COMPONENTS,
     BUILTINS,
@@ -186,6 +186,8 @@ def _try_parse_function(outputs: list[str], rhs: str,
         return _parse_haplotypeGenetic(outputs, args_str, effects, lineno, grouping)
     elif func_name == 'noise':
         return _parse_noise(outputs, args_str, lineno, grouping)
+    elif func_name == 'threshold':
+        return _parse_threshold(outputs, args_str, lineno)
     elif func_name == 'cnoise':
         return _parse_cnoise(outputs, args_str, lineno, grouping)
     elif func_name in ('parent', 'mother', 'father'):
@@ -289,6 +291,30 @@ def _parse_noise(outputs: list[str], args_str: str, lineno: int,
         )
     component = NoiseComponent(variance=variance)
     return ArchNode(outputs=outputs, component=component, inputs=[], grouping=grouping)
+
+
+def _parse_threshold(outputs: list[str], args_str: str,
+                     lineno: int) -> ArchNode:
+    """Parse threshold(source, value) → ThresholdComponent."""
+    parts = [p.strip() for p in args_str.split(',')]
+    if len(parts) != 2:
+        raise ValueError(
+            f"Line {lineno}: threshold() requires 2 arguments: "
+            f"threshold(source, value), got {len(parts)}"
+        )
+    source = parts[0].strip()
+    if not source:
+        raise ValueError(f"Line {lineno}: threshold() requires a source name")
+    try:
+        thresh_val = float(parts[1])
+    except ValueError:
+        raise ValueError(
+            f"Line {lineno}: threshold() second argument must be numeric, "
+            f"got '{parts[1]}'"
+        )
+    component = ThresholdComponent(source=source, threshold=thresh_val)
+    return ArchNode(outputs=outputs, component=component,
+                    inputs=[source], grouping=None)
 
 
 def _parse_cnoise(outputs: list[str], args_str: str, lineno: int,

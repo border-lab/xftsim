@@ -1,13 +1,19 @@
 """
-New mate assignment and random mating for the refactored simulation loop.
+New mate assignment and mating regimes for the refactored simulation loop.
 
 NMateAssignment: dataclass linking offspring to parents by index.
 RandomMating: shuffles and pairs individuals to produce offspring.
+LinearAssortativeMating: rank-order pairing on a phenotypic composite.
+GeneralAssortativeMating: arbitrary K x K cross-mate correlation via QAP (Hexaly).
+BatchedMating: wraps any mating regime, splitting individuals into batches.
 """
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from dataclasses import dataclass
+from typing import Dict
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
 
@@ -309,3 +315,331 @@ class LinearAssortativeMating:
     def __repr__(self) -> str:
         return (f"LinearAssortativeMating(components={self.component_names}, "
                 f"r={self.r}, offspring_per_pair={self.offspring_per_pair})")
+
+
+def _solve_qap_hexaly(Y: np.ndarray, Z: np.ndarray, R: np.ndarray,
+                       nb_threads: int = 4, time_limit: int = 120,
+                       tolerance: float = 1e-5, verbosity: int = 1,
+                       time_between_displays: int = 15,
+                       termination_interval: int = 15) -> np.ndarray:
+    """Solve the Quadratic Assignment Problem using Hexaly Optimizer.
+
+    Finds a permutation P* of females that minimizes
+    ``||Y'[P*] Z / n  -  R||_F`` where Y, Z are standardized phenotype
+    matrices and R is the target cross-mate correlation.
+
+    Parameters
+    ----------
+    Y : np.ndarray
+        (n, K) standardized phenotypes for the first mate group.
+    Z : np.ndarray
+        (n, K) standardized phenotypes for the second mate group.
+    R : np.ndarray
+        (K, K) target cross-correlation matrix.
+    nb_threads : int
+        Number of solver threads.
+    time_limit : int
+        Maximum solve time in seconds.
+    tolerance : float
+        Objective threshold for early termination.
+    verbosity : int
+        Hexaly output verbosity.
+    time_between_displays : int
+        Seconds between Hexaly status lines.
+    termination_interval : int
+        Stop if no improvement for this many seconds.
+
+    Returns
+    -------
+    np.ndarray
+        (n,) permutation array mapping female indices.
+    """
+    import hexaly.optimizer
+
+    n = Y.shape[0]
+
+    # Initial value: sort-of-linear heuristic (sort by row means)
+    init_perm = np.argsort(Y.mean(axis=1))[np.argsort(np.argsort(Z.mean(axis=1)))]
+
+    const = np.trace(R @ R.T)
+    # Gram matrices
+    YY = Y @ Y.T / n  # "flow"
+    ZZ = Z @ Z.T / n  # "distance"
+    W = Y @ R @ Z.T / n  # "cost"
+
+    class _TerminateSolver:
+        def __init__(self, interval: int):
+            self.last_best_value = np.inf
+            self.last_best_running_time = 0.0
+            self.interval = interval
+
+        def callback(self, optimizer, cb_type):
+            stats = optimizer.statistics
+            obj = optimizer.model.objectives[0]
+            if obj.value < self.last_best_value:
+                self.last_best_running_time = stats.running_time
+                self.last_best_value = obj.value
+            if stats.running_time - self.last_best_running_time > self.interval:
+                optimizer.stop()
+
+    with hexaly.optimizer.HexalyOptimizer() as optimizer:
+        cb = _TerminateSolver(int(termination_interval))
+        optimizer.add_callback(hexaly.optimizer.HxCallbackType.TIME_TICKED,
+                               cb.callback)
+        optimizer.param.time_limit = int(time_limit)
+        optimizer.param.nb_threads = int(nb_threads)
+        optimizer.param.verbosity = int(verbosity)
+        optimizer.param.time_between_displays = int(time_between_displays)
+
+        model = optimizer.model
+        array_YY = model.array(model.array(YY[i, :]) for i in range(n))
+        array_W = model.array(model.array(W[i, :]) for i in range(n))
+
+        # Decision variable: permutation as a list
+        p = model.list(n)
+        model.constraint(model.eq(model.count(p), n))
+
+        # Objective: sqrt( sum_ij YY[P[i],P[j]]*ZZ[i,j] - 2*sum_i W[P[i],i] + const )
+        qobj = model.sum(
+            model.at(array_YY, p[i], p[j]) * ZZ[i, j]
+            for j in range(n) for i in range(n))
+        lobj = model.sum(model.at(array_W, p[i], i) for i in range(n))
+        obj = (qobj - 2 * lobj + const) ** 0.5
+        model.minimize(obj)
+        model.close()
+
+        # Seed with heuristic
+        p.value.clear()
+        for pp in init_perm:
+            p.value.add(int(pp))
+
+        optimizer.param.set_objective_threshold(0, tolerance)
+        optimizer.solve()
+
+        return np.array([p.value.get(i) for i in range(n)])
+
+
+class GeneralAssortativeMating:
+    """Assortative mating with an arbitrary K x K cross-mate correlation target.
+
+    Uses the Hexaly Optimizer to solve the Quadratic Assignment Problem:
+    find a permutation P* of one sex that minimizes
+    ``||Y'[P*] Z / n  -  Omega||_F`` where Omega is the target cross-mate
+    cross-trait correlation matrix.
+
+    Parameters
+    ----------
+    component_names : list[str]
+        Phenotype component names (keys in NPhenotypeArray) to use.
+        Order must match the rows/columns of ``cross_corr``.
+    cross_corr : np.ndarray
+        (K, K) target cross-mate correlation matrix.
+        ``cross_corr[i, j]`` is the desired correlation between component i
+        in females and component j in males.
+    offspring_per_pair : int
+        Number of offspring per mating pair.
+    solver_params : dict, optional
+        Hexaly solver parameters. Keys: nb_threads, time_limit, tolerance,
+        verbosity, time_between_displays, termination_interval.
+    """
+
+    def __init__(self, component_names: list[str],
+                 cross_corr: np.ndarray,
+                 offspring_per_pair: int = 2,
+                 solver_params: Dict[str, int | float] | None = None) -> None:
+        import hexaly.optimizer  # noqa: F401 — hard error if not installed
+
+        if offspring_per_pair < 1:
+            raise ValueError("offspring_per_pair must be >= 1")
+
+        self.component_names: list[str] = list(component_names)
+        K = len(self.component_names)
+        self.cross_corr = np.asarray(cross_corr, dtype=np.float64)
+        if self.cross_corr.shape != (K, K):
+            raise ValueError(
+                f"cross_corr shape {self.cross_corr.shape} does not match "
+                f"{K} components — expected ({K}, {K})")
+        self.offspring_per_pair: int = offspring_per_pair
+        self.solver_params: dict = dict(
+            nb_threads=4,
+            time_limit=120,
+            tolerance=1e-5,
+            verbosity=1,
+            time_between_displays=15,
+            termination_interval=15,
+        )
+        if solver_params is not None:
+            self.solver_params.update(solver_params)
+
+    def mate(self, samples: SampleMeta,
+             rng: np.random.RandomState | None = None,
+             phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
+        """Produce a mate assignment achieving the target cross-mate correlations.
+
+        Parameters
+        ----------
+        samples : SampleMeta
+            Current generation's sample metadata.
+        rng : np.random.RandomState, optional
+            Random state for reproducibility (used only for offspring metadata).
+        phenotypes : NPhenotypeArray
+            Current phenotypes. Must contain all ``component_names``.
+
+        Returns
+        -------
+        NMateAssignment
+        """
+        if phenotypes is None:
+            raise ValueError(
+                "GeneralAssortativeMating requires phenotypes")
+
+        if rng is None:
+            rng = np.random.RandomState()
+
+        female_idx = np.where(samples.sex == 0)[0]
+        male_idx = np.where(samples.sex == 1)[0]
+
+        if len(female_idx) == 0 or len(male_idx) == 0:
+            raise ValueError("Need at least one female and one male for mating")
+
+        # Balance sexes
+        n_pairs = min(len(female_idx), len(male_idx))
+        rng.shuffle(female_idx)
+        rng.shuffle(male_idx)
+        female_idx = female_idx[:n_pairs]
+        male_idx = male_idx[:n_pairs]
+
+        # Build (n_pairs, K) phenotype matrices
+        K = len(self.component_names)
+        Y = np.empty((n_pairs, K), dtype=np.float64)
+        Z = np.empty((n_pairs, K), dtype=np.float64)
+        for k, name in enumerate(self.component_names):
+            vals = phenotypes[name].astype(np.float64)
+            Y[:, k] = vals[female_idx]
+            Z[:, k] = vals[male_idx]
+
+        # Standardize columns
+        for k in range(K):
+            for arr in (Y, Z):
+                mu = arr[:, k].mean()
+                sd = arr[:, k].std()
+                if sd > 0:
+                    arr[:, k] = (arr[:, k] - mu) / sd
+                else:
+                    arr[:, k] = 0.0
+
+        # Solve QAP — returns permutation of female indices
+        perm = _solve_qap_hexaly(Y, Z, self.cross_corr, **self.solver_params)
+
+        # Apply permutation to females; males stay in place
+        mothers = female_idx[perm]
+        fathers = male_idx
+
+        opp = self.offspring_per_pair
+        n_offspring = n_pairs * opp
+
+        maternal_idx = np.repeat(mothers, opp)
+        paternal_idx = np.repeat(fathers, opp)
+
+        iid = np.arange(n_offspring, dtype=np.int64)
+        fid = np.repeat(np.arange(n_pairs, dtype=np.int64), opp)
+        sex_pattern = np.tile(np.arange(opp, dtype=np.int64) % 2, n_pairs)
+        generation = samples.generation + 1
+
+        offspring_samples = SampleMeta(
+            iid=iid, fid=fid, sex=sex_pattern, generation=generation,
+        )
+
+        return NMateAssignment(
+            offspring_samples=offspring_samples,
+            maternal_idx=maternal_idx,
+            paternal_idx=paternal_idx,
+        )
+
+    def __repr__(self) -> str:
+        K = len(self.component_names)
+        return (f"GeneralAssortativeMating(components={self.component_names}, "
+                f"cross_corr=({K}x{K}), "
+                f"offspring_per_pair={self.offspring_per_pair})")
+
+
+class BatchedMating:
+    """Wraps any mating regime, splitting individuals into batches.
+
+    Randomly partitions individuals into batches of at most
+    ``max_batch_size`` individuals, runs the inner regime on each batch
+    independently, then merges the resulting mate assignments.
+
+    This is essential for GeneralAssortativeMating at large n, where the
+    QAP solver scales quadratically. For example, n=8000 with
+    max_batch_size=1000 yields 8 independent QAP solves of 500 pairs
+    each, rather than one solve of 4000 pairs.
+
+    Parameters
+    ----------
+    regime
+        Any mating regime with a ``.mate(samples, rng, phenotypes)`` method.
+    max_batch_size : int
+        Maximum number of *individuals* (not pairs) per batch.
+    """
+
+    def __init__(self, regime, max_batch_size: int = 1000) -> None:
+        self.regime = regime
+        self.max_batch_size: int = max_batch_size
+
+    def mate(self, samples: SampleMeta,
+             rng: np.random.RandomState | None = None,
+             phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
+        if rng is None:
+            rng = np.random.RandomState()
+
+        n = samples.n
+        num_batches = math.ceil(n / self.max_batch_size)
+
+        # Random partition of all individuals
+        perm = rng.permutation(n)
+        batch_indices = np.array_split(perm, num_batches)
+
+        all_maternal = []
+        all_paternal = []
+        all_n_offspring = 0
+        all_fid_offset = 0
+
+        for bi, batch_idx in enumerate(batch_indices):
+            batch_idx = np.sort(batch_idx)
+
+            batch_samples = samples.subset(batch_idx)
+            batch_pheno = phenotypes.subset(batch_idx) if phenotypes is not None else None
+
+            assignment = self.regime.mate(batch_samples, rng=rng,
+                                         phenotypes=batch_pheno)
+
+            # Map batch-local parent indices back to global indices
+            all_maternal.append(batch_idx[assignment.maternal_idx])
+            all_paternal.append(batch_idx[assignment.paternal_idx])
+            all_n_offspring += assignment.n_offspring
+
+        maternal_idx = np.concatenate(all_maternal)
+        paternal_idx = np.concatenate(all_paternal)
+
+        # Build offspring metadata
+        opp = getattr(self.regime, 'offspring_per_pair', 2)
+        n_pairs = all_n_offspring // opp
+        iid = np.arange(all_n_offspring, dtype=np.int64)
+        fid = np.repeat(np.arange(n_pairs, dtype=np.int64), opp)
+        sex_pattern = np.tile(np.arange(opp, dtype=np.int64) % 2, n_pairs)
+        generation = samples.generation + 1
+
+        offspring_samples = SampleMeta(
+            iid=iid, fid=fid, sex=sex_pattern, generation=generation,
+        )
+
+        return NMateAssignment(
+            offspring_samples=offspring_samples,
+            maternal_idx=maternal_idx,
+            paternal_idx=paternal_idx,
+        )
+
+    def __repr__(self) -> str:
+        return (f"BatchedMating(regime={self.regime!r}, "
+                f"max_batch_size={self.max_batch_size})")
