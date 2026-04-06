@@ -1,26 +1,23 @@
 """
 Figure 2 — Psychiatric Diagnoses under Empirical xAM
-(Single seed, liability threshold model, 6-way + pairwise)
+(6-way simulation, 50 seeds)
 
 Models 6 psychiatric traits with empirical cross-mate correlations
-and trait-specific heritabilities from psych_cors.csv (seed=1).
+and trait-specific heritabilities from psych_cors.csv.
 
 Traits: ADHD, ALC, ANX, BIP, MDD, SCZ
 - Each trait has independent genetic effects (true rg = 0)
-- Empirical 6×6 cross-mate correlation matrix (non-exchangeable)
+- Empirical 6x6 cross-mate correlation matrix (non-exchangeable)
 - Liability threshold model: continuous phenotypes binarized into diagnoses
 - Mating operates on continuous phenotypes; HE estimated on both scales
 - No vertical transmission
 
-Two simulation types:
-  1) 6-way: all 6 traits assorted simultaneously
-  2) Pairwise: 15 separate sims, each assorting on only 2 traits
+Saves per-seed, per-generation results to figure2_results.csv.
 """
 
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-from itertools import combinations
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
 from xftsim.neffect import AdditiveEffects
@@ -32,10 +29,10 @@ from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
 
 # ── Parameters ──────────────────────────────────────────────────────────────
 
-SEED = 1
-n_individuals = 8000
+n_individuals = 16000
 n_loci = 2000
 n_generations = 6
+n_runs = 2
 
 dx = ["ADHD", "ALC", "ANX", "BIP", "MDD", "SCZ"]
 dx_diag = [f"{d}.dx" for d in dx]
@@ -44,50 +41,35 @@ dx_diag = [f"{d}.dx" for d in dx]
 prev = np.array([0.087, 0.291, 0.316, 0.025, 0.144, 0.04])
 thresh = stats.norm.ppf(1 - prev)
 
-# ── Load empirical correlations and heritabilities from CSV ─────────────────
 
-psychdat = pd.read_csv(
-    '/Users/ajayprabhakar/PycharmProjects/xftmanu_code_supplement/psych_cors.csv'
-)
-sdat = psychdat.loc[psychdat.seed == SEED]
+def build_and_run_6way(seed):
+    """Build and run the 6-way simulation for a given seed."""
 
-# Build full 6×6 cross-mate correlation matrix
-R_mate_full = np.array([
-    [sdat.rmate.loc[(sdat.dx1 == x) & (sdat.dx2 == y)].values[0]
-     for x in dx]
-    for y in dx
-])
+    # Load empirical correlations and heritabilities
+    psychdat = pd.read_csv(
+        '/Users/ajayprabhakar/PycharmProjects/xftmanu_code_supplement/psych_cors.csv'
+    )
+    sdat = psychdat.loc[psychdat.seed == seed]
 
-# Trait-specific heritabilities
-h2 = np.array([
-    sdat.vg1.loc[sdat.dx1 == d].mean() for d in dx
-])
-ve = 1.0 - h2
+    R_mate = np.array([
+        [sdat.rmate.loc[(sdat.dx1 == x) & (sdat.dx2 == y)].values[0]
+         for x in dx]
+        for y in dx
+    ])
 
-print("Traits:", dx)
-print(f"Heritabilities (seed={SEED}):")
-for d, h in zip(dx, h2):
-    print(f"  {d:>4s}: h² = {h:.4f}")
-print(f"\nCross-mate correlation matrix:")
-print("       " + "  ".join(f"{d:>6s}" for d in dx))
-for i, d in enumerate(dx):
-    print(f"  {d:>4s} " + "  ".join(f"{R_mate_full[i,j]:6.3f}" for j in range(6)))
-
-
-# ── Helper: build and run a simulation ──────────────────────────────────────
-
-def build_and_run(label, mate_component_names, cross_corr, sim_seed=42):
-    """Build and run a simulation with given mating structure."""
+    h2 = np.array([
+        sdat.vg1.loc[sdat.dx1 == d].mean() for d in dx
+    ])
+    ve = 1.0 - h2
 
     founder_haplotypes = founder_haplotypes_uniform_AFs(n=n_individuals, m=n_loci)
 
-    # All 6 traits are always simulated
     effects = {}
     formula_lines = []
     for i, d in enumerate(dx):
         eff_name = f'{d}_eff'
         effects[eff_name] = AdditiveEffects.from_h2(
-            h2=float(h2[i]), m=n_loci, seed=100 + i
+            h2=float(h2[i]), m=n_loci, seed=100 + i + seed * 1000
         )
         formula_lines.append(f"{d}.G ~ genetic({eff_name})")
         formula_lines.append(f"{d}.E ~ noise({float(ve[i])})")
@@ -99,11 +81,10 @@ def build_and_run(label, mate_component_names, cross_corr, sim_seed=42):
     arch = Architecture(formula=formula, effects=effects)
     rmap = RecombinationMap(p=0.5, m=n_loci)
 
-    # Mating only on the specified subset of traits
     mating = BatchedMating(
         regime=GeneralAssortativeMating(
-            component_names=mate_component_names,
-            cross_corr=cross_corr,
+            component_names=dx,
+            cross_corr=R_mate,
             offspring_per_pair=2,
             solver_params=dict(
                 time_limit=30,
@@ -125,130 +106,124 @@ def build_and_run(label, mate_component_names, cross_corr, sim_seed=42):
             SampleStatistics(),
             HasemanElstonEstimator(phenotype_keys=dx + dx_diag),
         ],
-        seed=sim_seed,
+        seed=seed,
     )
-
-    print(f"\n{'='*70}")
-    print(f"Running: {label}")
-    print(f"  Mating on: {mate_component_names}")
-    print(f"{'='*70}")
 
     sim.run(n_generations=n_generations)
-    print(f"  Done. Final generation: {sim.generation}")
-    return sim
+    return sim, h2, R_mate
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+def extract_results(sim):
+    """Extract per-generation HE rg on liability and diagnosis scales."""
+    rows = []
 
-def extract_rg_per_gen(sim, scale='liability'):
-    """Extract rg matrix for every generation."""
-    n_traits = len(dx)
-    results = []
     for result in sim.results:
+        gen = result.generation
         he = result.statistics.get('HasemanElstonEstimator')
         if he is None or '_cov_g' not in he:
-            results.append((result.generation, None))
             continue
+
+        row = {'generation': gen}
+
         cov_g = he['_cov_g']
-        if scale == 'liability':
-            cov = cov_g[:n_traits, :n_traits]
-        else:
-            cov = cov_g[n_traits:, n_traits:]
-        diag = np.sqrt(np.diag(cov))
-        diag[diag == 0] = 1.0
-        rg = cov / np.outer(diag, diag)
-        results.append((result.generation, rg))
-    return results
+        he_keys = he['_keys']
+        d_diag = np.sqrt(np.abs(np.diag(cov_g)))
+        d_diag[d_diag < 1e-15] = 1.0
+        rg = cov_g / np.outer(d_diag, d_diag)
+
+        # HE h² per trait (liability and diagnosis)
+        for trait in dx + dx_diag:
+            if trait in he:
+                row[f'h2_HE_{trait}'] = he[trait]['h2']
+
+        # HE rg for all trait pairs — liability scale
+        for i in range(len(dx)):
+            for j in range(i + 1, len(dx)):
+                t1, t2 = dx[i], dx[j]
+                if t1 in he_keys and t2 in he_keys:
+                    ii = he_keys.index(t1)
+                    jj = he_keys.index(t2)
+                    row[f'rg_liab_{t1}_{t2}'] = rg[ii, jj]
+
+        # HE rg for all trait pairs — diagnosis scale
+        for i in range(len(dx_diag)):
+            for j in range(i + 1, len(dx_diag)):
+                t1, t2 = dx_diag[i], dx_diag[j]
+                if t1 in he_keys and t2 in he_keys:
+                    ii = he_keys.index(t1)
+                    jj = he_keys.index(t2)
+                    row[f'rg_dx_{dx[i]}_{dx[j]}'] = rg[ii, jj]
+
+        rows.append(row)
+
+    return rows
 
 
-def extract_pairwise_rg_per_gen(sim, idx1, idx2, scale='liability'):
-    """Extract rg between two specific traits for every generation."""
-    rg_by_gen = extract_rg_per_gen(sim, scale)
-    out = []
-    for gen, rg in rg_by_gen:
-        if rg is not None:
-            out.append((gen, rg[idx1, idx2]))
-        else:
-            out.append((gen, float('nan')))
-    return out
+# ── Main ─────────────────────────────────────────────────────────────────
 
+if __name__ == '__main__':
+    all_rows = []
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Part 1: 6-way simulation
-# ══════════════════════════════════════════════════════════════════════════════
+    for run in range(n_runs):
+        seed = run + 1
+        print(f"\n{'='*70}")
+        print(f"Seed {seed}/{n_runs}")
+        print(f"{'='*70}")
 
-sim_6way = build_and_run("6-way", dx, R_mate_full)
+        sim, h2, R_mate = build_and_run_6way(seed)
+        print(f"  Done. Final generation: {sim.generation}")
 
-# Store 6-way per-generation rg for each pair
-rg_6way_by_gen_liab = extract_rg_per_gen(sim_6way, 'liability')
-rg_6way_by_gen_dx = extract_rg_per_gen(sim_6way, 'diagnosis')
+        rows = extract_results(sim)
+        for row in rows:
+            row['seed'] = seed
+        all_rows.extend(rows)
 
-# Free memory
-del sim_6way
+        del sim
 
+    # ── Save to CSV ────────────────────────────────────────────────────
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Part 2: Pairwise simulations (15 pairs)
-# ══════════════════════════════════════════════════════════════════════════════
+    df = pd.DataFrame(all_rows)
+    outpath = 'figure2_results.csv'
+    df.to_csv(outpath, index=False)
+    print(f"\nAll results saved to {outpath}")
 
-pairs = list(combinations(range(6), 2))
+    # ── Print summary ──────────────────────────────────────────────────
 
-# Store per-generation rg for each pairwise sim: {(i,j): [(gen, rg), ...]}
-pairwise_by_gen_liab = {}
-pairwise_by_gen_dx = {}
+    print(f"\n{'='*100}")
+    print(f"FIGURE 2 RESULTS — 6-WAY, AVERAGED OVER {n_runs} SEEDS")
+    print(f"{'='*100}")
 
-for idx1, idx2 in pairs:
-    d1, d2 = dx[idx1], dx[idx2]
+    print(f"\n--- HE h² per trait (liability scale) ---")
+    print(f"{'Gen':>3}  " + "  ".join(f"{d:>8}" for d in dx))
+    print("-" * 60)
+    for gen in sorted(df['generation'].unique()):
+        gdf = df[df['generation'] == gen]
+        vals = "  ".join(
+            f"{gdf[f'h2_HE_{d}'].mean():8.4f}" if f'h2_HE_{d}' in gdf.columns else f"{'nan':>8}"
+            for d in dx
+        )
+        print(f"{gen:3d}  {vals}")
 
-    # 2×2 submatrix of cross-mate correlations
-    sub_corr = R_mate_full[np.ix_([idx1, idx2], [idx1, idx2])]
+    print(f"\n--- Mean off-diagonal rg (liability scale) ---")
+    rg_liab_cols = [c for c in df.columns if c.startswith('rg_liab_')]
+    print(f"{'Gen':>3}  {'mean_rg':>10}  {'sd_rg':>10}")
+    print("-" * 30)
+    for gen in sorted(df['generation'].unique()):
+        gdf = df[df['generation'] == gen]
+        all_rg = gdf[rg_liab_cols].values.flatten()
+        all_rg = all_rg[~np.isnan(all_rg)]
+        print(f"{gen:3d}  {np.mean(all_rg):10.4f}  {np.std(all_rg):10.4f}")
 
-    sim_pair = build_and_run(
-        f"Pairwise: {d1}-{d2}",
-        [d1, d2],
-        sub_corr,
-        sim_seed=42,
-    )
+    print(f"\n--- Mean off-diagonal rg (diagnosis scale) ---")
+    rg_dx_cols = [c for c in df.columns if c.startswith('rg_dx_')]
+    print(f"{'Gen':>3}  {'mean_rg':>10}  {'sd_rg':>10}")
+    print("-" * 30)
+    for gen in sorted(df['generation'].unique()):
+        gdf = df[df['generation'] == gen]
+        all_rg = gdf[rg_dx_cols].values.flatten()
+        all_rg = all_rg[~np.isnan(all_rg)]
+        print(f"{gen:3d}  {np.mean(all_rg):10.4f}  {np.std(all_rg):10.4f}")
 
-    pairwise_by_gen_liab[(idx1, idx2)] = extract_pairwise_rg_per_gen(
-        sim_pair, idx1, idx2, 'liability'
-    )
-    pairwise_by_gen_dx[(idx1, idx2)] = extract_pairwise_rg_per_gen(
-        sim_pair, idx1, idx2, 'diagnosis'
-    )
-
-    del sim_pair
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Results: Per-generation rg comparison (6-way vs Pairwise)
-# ══════════════════════════════════════════════════════════════════════════════
-
-for scale_name, rg_6way_list, pw_dict in [
-    ('LIABILITY', rg_6way_by_gen_liab, pairwise_by_gen_liab),
-    ('DIAGNOSIS', rg_6way_by_gen_dx, pairwise_by_gen_dx),
-]:
-    print(f"\n\n{'='*90}")
-    print(f"HE-Estimated rg per generation — {scale_name} scale  (true rg = 0)")
-    print(f"{'='*90}")
-
-    for idx1, idx2 in pairs:
-        d1, d2 = dx[idx1], dx[idx2]
-        xmate_r = R_mate_full[idx1, idx2]
-
-        print(f"\n  {d1}-{d2}  (cross-mate r = {xmate_r:.3f})")
-        print(f"  {'Gen':>3s}  {'6-way rg':>10s}  {'pairwise rg':>12s}")
-        print(f"  {'-'*30}")
-
-        pw_vals = dict(pw_dict[(idx1, idx2)])
-
-        for gen, rg_mat in rg_6way_list:
-            rg6 = rg_mat[idx1, idx2] if rg_mat is not None else float('nan')
-            rgp = pw_vals.get(gen, float('nan'))
-            print(f"  {gen:3d}  {rg6:10.4f}  {rgp:12.4f}")
-
-    print(f"\n{'='*90}")
-
-print("\nNote: True genetic correlations are all zero (independent effects).")
-print("6-way rg includes indirect xAM effects mediated through other traits.")
-print("Pairwise rg reflects only the direct cross-mate similarity of that pair.")
+    print(f"\n{'='*100}")
+    print("Note: True genetic correlations are all zero (independent effects).")
+    print("All rg inflation is an artifact of 6-way cross-trait assortative mating.")

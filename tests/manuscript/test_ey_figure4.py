@@ -10,51 +10,24 @@ Models three traits with distinct transmission channels:
 - Education: low heritability (h²=0.01), VT from parental edu AND parental wealth.
 - Wealth: NO genetic component. Pure vertical transmission from parental wealth.
 
-Variance decomposition at generation 0 (paper targets):
-- Height: 60% genetic, 40% noise
-- Education: 1% genetic, ≈67% VT (from parental edu + wealth), ≈32% noise
-- Wealth: ≈67% VT (from parental wealth), ≈33% noise
-
-Vertical transmission (from ey_sim.py):
-  The paper uses a LinearVerticalComponent with a transmission matrix:
-      VT inputs: [edu_m, edu_f, wlth_m, wlth_f]
-      edu_vert:    [CC, CC, CC, CC] * sqrt(0.5)     (CC = sqrt(1/3))
-      height_vert: [0,  0,  0,  0 ]
-      wealth_vert: [0,  0,  AA, AA] * sqrt(0.5)     (AA = sqrt(2/3))
-
-  So each VT coefficient (per-parent) is:
-      edu ← edu_parent:    CC * sqrt(0.5) = sqrt(1/6) ≈ 0.4082
-      edu ← wealth_parent: CC * sqrt(0.5) = sqrt(1/6) ≈ 0.4082
-      wealth ← wealth_parent: AA * sqrt(0.5) = sqrt(1/3) ≈ 0.5774
-
-  The legacy LinearVerticalComponent with normalize=True divides by the
-  std of the founder draws (which are N(0,1) since founder_variances=[1,1,1,1]).
-  This means the effective per-parent coefficients are exactly as above.
-
-Noise variances (from ey_sim.py):
-  edu:    1/3 - h2_edu = 1/3 - 0.01 ≈ 0.3233
-  height: 0.4
-  wealth: 1/3 ≈ 0.3333
-
-Mating regime:
-  The paper uses GeneralAssortativeMatingRegime with a full cross-correlation matrix:
-      [[0.246, 0.192, 0.252],
-       [0.192, 0.125, 0.183],
-       [0.252, 0.183, 0.251]]
-  The new API only has LinearAssortativeMating (single scalar r). We use the
-  mean of the cross-correlation matrix as the best approximation:
-      mean ≈ 0.206
-  This is an approximation — the paper's trait-specific correlations produce
-  a different inflation pattern than a uniform scalar. Results will be
-  qualitatively similar but not numerically identical to Figure 4.
+Panels:
+  (b) Per-trait h²_HE, h²_true, R²_G across generations
+  (c) True PGI score correlations (r_score) and HE rg for trait pairs
+  (d) GWAS beta correlations (r̂_β) for trait pairs
 
 Figure 4 target values (after 5 generations of xAM):
   Height: true h² 0.599 → 0.621  |  HE h² 0.599 → 0.686
   Edu:    true h² 0.010 → 0.005  |  HE h² 0.010 → 0.068
   Wealth: true h² 0.000 → 0.000  |  HE h² 0.000 → 0.036
+
+NOTE: This simulation uses LinearAssortativeMating (single scalar r)
+      instead of GeneralAssortativeMatingRegime (full cross-correlation
+      matrix). Results are qualitatively similar but not numerically
+      identical to the paper.
 """
 
 import numpy as np
+import pandas as pd
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
 from xftsim.neffect import AdditiveEffects
@@ -63,52 +36,52 @@ from xftsim.nmate import LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.nsim import NSimulation
 from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
+from xftsim.ngwas import GWAS
 
 # ── Parameters (matched to ey_sim.py) ────────────────────────────────────
 
 n_individuals = 128000
 n_loci = 2000
+n_generations = 6
 
 # Heritabilities (only height and edu have genetic components)
 h2_height = 0.60
 h2_edu = 0.01
 
-# VT coefficients from the paper's transmission matrix:
-#   CC = sqrt(1/3), AA = sqrt(2/3), each multiplied by sqrt(0.5)
+# VT coefficients from the paper's transmission matrix
 CC = np.sqrt(1 / 3)
 AA = np.sqrt(2 / 3)
-# Per-parent effective VT weight:
-vt_edu_from_edu = CC * np.sqrt(0.5)      # ≈ 0.4082
-vt_edu_from_wealth = CC * np.sqrt(0.5)   # ≈ 0.4082
-vt_wealth_from_wealth = AA * np.sqrt(0.5)  # ≈ 0.5774
+vt_edu_from_edu = CC * np.sqrt(0.5)
+vt_edu_from_wealth = CC * np.sqrt(0.5)
+vt_wealth_from_wealth = AA * np.sqrt(0.5)
 
 # Noise variances (from ey_sim.py)
-var_edu = 1 / 3 - h2_edu    # ≈ 0.3233
+var_edu = 1 / 3 - h2_edu
 var_height = 0.4
-var_wealth = 1 / 3           # ≈ 0.3333
+var_wealth = 1 / 3
 
-# Founder VT draw variance: the paper uses founder_variances = sqrt([1,1,1,1])
-# which means N(0,1) draws. The normalize=True in LinearVerticalComponent
-# divides by the observed std, so the effective founder variance is 1.0.
 vt_founder_var = 1.0
 
-# Mating: the paper uses a full cross-correlation matrix:
-#   [[0.246, 0.192, 0.252],
-#    [0.192, 0.125, 0.183],
-#    [0.252, 0.183, 0.251]]
-# Mean of all 9 entries ≈ 0.206
+# Mating cross-correlation matrix (paper uses full matrix; we use mean)
 xmatecorr = np.array([[0.24626319, 0.1915851, 0.2521529],
                        [0.1915851, 0.1247212, 0.18323772],
                        [0.2521529, 0.18323772, 0.25072489]])
 r_mean = float(np.mean(xmatecorr))
 
-# Recombination rate (from ey_sim.py: p = 50/m)
 p_recomb = 50 / n_loci
+
+traits = ['edu', 'height', 'wealth']
+# Only edu and height have genetic components
+genetic_traits = ['edu', 'height']
+trait_pairs = [('edu', 'height'), ('edu', 'wealth'), ('height', 'wealth')]
 
 
 def build_ey_sim(n=n_individuals, m=n_loci, seed=42):
-    """Build the education-height-wealth simulation matching ey_sim.py."""
+    """Build the education-height-wealth simulation.
 
+    retain_haplotypes and retain_phenotypes are set to n_generations+1
+    so all generations remain accessible for post-hoc analysis.
+    """
     founder_haplotypes = founder_haplotypes_uniform_AFs(n=n, m=m)
 
     height_eff = AdditiveEffects.from_h2(h2=h2_height, m=m, seed=seed)
@@ -153,8 +126,8 @@ wealth ~ wealth.E + wealth.VT
         architecture=arch,
         mating_regime=mating,
         recombination_map=rmap,
-        retain_haplotypes=1,
-        retain_phenotypes=2,
+        retain_haplotypes=n_generations + 1,
+        retain_phenotypes=n_generations + 1,
         statistics=[
             SampleStatistics(),
             HasemanElstonEstimator(phenotype_keys=['edu', 'height', 'wealth']),
@@ -164,102 +137,165 @@ wealth ~ wealth.E + wealth.VT
     return sim
 
 
-def extract_he_h2(sim, generation, trait):
-    """Extract HE-estimated h² for a trait at a given generation."""
-    for result in sim.results:
-        if result.generation != generation:
-            continue
-        he = result.statistics.get('HasemanElstonEstimator')
-        if he is None or trait not in he:
-            raise ValueError(f"No HE result for '{trait}' at gen {generation}")
-        return he[trait]['h2']
-    raise ValueError(f"Generation {generation} not found in results")
+def extract_all(sim):
+    """Extract all panel (b), (c), (d) quantities from a completed simulation.
 
+    Returns a list of dicts (one per generation).
+    """
+    rows = []
 
-def extract_he_rg(sim, generation):
-    """Extract mean off-diagonal genetic correlation from HE at a generation."""
     for result in sim.results:
-        if result.generation != generation:
-            continue
-        he = result.statistics.get('HasemanElstonEstimator')
-        if he is None or '_cov_g' not in he:
-            raise ValueError(f"No HE cov_g at generation {generation}")
-        cov_g = he['_cov_g']
-        k = cov_g.shape[0]
-        d = np.sqrt(np.abs(np.diag(cov_g)))
-        d[d < 1e-15] = 1.0
-        rg = cov_g / np.outer(d, d)
-        mask = np.triu(np.ones((k, k), dtype=bool), k=1)
-        return rg, he['_keys']
-    raise ValueError(f"Generation {generation} not found in results")
+        gen = result.generation
+        stats = result.statistics
+        row = {'generation': gen}
+
+        pheno = sim.phenotype_history.get(gen)
+        hap = sim.haplotype_history.get(gen)
+
+        # ── Panel (b): h²_HE, h²_true, R²_G per trait ──────────────
+
+        # HE h²
+        he = stats.get('HasemanElstonEstimator')
+        if he:
+            for t in traits:
+                if t in he:
+                    row[f'h2_HE_{t}'] = he[t]['h2']
+
+        if pheno is not None:
+            for t in traits:
+                total = pheno[t]
+                var_total = np.var(total)
+
+                # True h² (only edu and height have .G components)
+                if t in genetic_traits:
+                    g = pheno[f'{t}.G']
+                    row[f'h2_true_{t}'] = np.var(g) / var_total if var_total > 0 else 0.0
+                else:
+                    row[f'h2_true_{t}'] = 0.0
+
+                # R²_G: variance in each phenotype explained by each PGI
+                for gt in genetic_traits:
+                    g = pheno[f'{gt}.G']
+                    r = np.corrcoef(g, total)[0, 1]
+                    row[f'R2_{t}_from_{gt}_PGI'] = r ** 2
+
+        # Phenotypic variances
+        ss = stats.get('SampleStatistics')
+        if ss:
+            keys_ss = ss['keys']
+            var_ss = ss['var']
+            for t in traits:
+                if t in keys_ss:
+                    row[f'var_{t}'] = var_ss[keys_ss.index(t)]
+
+        # ── Panel (c): PGI score correlations and HE rg ─────────────
+
+        # True PGI score correlations (only between traits that have .G)
+        if pheno is not None:
+            for t1, t2 in trait_pairs:
+                # r_score: correlation of true genetic values
+                if t1 in genetic_traits and t2 in genetic_traits:
+                    g1 = pheno[f'{t1}.G']
+                    g2 = pheno[f'{t2}.G']
+                    row[f'r_score_{t1}_{t2}'] = np.corrcoef(g1, g2)[0, 1]
+                else:
+                    row[f'r_score_{t1}_{t2}'] = np.nan
+
+        # HE rg
+        if he and '_cov_g' in he:
+            cov_g = he['_cov_g']
+            he_keys = he['_keys']
+            d = np.sqrt(np.abs(np.diag(cov_g)))
+            d[d < 1e-15] = 1.0
+            rg = cov_g / np.outer(d, d)
+            for t1, t2 in trait_pairs:
+                if t1 in he_keys and t2 in he_keys:
+                    i = he_keys.index(t1)
+                    j = he_keys.index(t2)
+                    row[f'rg_HE_{t1}_{t2}'] = rg[i, j]
+
+        # ── Panel (d): GWAS beta correlations ────────────────────────
+
+        if pheno is not None and hap is not None:
+            gwas = GWAS(hap, pheno)
+            gwas_results = gwas.run(traits)
+            betas = {t: gwas_results[t].beta for t in traits}
+            for t1, t2 in trait_pairs:
+                row[f'r_beta_{t1}_{t2}'] = np.corrcoef(betas[t1], betas[t2])[0, 1]
+
+        rows.append(row)
+
+    return rows
 
 
 # ── Run as script ─────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    sim = build_ey_sim()
-    sim.run(n_generations=6)
-    print(f"Simulation complete. Final generation: {sim.generation}\n")
+    n_runs = 10
+    all_rows = []
 
-    traits = ['edu', 'height', 'wealth']
+    for run in range(n_runs):
+        seed = run + 1
+        print(f"\n{'='*70}")
+        print(f"Seed {seed}/{n_runs}")
+        print(f"{'='*70}")
 
-    print("=" * 90)
-    print(f"{'Gen':>3}  |  {'--- Phenotypic Variance ---':^30}  |  {'--- HE-Estimated h² ---':^30}")
-    print(f"{'':>3}  |  {'edu':>8}  {'height':>8}  {'wealth':>8}  |  {'edu':>8}  {'height':>8}  {'wealth':>8}")
-    print("-" * 90)
+        sim = build_ey_sim(seed=seed)
+        sim.run(n_generations=n_generations)
+        print(f"  Done. Final generation: {sim.generation}")
 
-    for result in sim.results:
-        stats = result.statistics
-        gen = result.generation
+        rows = extract_all(sim)
+        for row in rows:
+            row['seed'] = seed
+        all_rows.extend(rows)
 
-        ss = stats.get('SampleStatistics')
-        pheno_vars = {}
-        if ss:
-            keys = ss['keys']
-            var = ss['var']
-            for t in traits:
-                if t in keys:
-                    pheno_vars[t] = var[keys.index(t)]
+        del sim
 
-        he = stats.get('HasemanElstonEstimator')
-        he_h2 = {}
-        if he:
-            for t in traits:
-                if t in he:
-                    he_h2[t] = he[t]['h2']
+    # ── Save to CSV ────────────────────────────────────────────────────────
 
-        pv = "  ".join(f"{pheno_vars.get(t, float('nan')):8.4f}" for t in traits)
-        hv = "  ".join(f"{he_h2.get(t, float('nan')):8.4f}" for t in traits)
-        print(f"{gen:3d}  |  {pv}  |  {hv}")
+    df = pd.DataFrame(all_rows)
+    outpath = 'figure4_results.csv'
+    df.to_csv(outpath, index=False)
+    print(f"\nAll results saved to {outpath}")
 
-    print("=" * 90)
+    # ── Print averaged summary ─────────────────────────────────────────────
 
-    # HE genetic correlations
-    print("\nHE-estimated genetic correlations:")
-    for result in sim.results:
-        gen = result.generation
-        he = result.statistics.get('HasemanElstonEstimator')
-        if he is None or '_cov_g' not in he:
-            continue
-        cov_g = he['_cov_g']
-        d = np.sqrt(np.abs(np.diag(cov_g)))
-        d[d < 1e-15] = 1.0
-        rg = cov_g / np.outer(d, d)
-        he_keys = he['_keys']
-        pairs = []
-        for i in range(len(he_keys)):
-            for j in range(i + 1, len(he_keys)):
-                pairs.append(f"rg({he_keys[i]},{he_keys[j]})={rg[i,j]:.3f}")
-        print(f"  Gen {gen}: " + "  ".join(pairs))
+    print(f"\n{'='*100}")
+    print(f"FIGURE 4 RESULTS — AVERAGED OVER {n_runs} SEEDS")
+    print(f"{'='*100}")
 
-    print("\n" + "=" * 90)
+    print(f"\n--- Panel (b): Heritability estimates ---")
+    print(f"{'Gen':>3}  |  {'h2_HE_edu':>10} {'h2_HE_hgt':>10} {'h2_HE_wlt':>10}"
+          f"  |  {'h2_true_edu':>11} {'h2_true_hgt':>11} {'h2_true_wlt':>11}")
+    print("-" * 85)
+    for gen in sorted(df['generation'].unique()):
+        gdf = df[df['generation'] == gen]
+        he = "  ".join(f"{gdf[f'h2_HE_{t}'].mean():10.4f}" for t in traits)
+        tr = "  ".join(f"{gdf[f'h2_true_{t}'].mean():11.4f}" for t in traits)
+        print(f"{gen:3d}  |  {he}  |  {tr}")
+
+    print(f"\n--- Panel (c): PGI score correlations and HE rg ---")
+    for t1, t2 in trait_pairs:
+        print(f"\n  {t1}/{t2}:")
+        print(f"  {'Gen':>3}  {'r_score':>10}  {'rg_HE':>10}")
+        for gen in sorted(df['generation'].unique()):
+            gdf = df[df['generation'] == gen]
+            rs = gdf[f'r_score_{t1}_{t2}'].mean()
+            rg = gdf[f'rg_HE_{t1}_{t2}'].mean()
+            print(f"  {gen:3d}  {rs:10.4f}  {rg:10.4f}")
+
+    print(f"\n--- Panel (d): GWAS beta correlations ---")
+    for t1, t2 in trait_pairs:
+        print(f"\n  {t1}/{t2}:")
+        print(f"  {'Gen':>3}  {'r_beta':>10}")
+        for gen in sorted(df['generation'].unique()):
+            gdf = df[df['generation'] == gen]
+            rb = gdf[f'r_beta_{t1}_{t2}'].mean()
+            print(f"  {gen:3d}  {rb:10.4f}")
+
+    print(f"\n{'='*100}")
     print("Figure 4 target values (5 generations of xAM):")
     print("  Height: true h² 0.599 → 0.621   |  HE h² 0.599 → 0.686")
     print("  Edu:    true h² 0.010 → 0.005   |  HE h² 0.010 → 0.068")
     print("  Wealth: true h² 0.000 → 0.000   |  HE h² 0.000 → 0.036")
-    print()
-    print("NOTE: This simulation uses LinearAssortativeMating (single r={:.3f})".format(r_mean))
-    print("      instead of GeneralAssortativeMatingRegime (full cross-correlation")
-    print("      matrix). Results are qualitatively similar but not numerically")
-    print("      identical to the paper. A GeneralAssortativeMating implementation")
-    print("      in the new API would be needed for exact replication.")
+    print(f"\nNOTE: Uses LinearAssortativeMating (r={r_mean:.3f}) as approximation.")

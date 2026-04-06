@@ -18,6 +18,7 @@ Target values from Table S6 (generation 5):
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
 from xftsim.neffect import AdditiveEffects
@@ -192,40 +193,106 @@ def extract_results(sim):
 
 if __name__ == '__main__':
     scenarios = ['RM', 'RM+VT', '5xAM', '5xAM+VT']
-    all_results = {}
+    n_runs = 10
+
+    # {scenario: {gen: {'h2': [values], 'rg': [values], 'var': [values]}}}
+    aggregated = {s: {} for s in scenarios}
 
     for scenario in scenarios:
         print(f"\n{'='*70}")
-        print(f"Running: {scenario}")
+        print(f"Running: {scenario} ({n_runs} seeds)")
         print(f"{'='*70}")
-        sim = build_sim(scenario)
-        sim.run(n_generations=n_generations)
-        all_results[scenario] = extract_results(sim)
-        print(f"  Done. Final generation: {sim.generation}")
 
-    # ── Summary table ──────────────────────────────────────────────────────
+        for run in range(n_runs):
+            seed = run + 1
+            print(f"  Seed {seed}/{n_runs} ... ", end="", flush=True)
+            sim = build_sim(scenario, seed=seed)
+            sim.run(n_generations=n_generations)
+            rows = extract_results(sim)
+            print(f"done (gen {sim.generation})")
 
-    print(f"\n\n{'='*90}")
-    print("FIGURE 3 RESULTS SUMMARY")
-    print(f"{'='*90}")
-    print(f"{'Scenario':<15} {'Gen':>3}  |  {'Mean h²(HE)':>11}  {'Mean rg(HE)':>11}  {'Mean Var(Y)':>11}")
-    print(f"{'-'*65}")
+            for row in rows:
+                gen = row['gen']
+                if gen not in aggregated[scenario]:
+                    aggregated[scenario][gen] = {'h2': [], 'rg': [], 'var': []}
+                aggregated[scenario][gen]['h2'].append(row['mean_he_h2'])
+                aggregated[scenario][gen]['rg'].append(row['mean_he_rg'])
+                aggregated[scenario][gen]['var'].append(row['mean_pheno_var'])
+
+            del sim
+
+    # ── Summary table (averaged over seeds) ────────────────────────────────
+
+    print(f"\n\n{'='*100}")
+    print(f"FIGURE 3 RESULTS — AVERAGED OVER {n_runs} SEEDS")
+    print(f"{'='*100}")
+    print(f"{'Scenario':<15} {'Gen':>3}  |  {'Mean h²(HE)':>11} {'± SD':>8}  "
+          f"{'Mean rg(HE)':>11} {'± SD':>8}  {'Mean Var(Y)':>11}")
+    print(f"{'-'*85}")
 
     for scenario in scenarios:
-        for row in all_results[scenario]:
-            print(f"{scenario:<15} {row['gen']:3d}  |  "
-                  f"{row['mean_he_h2']:11.4f}  "
-                  f"{row['mean_he_rg']:11.4f}  "
-                  f"{row['mean_pheno_var']:11.4f}")
+        gens = sorted(aggregated[scenario].keys())
+        for gen in gens:
+            vals = aggregated[scenario][gen]
+            h2_arr = np.array(vals['h2'])
+            rg_arr = np.array(vals['rg'])
+            var_arr = np.array(vals['var'])
+            print(f"{scenario:<15} {gen:3d}  |  "
+                  f"{np.mean(h2_arr):11.4f} {np.std(h2_arr):8.4f}  "
+                  f"{np.mean(rg_arr):11.4f} {np.std(rg_arr):8.4f}  "
+                  f"{np.mean(var_arr):11.4f}")
         print()
 
     # ── Comparison with paper targets ──────────────────────────────────────
 
-    print(f"{'='*90}")
+    print(f"{'='*100}")
     print("Table S6 targets (generation 5):")
     print(f"  {'Scenario':<15} {'true h²':>8} {'est h²':>8} {'true rg':>8} {'est rg':>8}")
     print(f"  {'RM':<15} {'0.500':>8} {'0.500':>8} {'0.000':>8} {'0.000':>8}")
     print(f"  {'RM + VT':<15} {'0.442':>8} {'0.552':>8} {'0.000':>8} {'0.199':>8}")
     print(f"  {'5xAM':<15} {'0.535':>8} {'0.658':>8} {'0.132':>8} {'0.296':>8}")
     print(f"  {'5xAM + VT':<15} {'0.396':>8} {'0.749':>8} {'0.078':>8} {'0.513':>8}")
-    print(f"{'='*90}")
+    print(f"{'='*100}")
+
+    # ── Line graphs: all models on same plot ─────────────────────────────────
+
+    colors = {'RM': 'tab:blue', 'RM+VT': 'tab:orange',
+              '5xAM': 'tab:green', '5xAM+VT': 'tab:red'}
+
+    # h² plot
+    fig_h2, ax_h2 = plt.subplots(figsize=(8, 5))
+    for scenario in scenarios:
+        gens = np.array(sorted(aggregated[scenario].keys()))
+        h2_mean = np.array([np.mean(aggregated[scenario][g]['h2']) for g in gens])
+        h2_std = np.array([np.std(aggregated[scenario][g]['h2']) for g in gens])
+        ax_h2.plot(gens, h2_mean, 'o-', label=scenario, color=colors[scenario])
+        ax_h2.fill_between(gens, h2_mean - h2_std, h2_mean + h2_std,
+                           alpha=0.2, color=colors[scenario])
+    ax_h2.set_xlabel('Generation')
+    ax_h2.set_ylabel('h²(HE)')
+    ax_h2.set_title(f'HE-Estimated h² Across Generations (mean ± SD, n={n_runs})')
+    ax_h2.legend()
+    ax_h2.grid(True, alpha=0.3)
+    fig_h2.tight_layout()
+    fig_h2.savefig('figure3_h2.png', dpi=150)
+    print("\nPlot saved to figure3_h2.png")
+
+    # rg plot
+    fig_rg, ax_rg = plt.subplots(figsize=(8, 5))
+    for scenario in scenarios:
+        gens = np.array(sorted(aggregated[scenario].keys()))
+        rg_mean = np.array([np.mean(aggregated[scenario][g]['rg']) for g in gens])
+        rg_std = np.array([np.std(aggregated[scenario][g]['rg']) for g in gens])
+        ax_rg.plot(gens, rg_mean, 's-', label=scenario, color=colors[scenario])
+        ax_rg.fill_between(gens, rg_mean - rg_std, rg_mean + rg_std,
+                           alpha=0.2, color=colors[scenario])
+    ax_rg.set_xlabel('Generation')
+    ax_rg.set_ylabel('rg(HE)')
+    ax_rg.set_title(f'HE-Estimated rg Across Generations (mean ± SD, n={n_runs})')
+    ax_rg.legend()
+    ax_rg.grid(True, alpha=0.3)
+    fig_rg.tight_layout()
+    fig_rg.savefig('figure3_rg.png', dpi=150)
+    print("Plot saved to figure3_rg.png")
+
+    plt.show()
