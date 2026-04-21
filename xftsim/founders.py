@@ -8,6 +8,13 @@ import xarray as xr
 from nptyping import NDArray, Int8, Int64, Float64, Bool, Shape, Float, Int
 from typing import Any, Hashable, List, Iterable, Callable, Union, Dict
 from functools import cached_property
+import msprime
+import tskit
+import pygrgl
+import tempfile
+import subprocess
+from shutil import which
+import os
 
 import xftsim as xft
 
@@ -132,3 +139,130 @@ def founder_haplotypes_from_plink_bfile(path: str,
         plink bfile format doesn't track phase.
     """
     return xft.io.read_plink1_as_pseudohaplotypes(path, generation=generation)
+
+def founder_haplotypes_from_msprime_grg(
+    n: int,
+    sequence_length: int,
+    Ne: float = 10000,
+    recombination_rate: float = 1e-8,
+    mutation_rate: float = 1e-8,
+    generation: int = 0,
+    *,
+    binary_muts: bool = False,
+    use_node_times: bool = False,
+    no_simplify: bool = False,
+    maintain_topo: bool = False,
+    ts_coals: bool = False,
+) -> xft.struct.GraphHaplotypeOperator:
+    """
+    Generate founder haplotypes using msprime and return them as a GraphHaplotypeOperator.
+
+    This function simulates ancestry and mutations for a population of size `n`
+    over a sequence of length `sequence_length`, then converts the resulting
+    TreeSequence into a Genotype Representation Graph (GRG) via the grgl CLI.
+
+    Parameters
+    ----------
+    n : int
+        Number of diploid individuals to simulate.
+    sequence_length : int
+        The length of the genomic region to simulate (in base pairs).
+    Ne : float, optional
+        Effective population size. Default is 10000.
+    recombination_rate : float, optional
+        Recombination rate per base pair per generation. Default is 1e-8.
+    mutation_rate : float, optional
+        Mutation rate per base pair per generation. Default is 1e-8.
+    generation : int, optional
+        Generation number for the founders. Default is 0.
+    binary_muts : bool, optional
+        Flag to pass --binary-muts to grgl.
+    use_node_times : bool, optional
+        Flag to pass --ts-node-times to grgl.
+    no_simplify : bool, optional
+        Flag to pass --no-simplify to grgl.
+    maintain_topo : bool, optional
+        Flag to pass --maintain-topo to grgl.
+    ts_coals : bool, optional
+        Flag to pass --ts-coals to grgl to calculate diploid coalescence information.
+
+    Returns
+    -------
+    xft.struct.GraphHaplotypeOperator
+        The operator containing the simulated founder graph and metadata.
+    """
+    # Step 2: Simulate Ancestry and Mutations
+    ts = msprime.sim_ancestry(
+        samples=n,
+        sequence_length=sequence_length,
+        population_size=Ne,
+        recombination_rate=recombination_rate,
+    )
+    ts = msprime.sim_mutations(ts, rate=mutation_rate)
+
+    # Step 3: Convert TreeSequence to GRG (no VCF middleman)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        trees_path = os.path.join(tmpdir, "founders.trees")
+        grg_path = os.path.join(tmpdir, "founders.grg")
+
+        # Dump the msprime TreeSequence to a .trees file
+        ts.dump(trees_path)
+
+        # Find the GRGL binary ("grgl") installed with pygrgl
+        grg_bin = which("grg")
+        if grg_bin is None:
+            raise RuntimeError(
+                "Could not find 'grg' on PATH. "
+                "Make sure pygrgl is installed and the environment is activated."
+            )
+
+        # Build the same command that `grg convert <trees> <grg>` uses
+        cmd = [grg_bin, "convert", trees_path, grg_path]
+        if binary_muts:
+            cmd.append("--binary-muts")
+        if use_node_times:
+            cmd.append("--ts-node-times")
+        if no_simplify:
+            cmd.append("--no-simplify")
+        if maintain_topo:
+            cmd.append("--maintain-topo")
+        if ts_coals:
+            cmd.append("--ts-coals")
+
+        # Run GRGL to create the GRG file
+        subprocess.check_call(cmd)
+
+        # Load the GRG back into Python
+        grg = pygrgl.load_immutable_grg(grg_path)
+
+    # Step 4: Extract and Build Metadata
+    iids = np.array([f"ind_{i}" for i in range(ts.num_individuals)], dtype=str)
+    samples = xft.struct.SampleMeta(iid=iids, generation=generation)
+
+        # Align variants to GRG mutations (placeholder implementation)
+    num_grg_muts = grg.num_mutations  # this is an int attribute
+
+    # You can keep vid as ints:
+    vids = np.arange(num_grg_muts, dtype=int)
+
+    chroms = np.repeat("1", num_grg_muts)
+    pos_bp = np.arange(num_grg_muts, dtype=int)
+    pos_cM = pos_bp * recombination_rate * 100.0
+    zero_allele = np.repeat("0", num_grg_muts)
+    one_allele = np.repeat("1", num_grg_muts)
+
+    variants = xft.struct.VariantMeta(
+        vid=vids,
+        chrom=chroms,
+        pos_bp=pos_bp,
+        pos_cM=pos_cM,
+        zero_allele=zero_allele,
+        one_allele=one_allele,
+    )
+
+
+
+    # Step 5: Instantiate and Return
+    return xft.struct.GraphHaplotypeOperator(
+        grg=grg, generation=generation, samples=samples, variants=variants
+    )
