@@ -1,127 +1,166 @@
 """
-Wealth-Education-Height Joint Architecture Simulation
-(Reproducing Figure 4 from the xAM manuscript)
 
-Models three traits with distinct transmission channels:
-- Height: heritable (h²=0.60), no VT. Connects to other traits only via xAM.
-- Education: low heritability (h²=0.01), VT from parental edu AND parental wealth.
-- Wealth: NO genetic component. Pure vertical transmission from parental wealth.
+The architecture is built programmatically (bypassing the formula DSL) so
+that the parental-wealth lookup nodes are SHARED between edu.VT and
+wealth.VT. The formula DSL would create independent founder draws per
+mother()/father() call; legacy ey_sim.py stores parental wealth in a
+single column (input_cindex vert_input) that both edu.vert and wealth.vert
+read. Sharing here restores that behavior — the gen-0 founder draws for
+parental wealth are the same draws seen by both aggregations, so the
+expected gen-0 corr(edu.vert, wealth.vert) matches the paper.
 
-Parameters calibrated so that at generation 0:
-- Height: 60% genetic, 40% noise (total variance = 1.0)
-- Education: 1% genetic, 67% VT (from parental edu + wealth), 32% noise
-- Wealth: 67% VT (from parental wealth), 33% noise
+NOTE: The new nstats.HasemanElstonEstimator runs on the full sample (no
+RandomSiblingSubsampleFilter equivalent). ey_sim.py filters to a k=4000
+sibling subsample before HE; HE estimates here will be on the full
+unfiltered population, which under xAM slightly inflates HE h² vs. the
+paper values.
 """
 
 import numpy as np
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
 from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture
+from xftsim.narch import (
+    Architecture,
+    GeneticComponent,
+    NoiseComponent,
+    MotherComponent,
+    FatherComponent,
+    AggregationComponent,
+)
 from xftsim.nmate import GeneralAssortativeMating, BatchedMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.nsim import NSimulation
 from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
 
-# ── Parameters ──────────────────────────────────────────────────────────────
+# ── Parameters (matched to ey_sim.py) ──────────────────────────────────────
 
-n_individuals = 8000
-n_loci = 1000
+n_individuals = 20_000
+n_loci = 1_000
+n_generations = 6           # gens 0..5  ⇒  "after 5 generations of xAM"
 
-# Heritabilities (only height and edu have genetic components)
 h2_height = 0.60
 h2_edu = 0.01
 
-# VT coefficients (per-parent)
+# VT coefficients from the paper's transmission matrix
+CC = np.sqrt(1.0 / 3.0)
+AA = np.sqrt(2.0 / 3.0)
+vt_edu_from_edu    = CC * np.sqrt(0.5)      # ≈ 0.4082
+vt_edu_from_wealth = CC * np.sqrt(0.5)      # ≈ 0.4082
+vt_wealth_from_wealth = AA * np.sqrt(0.5)   # ≈ 0.5774
 
-vt_edu_founder_var = 0.20
-vt_wlth_founder_var = 0.15
+# Founder variance for VT sources (ey_sim.py: founder_variances = [1,1,1,1])
+vt_founder_var = 1.0
 
-vt_edu_self = 0.22    # parent edu    → offspring edu
-vt_wlth_edu = 0.18    # parent wealth → offspring edu  (cross-trait)
-vt_wlth_self = 0.20   # parent wealth → offspring wealth
-
-# Residual (environmental noise) variances
-# Chosen so gen-0 total variance is close to 1.0
-# height: h2=0.60 + noise=0.40 = 1.0
-# edu:    h2=0.01 + VT + noise ≈ 1.0
-# wealth: VT + noise ≈ 1.0
+# Residual noise variances (ey_sim.py: [1/3 - H2, 0.4, 1/3])
+var_edu = 1.0 / 3.0 - h2_edu
 var_height = 0.40
-var_edu = 0.79
-var_wealth = 0.88
+var_wealth = 1.0 / 3.0
 
-# ── Founder haplotypes ─────────────────────────────────────────────────────
+# Recombination probability (ey_sim.py: p = 50/m)
+p_recomb = 50.0 / n_loci
+
+# ── Founders and genetic effects ───────────────────────────────────────────
 
 founder_haplotypes = founder_haplotypes_uniform_AFs(n=n_individuals, m=n_loci)
-
-# ── Genetic effects (height and edu only — wealth has none) ────────────────
 
 height_eff = AdditiveEffects.from_h2(h2=h2_height, m=n_loci, seed=1)
 edu_eff = AdditiveEffects.from_h2(h2=h2_edu, m=n_loci, seed=2)
 
-# ── Architecture (formula DSL) ─────────────────────────────────────────────
+# ── Architecture (programmatic, with shared parental-wealth lookups) ───────
 
-formula = f"""
+arch = Architecture()
 
-height.G ~ genetic(height_eff)
-height.E ~ noise({var_height})
-height ~ height.G + height.E
+# Genetic components (only height and edu have additive genetic effects)
+arch.add('height.G', GeneticComponent(height_eff))
+arch.add('edu.G', GeneticComponent(edu_eff))
 
-edu.G ~ genetic(edu_eff)
-edu.E ~ noise({var_edu})
-edu.VT_edu_m ~ mother(edu, founder=noise({vt_edu_founder_var}))
-edu.VT_edu_f ~ father(edu, founder=noise({vt_edu_founder_var}))
-edu.VT_wlth_m ~ mother(wealth, founder=noise({vt_wlth_founder_var}))
-edu.VT_wlth_f ~ father(wealth, founder=noise({vt_wlth_founder_var}))
-edu.VT ~ {vt_edu_self} * edu.VT_edu_m + {vt_edu_self} * edu.VT_edu_f + {vt_wlth_edu} * edu.VT_wlth_m + {vt_wlth_edu} * edu.VT_wlth_f
-edu ~ edu.G + edu.E + edu.VT
+# Residual noise
+arch.add('height.E', NoiseComponent(var_height))
+arch.add('edu.E', NoiseComponent(var_edu))
+arch.add('wealth.E', NoiseComponent(var_wealth))
 
-wealth.E ~ noise({var_wealth})
-wealth.VT_m ~ mother(wealth, founder=noise({vt_wlth_founder_var}))
-wealth.VT_f ~ father(wealth, founder=noise({vt_wlth_founder_var}))
-wealth.VT ~ {vt_wlth_self} * wealth.VT_m + {vt_wlth_self} * wealth.VT_f
-wealth ~ wealth.E + wealth.VT
-"""
+# SHARED parental-wealth lookups — computed ONCE per generation,
+# referenced by both edu.VT (cross-trait term) and wealth.VT.
+# Matches legacy LinearVerticalComponent behavior where parental
+# wealth lives in a single stored column that both outputs read.
+arch.add('wealth.VT_m', MotherComponent(
+    'wealth',
+    founder_component=NoiseComponent(vt_founder_var),
+    normalize=True,
+))
+arch.add('wealth.VT_f', FatherComponent(
+    'wealth',
+    founder_component=NoiseComponent(vt_founder_var),
+    normalize=True,
+))
 
-effects = {
-    'height_eff': height_eff,
-    'edu_eff': edu_eff,
-}
-arch = Architecture(formula=formula, effects=effects)
+# Parental-edu lookups (used only by edu.VT — no sharing needed)
+arch.add('edu.VT_m', MotherComponent(
+    'edu',
+    founder_component=NoiseComponent(vt_founder_var),
+    normalize=True,
+))
+arch.add('edu.VT_f', FatherComponent(
+    'edu',
+    founder_component=NoiseComponent(vt_founder_var),
+    normalize=True,
+))
 
+# edu.VT = CC·√0.5 × (edu.VT_m + edu.VT_f + wealth.VT_m + wealth.VT_f)
+arch.add('edu.VT', AggregationComponent(
+    f'{vt_edu_from_edu} * edu.VT_m + {vt_edu_from_edu} * edu.VT_f + '
+    f'{vt_edu_from_wealth} * wealth.VT_m + {vt_edu_from_wealth} * wealth.VT_f'
+))
 
-rmap = RecombinationMap(p=0.5, m=n_loci)
+# wealth.VT = AA·√0.5 × (wealth.VT_m + wealth.VT_f)  — reads the SAME
+# two nodes as edu.VT, so gen-0 founder draws are shared.
+arch.add('wealth.VT', AggregationComponent(
+    f'{vt_wealth_from_wealth} * wealth.VT_m + {vt_wealth_from_wealth} * wealth.VT_f'
+))
 
-# Cross-mate correlation matrix from the manuscript (Figure 4)
-# Rows/cols: [height, edu, wealth]
+# Final trait phenotypes
+arch.add('height', AggregationComponent('height.G + height.E'))
+arch.add('edu',    AggregationComponent('edu.G + edu.E + edu.VT'))
+arch.add('wealth', AggregationComponent('wealth.E + wealth.VT'))
+
+# ── Recombination and mating ───────────────────────────────────────────────
+
+rmap = RecombinationMap(p=p_recomb, m=n_loci)
+
+# Cross-mate correlation matrix from ey_sim.py (xmatecorr), indexed as
+# [edu, height, wealth]. Keeping that ordering here.
 cross_corr = np.array([
-    [0.246, 0.192, 0.252],
-    [0.192, 0.125, 0.183],
-    [0.252, 0.183, 0.251],
+    [0.24626319, 0.19158510, 0.25215290],   # edu    × {edu, height, wealth}
+    [0.19158510, 0.12472120, 0.18323772],   # height × {edu, height, wealth}
+    [0.25215290, 0.18323772, 0.25072489],   # wealth × {edu, height, wealth}
 ])
 
 mating = BatchedMating(
     regime=GeneralAssortativeMating(
-        component_names=['height', 'edu', 'wealth'],
+        component_names=['edu', 'height', 'wealth'],
         cross_corr=cross_corr,
         offspring_per_pair=2,
         solver_params=dict(
-            time_limit=30,
-            termination_interval=5,
+            nb_threads=8,
+            time_limit=10,
             tolerance=1e-3,
+            time_between_displays=5,
+            termination_interval=5,
         ),
     ),
-    max_batch_size=1000,
+    max_batch_size=250,
 )
 
+# ── Simulation ─────────────────────────────────────────────────────────────
 
 sim = NSimulation(
     founder_haplotypes=founder_haplotypes,
     architecture=arch,
     mating_regime=mating,
     recombination_map=rmap,
-    retain_haplotypes=1,
-    retain_phenotypes=2,
+    retain_haplotypes=n_generations + 1,
+    retain_phenotypes=n_generations + 1,
     statistics=[
         SampleStatistics(),
         HasemanElstonEstimator(phenotype_keys=['height', 'edu', 'wealth']),
@@ -129,24 +168,60 @@ sim = NSimulation(
     seed=42,
 )
 
-n_generations = 6
 sim.run(n_generations=n_generations)
 print(f"Simulation complete. Final generation: {sim.generation}\n")
+
+# ── Post-hoc sibship-free HE on one-per-family subsample ──────────────────
+
+def he_h2_unrelated(hap, pheno, keys):
+    """Run GRM-based HE on one individual per FID.
+
+    Mirrors HasemanElstonEstimator but first subsets to unrelated
+    individuals (one per family) to remove VT-induced family
+    relatedness that would otherwise inflate HE h² under xAM —
+    matches ey_sim.py's RandomSiblingSubsampleFilter + HE pipeline.
+    """
+    fids = hap.samples.fid
+    _, first_idx = np.unique(fids, return_index=True)
+    keep = np.sort(first_idx)
+    hap_sub = hap.subset(sample_idx=keep)
+
+    G = hap_sub.to_diploid_standardized(scale=True).astype(np.float64)
+    n, m = G.shape
+
+    Y = np.column_stack([pheno[k][keep] for k in keys]).astype(np.float64)
+    Y = (Y - Y.mean(0)) / np.where(Y.std(0) < 1e-15, 1.0, Y.std(0))
+
+    GtY = G.T @ Y
+    KY = G @ GtY / m
+    GtG = G.T @ G
+    trK2 = float(np.sum(GtG ** 2) / (m * m))
+    denom = trK2 - n
+    if abs(denom) < 1e-15:
+        return {k: float('nan') for k in keys}
+    cov_g = Y.T @ (KY - Y) / denom
+    return {k: float(cov_g[i, i]) for i, k in enumerate(keys)}
+
 
 # ── Results: True variance components + HE-estimated h² ───────────────────
 
 traits = ['height', 'edu', 'wealth']
+genetic_traits = ['height', 'edu']
 
-print("=" * 90)
-print(f"{'Gen':>3}  |  {'--- Phenotypic Variance ---':^30}  |  {'--- HE-Estimated h² ---':^30}")
-print(f"{'':>3}  |  {'height':>8}  {'edu':>8}  {'wealth':>8}  |  {'height':>8}  {'edu':>8}  {'wealth':>8}")
-print("-" * 90)
+print("=" * 138)
+print(f"{'Gen':>3}  |  {'--- Phenotypic Variance ---':^30}  |  "
+      f"{'--- True h² ---':^30}  |  {'--- HE h² (full) ---':^30}  |  "
+      f"{'--- HE h² (1/family) ---':^30}")
+print(f"{'':>3}  |  {'height':>8}  {'edu':>8}  {'wealth':>8}  |  "
+      f"{'height':>8}  {'edu':>8}  {'wealth':>8}  |  "
+      f"{'height':>8}  {'edu':>8}  {'wealth':>8}  |  "
+      f"{'height':>8}  {'edu':>8}  {'wealth':>8}")
+print("-" * 138)
 
 for result in sim.results:
     stats = result.statistics
     gen = result.generation
 
-    # Phenotypic variances from SampleStatistics
     ss = stats.get('SampleStatistics')
     pheno_vars = {}
     if ss:
@@ -156,7 +231,16 @@ for result in sim.results:
             if t in keys:
                 pheno_vars[t] = var[keys.index(t)]
 
-    # HE-estimated h² from HasemanElstonEstimator
+    pheno = sim.phenotype_history.get(gen)
+    true_h2 = {}
+    if pheno is not None:
+        for t in traits:
+            var_tot = np.var(pheno[t])
+            if t in genetic_traits and var_tot > 0:
+                true_h2[t] = float(np.var(pheno[f'{t}.G']) / var_tot)
+            else:
+                true_h2[t] = 0.0
+
     he = stats.get('HasemanElstonEstimator')
     he_h2 = {}
     if he:
@@ -164,13 +248,18 @@ for result in sim.results:
             if t in he:
                 he_h2[t] = he[t]['h2']
 
+    hap = sim.haplotype_history.get(gen)
+    he_unrel = {}
+    if hap is not None and pheno is not None:
+        he_unrel = he_h2_unrelated(hap, pheno, traits)
+
     pv = "  ".join(f"{pheno_vars.get(t, float('nan')):8.4f}" for t in traits)
-    hv = "  ".join(f"{he_h2.get(t, float('nan')):8.4f}" for t in traits)
-    print(f"{gen:3d}  |  {pv}  |  {hv}")
+    tv = "  ".join(f"{true_h2.get(t, float('nan')):8.4f}"  for t in traits)
+    hv = "  ".join(f"{he_h2.get(t, float('nan')):8.4f}"    for t in traits)
+    hu = "  ".join(f"{he_unrel.get(t, float('nan')):8.4f}" for t in traits)
+    print(f"{gen:3d}  |  {pv}  |  {tv}  |  {hv}  |  {hu}")
 
-print("=" * 90)
-
-# ── Summary comparison with Figure 4 ──────────────────────────────────────
+print("=" * 138)
 
 print("\nFigure 4 comparison (paper values after 5 generations of xAM):")
 print("  Height true h²: 0.599 → 0.621   |  HE-estimated h²: 0.599 → 0.686")

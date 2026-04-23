@@ -30,8 +30,8 @@ from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
 
 # ── Parameters ──────────────────────────────────────────────────────────────
 
-n_individuals = 8000
-n_loci = 2000
+n_individuals = 32000
+n_loci = 4000
 n_generations = 6
 K = 5  # number of traits
 
@@ -92,8 +92,8 @@ def build_sim(scenario, seed=42):
     if use_vt:
         # First, define all mother/father VT source components
         for src in trait_names:
-            lines.append(f'{src}.VTsrc_m ~ mother({src}, founder=noise({vt_founder_var}))')
-            lines.append(f'{src}.VTsrc_f ~ father({src}, founder=noise({vt_founder_var}))')
+            lines.append(f'{src}.VTsrc_m ~ mother({src}, normalize=True,  founder=noise({vt_founder_var}))')
+            lines.append(f'{src}.VTsrc_f ~ father({src}, normalize=True, founder=noise({vt_founder_var}))')
         lines.append('')
 
     for i, name in enumerate(trait_names):
