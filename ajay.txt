@@ -1,0 +1,600 @@
+
+ ▐▛███▜▌   Claude Code v2.1.34
+▝▜█████▛▘  Opus 4.6 · Claude Max
+  ▘▘ ▝▝    ~/Dropbox/xftsim
+
+✻ Conversation compacted (ctrl+o for history)
+
+  ⎿  Referenced file 
+     ../../../../tmp/claude-1000/-home-rsb-Dropbox-xftsim/tasks/a0b9cfb.output
+  ⎿  Read xftsim/__init__.py (77 lines)
+  ⎿  Referenced file docs/plans/devnotes/2026-02-08.md
+  ⎿  Read tests/test_demos.py (102 lines)
+  ⎿  Read xftsim/sim.py (3 lines)
+
+● Task "Find remaining test gaps" completed in background
+
+● Task "Find more test coverage gaps" completed in background
+
+● Task "Write parser sibling tests" completed in background
+
+● Task "Write extract_grouping tests" completed in background
+
+● Task "Write variance partitioning test" completed in background
+
+● Task "Write DenseHaplotypeArray af tests" completed in background
+
+● Task "Write meiosis edge case tests" completed in background
+
+● Task "Write nsim internals tests" completed in background
+
+● Task "Write assortative score detail tests" completed in background
+
+● Task "Write checkpoint resume equivalence" completed in background
+
+● Task "Write SibPairFilter vectorized tests" completed in background
+
+● Task "Write DenseHaplotypeArray matvec tests" completed in background
+
+● Task "Write neffect roundtrip edge tests" completed in background
+
+● Task "Write architecture repr + edge tests" completed in background
+
+● Task "Write multi-gen drift numerical test" completed in background
+
+● Task "Write IO error edge case tests" completed in background
+
+● Task "Write formula parser advanced tests" completed in background
+
+● Task "Write SampleMeta/VariantMeta tests" completed in background
+
+● Task "Implement HE + statistics" completed in background
+
+● Task "Implement ascertainment filters" completed in background
+
+● Task "Create example notebooks" completed in background
+
+● Task "Clean up legacy modules" completed in background
+  ⎿  Skills restored (keybindings-help)
+
+● Let me check the status of the remaining background agents.
+
+● Task Output(non-blocking) ab29b43
+  ⎿  Read output (ctrl+o to expand)
+
+● Task Output(non-blocking) ab8f495
+  ⎿  Read output (ctrl+o to expand)
+
+● Task Output(non-blocking) a0b9cfb
+  ⎿  Read output (ctrl+o to expand)
+
+● All 4 background agents have completed successfully. Here's the status:
+  Agent: ab29b43
+  Task: HE + statistics
+  Status: Done
+  Result: 3 new estimators (HasemanElston, POR, MatingStatistics) + 51 tests
+    passing
+  ────────────────────────────────────────
+  Agent: aad7c94
+  Task: Ascertainment filters
+  Status: Done
+  Result: 3 new filters (Unrelated, Ascertainment, Subsample) + 65 tests passing
+  ────────────────────────────────────────
+  Agent: ab8f495
+  Task: Example notebooks
+  Status: Done
+  Result: 3 notebooks (simple sim, bivariate assortative, vertical transmission)
+  ────────────────────────────────────────
+  Agent: a0b9cfb
+  Task: Legacy cleanup
+  Status: Done
+  Result: 9 modules moved to xftsim/legacy/, shims in place, 3182 tests passing
+  Now let me run the full test suite to make sure everything integrates cleanly,
+   then commit and push.
+
+● Bash(python -m pytest --tb=short -q 2>&1)
+  ⎿ ============================= test session starts =====================
+    =========
+    platform linux -- Python 3.12.7, pytest-9.0.2, pluggy-1.5.0
+    … +558 lines (ctrl+o to expand)
+
+  ⎿  (timeout 5m)
+
+❯ whats up with the -7k lines i see in the status, that makes me a little   
+  nervous                                                                   
+
+● 3182 passed, 0 failed. Everything integrates cleanly.
+
+  Let me address your concern about the -7k lines. Let me check what's going on.
+
+● Bash(git diff --stat 2>&1)
+  ⎿  xftsim/__init__.py |   21 +-
+     xftsim/arch.py     | 1788 +-------------------------------------------
+    --------
+    … +11 lines (ctrl+o to expand)
+
+
+● Bash(git diff --stat -- xftsim/legacy/ 2>&1; echo "---"; ls -la xftsim/legacy/
+       2>&1)
+  ⎿  ---
+     total 292
+     drwxrwxr-x 3 rsb rsb  4096 Feb  8 17:45 .
+     … +12 lines (ctrl+o to expand)
+
+● That's what I expected — nothing was deleted. The -7k lines is because the
+  legacy cleanup agent moved the code from the original files into
+  xftsim/legacy/. The original files (arch.py, sim.py, mate.py, effect.py, etc.)
+   were replaced with 2-line shims like:
+
+  """Shim: re-exports legacy arch module from xftsim.legacy.arch."""
+  from xftsim.legacy.arch import *  # noqa: F401,F403
+
+  The xftsim/legacy/ directory is untracked (new), so git shows the deletions
+  from the original files but doesn't count the additions in the new directory
+  yet. When we git add the legacy directory, it'll be a net-zero move. Let me
+  show you:
+
+● Read 1 file (ctrl+o to expand)
+
+● ~6901 lines moved to xftsim/legacy/, ~6894 lines removed from originals. Net:
+  basically zero. All the code is preserved, just relocated. The shims ensure
+  xft.arch, xft.sim, xft.mate etc. still work identically — all 3182 tests pass
+  including test_legacy_compat.py.
+
+  Now let me commit everything. Let me check the full picture first.
+
+● Bash(git status -u 2>&1)
+  ⎿  On branch ajay
+     Your branch is up to date with 'origin/ajay'.
+     … +36 lines (ctrl+o to expand)
+
+● Bash(git log --oneline -5 2>&1)
+  ⎿ aa80928 Fix all 15 demo test failures: rewrite DemoSimulation to use ne
+    w NSimulation system
+    16a7f18 Add advanced architecture, parser, IO, metadata, effects, drift
+    … +7 lines (ctrl+o to expand)
+
+
+
+● Bash(git add xftsim/__init__.py xftsim/arch.py xftsim/data.py xftsim/effect.py
+       xftsim/filters.py xftsim/index.py xftsim/mate.py xftsim/nfilter.py
+      xftsim/nstats.py xf…)
+  ⎿  (No content)
+
+● Bash(git diff --stat --cached 2>&1)
+  ⎿   docs/examples/01_simple_simulation.ipynb     |  373 ++++++
+      docs/examples/02_bivariate_assortative.ipynb |  428 ++++++
+      docs/examples/03_vertical_transmission.ipynb |  496 +++++++
+     … +30 lines (ctrl+o to expand)
+
+● Good — now you can see the full picture: +10,160 / -6,894. The legacy code is
+  a net-zero move (~6.9k lines relocated), and the real new additions are:
+
+  - +421 lines in nstats.py + nfilter.py (HE estimator, POR, MatingStatistics,
+  ascertainment filters)
+  - +1,511 lines in tests (3 test files)
+  - +1,297 lines in notebooks (3 examples)
+
+  Now let me update devnotes and commit.
+
+● Read 1 file (ctrl+o to expand)
+
+● Update(docs/plans/devnotes/2026-02-08.md)
+  ⎿  Added 16 lines, removed 4 lines
+      205    - Fixed `AdditiveEffects.__init__` AF shape handling for Dip
+           loidVariantIndex
+      206    - Fixed `XftIndex.coords` to use `np.asarray()` for pandas 2
+           .x ArrowStringArray compat
+      207    - Set `_sample_indexer` in `RandomMatingRegime.mate()` for o
+           ld mating system
+      208 +- Commit: `aa80928`
+      209 +
+      210 +### Batch 29: Feature completion — statistics, filters, notebo
+          +oks, legacy cleanup (116 new tests → 3182)
+      211 +- **HE + statistics** (nstats.py): Added `HasemanElstonEstimat
+          +or`, `ParentOffspringRegression`, `MatingStatistics`
+      212 +  - 35 unit tests (`test_nstats_advanced.py`) + 16 numerical t
+          +ests (`test_he_estimation.py`)
+      213 +- **Ascertainment filters** (nfilter.py): Added `UnrelatedFilt
+          +er`, `AscertainmentFilter`, `SubsampleFilter`
+      214 +  - 65 unit tests (`test_ascertainment_filters.py`)
+      215 +- **Example notebooks** (docs/examples/): 3 Jupyter notebooks
+      216 +  - `01_simple_simulation.ipynb` — univariate getting started
+      217 +  - `02_bivariate_assortative.ipynb` — multivariate traits wit
+          +h assortative mating
+      218 +  - `03_vertical_transmission.ipynb` — VT and trio analysis
+      219 +- **Legacy cleanup**: Moved 9 legacy modules (arch, sim, mate,
+          + effect, filters, stats, index, proc, data) to `xftsim/legacy/
+          +`, replaced originals with 2-line shim re-exports
+      220  - Commit: (this batch)
+      221 
+      222  ## Totals
+      223  - **Session start (all continuation sessions combined)**: 2439
+            tests
+      212 -- **Current**: 3066 tests                                     
+      213 -- **New tests this session**: 627+                            
+      214 -- **New test files**: 34+                                     
+      215 -- **All passing**: yes (3066/3066)                            
+      224 +- **Current**: 3182 tests
+      225 +- **New tests this session**: 743+
+      226 +- **New test files**: 37+
+      227 +- **All passing**: yes (3182/3182)
+      228 
+      229  ## Notable Fixes During Testing (original session)
+      230  - `offspring_per_pair=1` creates all-female offspring (design
+           behavior, not bug) — adjusted test
+
+● Bash(git add docs/plans/devnotes/2026-02-08.md && git commit -m "Add
+      HE/POR/MatingStatistics, ascertainment filters, example notebooks, legacy
+      cleanup (Batch 29, 116…)
+  ⎿ [ajay 7ea0f6f] Add HE/POR/MatingStatistics, ascertainment filters, exam
+    ple notebooks, legacy cleanup (Batch 29, 116 tests → 3182)
+     29 files changed, 10176 insertions(+), 6898 deletions(-)
+    … +17 lines (ctrl+o to expand)
+
+
+● Bash(git push origin ajay 2>&1)
+  ⎿  To github.com:border-lab/xftsim.git
+        aa80928..7ea0f6f  ajay -> ajay
+
+● Now let me update the memory file to reflect the current state.
+
+● Recalled 1 memory, wrote 2 memories (ctrl+o to expand)
+
+● All done. Here's the summary:
+
+  Committed and pushed as 7ea0f6f on ajay. Everything from the 4 parallel agents
+   is integrated:
+
+  1. HE + statistics — HasemanElstonEstimator, ParentOffspringRegression,
+  MatingStatistics in nstats.py (51 tests)
+  2. Ascertainment filters — UnrelatedFilter, AscertainmentFilter,
+  SubsampleFilter in nfilter.py (65 tests)
+  3. Example notebooks — 3 notebooks in docs/examples/ (simple sim, bivariate
+  assortative, vertical transmission)
+  4. Legacy cleanup — 9 modules moved to xftsim/legacy/, originals replaced with
+   2-line shim re-exports
+
+  3182 tests passing, 0 failures. The -7k lines you noticed is just the legacy
+  code moving from the original files into xftsim/legacy/ — net-zero relocation,
+   all functionality preserved via the shims.
+
+✻ Worked for 5m 25s
+
+● Agent "Implement ascertainment filters" completed
+
+● Already integrated — that was part of the commit 7ea0f6f that just went up.
+  All 65 ascertainment filter tests included.
+
+● Agent "Create example notebooks" completed
+
+● Already integrated — all 3 notebooks were included in commit 7ea0f6f.
+
+● Agent "Implement HE + statistics" completed
+
+● Already integrated — all 51 HE/POR/MatingStatistics tests included in commit
+  7ea0f6f.
+
+● Agent "Clean up legacy modules" completed
+
+● Already integrated — legacy cleanup included in commit 7ea0f6f. All 4 agents'
+  work is committed and pushed.
+
+❯ okay where are we now 
+
+● Here's the current state of the xftsim refactor on the ajay branch:
+
+  What's Done (Everything)
+  Area: Core abstractions (SampleMeta, VariantMeta, HaplotypeOperator,
+    PhenotypeArray, PedigreeArray)
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Simulation loop (NSimulation)
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Formula DSL + parser
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Multi-trait, VT, grouping, sibling components
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Assortative mating
+  Status: Complete
+  ────────────────────────────────────────
+  Area: GRG integration
+  Status: Complete
+  ────────────────────────────────────────
+  Area: I/O (effects, architecture, checkpoints)
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Statistics (SampleStatistics, HE, POR, MatingStatistics)
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Filters (Trio, SibPair, Unrelated, Ascertainment, Subsample)
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Example notebooks (3)
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Legacy cleanup (9 modules → xftsim/legacy/)
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Demo tests fixed
+  Status: Complete
+  ────────────────────────────────────────
+  Area: Tests
+  Status: 3182 passing, 0 failing
+  What Could Still Be Done (from the earlier brainstorm)
+
+  Tier 2 — Moderate effort:
+  - GWAS/PGS module (summary statistics, polygenic scores)
+  - API docs / docstring audit
+  - Performance benchmarks
+
+  Tier 3 — Lower priority / larger scope:
+  - n-prefix naming consolidation (rename narch→arch, nsim→sim, etc.)
+  - CLI interface
+  - Sparse I/O formats
+  - Continuous integration setup
+
+  The core refactor is functionally complete. Everything from the original
+  brainstorm list that was feasible in a session is done. The remaining items
+  are either new feature work (GWAS/PGS), polish (docs, naming), or
+  infrastructure (CI, CLI).
+
+❯ lets do all of tier 2 + CLI. we'll want a moder cli with color and        
+  progress bar but also an option for plainer output when logged to stdout  
+  to file on a slurm cluster eg                                             
+
+● Let me plan the CLI a bit before launching everything. Let me check what's
+  available.
+
+● Bash(python -c "import click; print('click', click.__version__)" 2>&1; python
+      -c "import typer; print('typer', typer.__version__)" 2>&1; python -c
+      "import rich; prin…)
+  ⎿ <string>:1: DeprecationWarning: The '__version__' attribute is deprecat
+    ed and will be removed in Click 9.1. Use feature detection or 'importli
+    b.metadata.version("click")' instead.
+    … +6 lines (ctrl+o to expand)
+
+
+
+● Bash(cat /home/rsb/Dropbox/xftsim/pyproject.toml 2>/dev/null | head -60; echo
+      "---"; cat /home/rsb/Dropbox/xftsim/setup.py 2>/dev/null | head -40)
+  ⎿  ---
+     from setuptools import setup, find_packages
+     … +31 lines (ctrl+o to expand)
+
+● Good — click, typer, and rich are all available. Now launching all 4 tasks in
+  parallel.
+
+● 4 Task agents launched (ctrl+o to expand)
+   ├─ Implement GWAS/PGS module
+   │  ⎿  Running in the background (shift+↑ to manage)
+   ├─ Build CLI with rich output
+   │  ⎿  Running in the background (shift+↑ to manage)
+   ├─ Create performance benchmarks
+   │  ⎿  Running in the background (shift+↑ to manage)
+   └─ Audit and add docstrings
+      ⎿  Running in the background (shift+↑ to manage)
+
+● All 4 agents are making good progress:
+  ┌─────────┬────────────────────────────┬────────┬────────────┬─────────┐
+  │  Agent  │            Task            │ Tokens │ Tool calls │ Status  │
+  ├─────────┼────────────────────────────┼────────┼────────────┼─────────┤
+  │ a475ffa │ GWAS/PGS module            │ 55k    │ 29         │ Running │
+  ├─────────┼────────────────────────────┼────────┼────────────┼─────────┤
+  │ ab9beba │ CLI with rich/plain output │ 78k    │ 17         │ Running │
+  ├─────────┼────────────────────────────┼────────┼────────────┼─────────┤
+  │ aa53acc │ Performance benchmarks     │ 48k    │ 12         │ Running │
+  ├─────────┼────────────────────────────┼────────┼────────────┼─────────┤
+  │ ad5cf81 │ Docstring audit            │ —      │ —          │ Running │
+  └─────────┴────────────────────────────┴────────┴────────────┴─────────┘
+  I'll let you know as they complete. They're all independent so no conflict
+  risk.
+
+✻ Worked for 1m 42s
+
+● Agent "Create performance benchmarks" completed
+
+● Benchmarks done. Key takeaway: simulation loop is fast (0.5s for 5k
+  individuals x 2k variants x 5 generations), I/O is the bottleneck at large
+  scale due to compressed npz writes.
+
+  3 agents still running (GWAS/PGS, CLI, docstrings).
+
+● Agent "Implement GWAS/PGS module" completed
+
+● GWAS/PGS module done — 32 tests passing. Vectorized GWAS (no per-variant
+  loops), PGS with raw/standardized modes and dict-based weight lookup.
+
+  2 agents still running (CLI, docstrings).
+
+● Agent "Build CLI with rich output" completed
+
+● CLI done — 41 tests passing. 4 commands (run, resume, info, demo), auto TTY
+  detection with --plain/--rich flags, YAML/JSON config parsing.
+
+  1 agent still running (docstrings). Let me check on it.
+
+● Task Output(non-blocking) ad5cf81
+  ⎿  Task is still running…
+
+● Docstring agent is still working — it's made it through nsim, narch, neffect,
+  nmate and is now on io.py. Should finish soon.
+
+● Agent "Audit and add docstrings" completed
+
+● All 4 agents done. Let me run the full test suite to verify everything
+  integrates, then commit and push.
+
+● Bash(python -m pytest --tb=short -q 2>&1)
+  ⎿ ============================= test session starts =====================
+    =========
+    platform linux -- Python 3.12.7, pytest-9.0.2, pluggy-1.5.0
+    … +586 lines (ctrl+o to expand)
+
+  ⎿  (timeout 5m)
+
+● 3255 passed, 0 failed. Now let me commit and push.
+
+● Bash(git status -u --short 2>&1)
+  ⎿   M xftsim/__init__.py
+      M xftsim/io.py
+      M xftsim/narch.py
+     … +13 lines (ctrl+o to expand)
+
+● Bash(git log --oneline -3 2>&1)
+  ⎿ 7ea0f6f Add HE/POR/MatingStatistics, ascertainment filters, example not
+    ebooks, legacy cleanup (Batch 29, 116 tests → 3182)
+    aa80928 Fix all 15 demo test failures: rewrite DemoSimulation to use ne
+    … +3 lines (ctrl+o to expand)
+
+
+
+● Bash(git add xftsim/__init__.py xftsim/io.py xftsim/narch.py xftsim/neffect.py
+       xftsim/nfilter.py xftsim/nmate.py xftsim/nsim.py xftsim/nstats.py
+      xftsim/struct.py xft…)
+  ⎿  (No content)
+
+● Now update devnotes and commit.
+
+● Read 1 file (ctrl+o to expand)
+
+● Update(docs/plans/devnotes/2026-02-08.md)
+  ⎿  Added 15 lines, removed 4 lines
+      217    - `02_bivariate_assortative.ipynb` — multivariate traits wit
+           h assortative mating
+      218    - `03_vertical_transmission.ipynb` — VT and trio analysis
+      219  - **Legacy cleanup**: Moved 9 legacy modules (arch, sim, mate,
+            effect, filters, stats, index, proc, data) to `xftsim/legacy/
+           `, replaced originals with 2-line shim re-exports
+      220 +- Commit: `7ea0f6f`
+      221 +
+      222 +### Batch 30: GWAS/PGS, CLI, benchmarks, docstrings (73 new te
+          +sts → 3255)
+      223 +- **GWAS/PGS module** (ngwas.py): Vectorized GWAS (beta/SE/t/p
+          + per variant), PGS (raw/standardized scoring)
+      224 +  - 23 unit tests (`test_ngwas.py`) + 9 numerical tests (`test
+          +_gwas_numerical.py`)
+      225 +- **CLI** (cli.py): `typer`+`rich` CLI with `run`, `resume`, `
+          +info`, `demo` commands
+      226 +  - Auto TTY detection, `--plain`/`--rich`/`--quiet`/`--verbos
+          +e` flags
+      227 +  - YAML/JSON config → NSimulation via `build_simulation_from_
+          +config()`
+      228 +  - 41 unit tests (`test_cli.py`)
+      229 +- **Performance benchmarks** (benchmarks/bench_core.py): Timin
+          +g suite for founders, meiosis, matvec, arch compute, simulatio
+          +n, I/O
+      230 +- **Docstring audit**: numpy-style docstrings added to nsim, n
+          +arch, neffect, nmate, nfilter, nstats, io, struct
+      231  - Commit: (this batch)
+      232 
+      233  ## Totals
+      234  - **Session start (all continuation sessions combined)**: 2439
+            tests
+      224 -- **Current**: 3182 tests                                     
+      225 -- **New tests this session**: 743+                            
+      226 -- **New test files**: 37+                                     
+      227 -- **All passing**: yes (3182/3182)                            
+      235 +- **Current**: 3255 tests
+      236 +- **New tests this session**: 816+
+      237 +- **New test files**: 40+
+      238 +- **All passing**: yes (3255/3255)
+      239 
+      240  ## Notable Fixes During Testing (original session)
+      241  - `offspring_per_pair=1` creates all-female offspring (design
+           behavior, not bug) — adjusted test
+
+● Bash(git add docs/plans/devnotes/2026-02-08.md && git commit -m "Add GWAS/PGS
+      module, CLI, benchmarks, docstrings (Batch 30, 73 tests → 3255)…)
+  ⎿  [ajay 0d56f6f] Add GWAS/PGS module, CLI, benchmarks, docstrings (Batch
+     30, 73 tests → 3255)
+      17 files changed, 2822 insertions(+), 77 deletions(-)
+     … +8 lines (ctrl+o to expand)
+
+● Bash(git push origin ajay 2>&1)
+  ⎿  To github.com:border-lab/xftsim.git
+        7ea0f6f..0d56f6f  ajay -> ajay
+
+● Now update memory.
+
+● Recalled 1 memory, wrote 1 memory (ctrl+o to expand)
+
+● All done. Committed as 0d56f6f and pushed. Here's the summary:
+  Task: GWAS/PGS
+  Files: ngwas.py
+  Tests: 32
+  Details: Vectorized per-variant OLS, PGS with raw/standardized modes
+  ────────────────────────────────────────
+  Task: CLI
+  Files: cli.py
+  Tests: 41
+  Details: run/resume/info/demo commands, TTY detection, --plain for SLURM
+  ────────────────────────────────────────
+  Task: Benchmarks
+  Files: benchmarks/bench_core.py
+  Tests: —
+  Details: Timing for founders, meiosis, matvec, sim loop, I/O
+  ────────────────────────────────────────
+  Task: Docstrings
+  Files: 8 source files
+  Tests: —
+  Details: numpy-style docs on all public classes/methods
+  3255 tests passing, 0 failures. The refactor is in very good shape.
+
+✻ Cooked for 59s
+
+❯ lets see the benchmark output 
+
+● Bash(python benchmarks/bench_core.py 2>&1)
+  ⎿  xftsim performance benchmarks
+     NumPy 1.26.4, Python 3.12.7
+     … +64 lines (ctrl+o to expand)
+  ⎿  (timeout 2m)
+
+● Key takeaways:
+
+  - Meiosis is fast — 105ms for 10k individuals x 5k variants (numba JIT)
+  - Matvec is BLAS-bound — 89ms raw, 200ms standardized at 10k x 5k
+  - Full simulation at realistic scale (5k x 2k, 5 gens) is under 0.5s
+  - I/O checkpoint is the bottleneck — 4.1s at 5k x 2k due to
+  np.savez_compressed
+  - Founder generation is the other slow spot — ~1s at 10k x 5k (Python-level
+  binomial loop)
+
+  The simulation loop itself is very efficient; I/O and founder generation are
+  the places where optimization effort would pay off most if you ever need to
+  scale up.
+
+❯ great log all progress, commit, and push 
+
+● Bash(git status --short 2>&1)
+  ⎿  (No content)
+
+● Everything was already committed and pushed in 0d56f6f. The devnotes at
+  docs/plans/devnotes/2026-02-08.md are already up to date with Batch 30. Let me
+   verify the memory file is current too.
+
+● Bash(git log --oneline -5 2>&1)
+  ⎿ 0d56f6f Add GWAS/PGS module, CLI, benchmarks, docstrings (Batch 30, 73
+    tests → 3255)
+    7ea0f6f Add HE/POR/MatingStatistics, ascertainment filters, example not
+    … +7 lines (ctrl+o to expand)
+
+
+● All clean — nothing to commit. Everything from this session is already pushed
+  to origin/ajay:
+  Commit: 0d56f6f
+  Summary: GWAS/PGS, CLI, benchmarks, docstrings (3255 tests)
+  ────────────────────────────────────────
+  Commit: 7ea0f6f
+  Summary: HE/POR/MatingStats, ascertainment filters, notebooks, legacy cleanup
+    (3182 tests)
+  ────────────────────────────────────────
+  Commit: aa80928
+  Summary: Fix all demo tests, rewrite DemoSimulation (3066 tests)
+  ────────────────────────────────────────
+  Commit: 16a7f18
+  Summary: Advanced test hardening batch 27 (3050 tests)
