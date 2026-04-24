@@ -1,0 +1,55 @@
+/home/rsb/Dropbox/ftsim/xftsim/xftsim/data.py:2: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+OLD xftsim 5xAM+VT | n=256000 m=4000 seed=1 minMAF=0.05 halve=True
+     |     4.48 mks in increment_generation
+     |     2.62 mks in reproduce
+     |    21.30 s in compute_phenotypes
+     |     2.23 s in mate
+     |     7.15 s in update_pedigree
+     |     6.31 mks in process
+  gen 0 done (30.7s) pop=256000 [total 30.7s]
+     |     2.80 mks in increment_generation
+     |    19.41 s in reproduce
+     |     7.14 s in compute_phenotypes
+     |     1.50 s in mate
+     |     3.96 s in update_pedigree
+     |     6.94 mks in process
+  gen 1 done (32.0s) pop=128000 [total 62.7s]
+     |     1.36 mks in increment_generation
+     |     7.94 s in reproduce
+     |     3.53 s in compute_phenotypes
+     |   755.51 ms in mate
+     |     1.94 s in update_pedigree
+     |     5.34 mks in process
+  gen 2 done (14.2s) pop=64000 [total 76.9s]
+     |     1.67 mks in increment_generation
+     |     3.88 s in reproduce
+     |     2.22 s in compute_phenotypes
+     |   388.22 ms in mate
+     |     1.60 s in update_pedigree
+     |     4.81 mks in process
+  gen 3 done (8.1s) pop=32000 [total 84.9s]
+     |     1.33 mks in increment_generation
+     |     1.75 s in reproduce
+     |     1.46 s in compute_phenotypes
+     |   217.38 ms in mate
+     |   551.33 ms in update_pedigree
+     |     5.86 mks in process
+  gen 4 done (4.0s) pop=16000 [total 88.9s]
+     |     1.46 mks in increment_generation
+     |   888.89 ms in reproduce
+     |     1.04 s in compute_phenotypes
+     |    98.50 ms in mate
+     |   273.41 ms in update_pedigree
+     |     5.52 mks in process
+  gen 5 done (2.3s) pop=8000 [total 91.2s]
+
+Gen 5 TRUE: h2=0.4010 rg=0.0806
+  one-per-family n: 8000 (from pop=8000)
+
+Gen 5 HE one-per-family (OLD xftsim halved):
+  h2_HE mean = 0.7541
+  rg_HE mean = 0.5169
+
+Saved to /home/rsb/data/fig3_paperscale/old_halved_seed1.csv
+Total time: 1.5 min

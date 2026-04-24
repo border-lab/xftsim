@@ -1,0 +1,2 @@
+seed,n,m,halved,h2_true_mean,rg_true_mean,h2_HE_native,rg_HE_native,n_HE_sample,engine
+1,512000,1045,True,0.38528106787602595,0.07643524696365431,0.7454528689384461,0.5136032517098217,16000,OLD_xftsim_native_HE

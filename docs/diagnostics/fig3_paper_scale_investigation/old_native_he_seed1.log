@@ -1,0 +1,93 @@
+/home/rsb/Dropbox/ftsim/xftsim/xftsim/data.py:2: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+OLD xftsim 5xAM+VT (native HE) | n=512000 m=1045 seed=1
+     |     4.39 mks in increment_generation
+     |     2.82 mks in reproduce
+     |    10.05 s in compute_phenotypes
+     |     4.77 s in mate
+     |    15.15 s in update_pedigree
+     |      |     6.52 s in sample statistics
+     |      |    37.38 s in haseman elston estimator
+     |      |     3.00 s in mating statistics
+     |    50.70 s in estimate_statistics
+     |     4.39 mks in process
+  gen 0 done (80.7s) pop=512000 [total 80.7s]
+     |     2.56 mks in increment_generation
+     |    17.77 s in reproduce
+     |     7.62 s in compute_phenotypes
+     |     2.61 s in mate
+     |     7.72 s in update_pedigree
+     |      |     4.00 s in sample statistics
+     |      |    17.93 s in haseman elston estimator
+     |      |     1.84 s in mating statistics
+     |    27.49 s in estimate_statistics
+     |     4.50 mks in process
+  gen 1 done (63.2s) pop=256000 [total 143.9s]
+     |     1.55 mks in increment_generation
+     |     6.36 s in reproduce
+     |     3.95 s in compute_phenotypes
+     |     1.50 s in mate
+     |     3.79 s in update_pedigree
+     |      |     1.85 s in sample statistics
+     |      |     8.66 s in haseman elston estimator
+     |      |     1.04 s in mating statistics
+     |    12.51 s in estimate_statistics
+     |     3.13 mks in process
+  gen 2 done (28.1s) pop=128000 [total 172.0s]
+     |     1.34 mks in increment_generation
+     |     3.32 s in reproduce
+     |     2.48 s in compute_phenotypes
+     |   662.20 ms in mate
+     |     1.79 s in update_pedigree
+     |      |   850.49 ms in sample statistics
+     |      |     4.49 s in haseman elston estimator
+     |      |   512.40 ms in mating statistics
+     |     6.31 s in estimate_statistics
+     |     3.56 mks in process
+  gen 3 done (14.6s) pop=64000 [total 186.6s]
+     |     1.65 mks in increment_generation
+     |     1.63 s in reproduce
+     |     1.40 s in compute_phenotypes
+     |   333.22 ms in mate
+     |     2.27 s in update_pedigree
+     |      |   316.37 ms in sample statistics
+     |      |     2.50 s in haseman elston estimator
+     |      |   268.58 ms in mating statistics
+     |     3.31 s in estimate_statistics
+     |     2.77 mks in process
+  gen 4 done (8.9s) pop=32000 [total 195.5s]
+     |     1.70 mks in increment_generation
+     |   850.45 ms in reproduce
+     |   864.72 ms in compute_phenotypes
+     |   200.62 ms in mate
+     |   538.37 ms in update_pedigree
+     |      |   158.38 ms in sample statistics
+     |      |     1.40 s in haseman elston estimator
+     |      |   165.27 ms in mating statistics
+     |     1.86 s in estimate_statistics
+     |     2.67 mks in process
+  gen 5 done (4.3s) pop=16000 [total 199.8s]
+
+results_store[5] keys: ['sample_statistics', 'HE_regression', 'mating_statistics']
+HE_regression keys: ['cov_HE', 'corr_HE']
+
+cov_HE shape: (5, 5)
+cov_HE (truncated):
+phenotype_name                                        y0        y1        y2
+component_name                                 phenotype phenotype phenotype
+vorigin_relative                                 proband   proband   proband
+phenotype_name component_name vorigin_relative                              
+y0             phenotype      proband           0.767552  0.393173  0.381705
+y1             phenotype      proband           0.393173  0.728974  0.384017
+y2             phenotype      proband           0.381705  0.384017  0.740216
+
+Gen 5 HE (NATIVE old xftsim):
+  h2_HE mean = 0.7455
+  rg_HE mean = 0.5136
+
+Gen 5 TRUE: h2=0.3853 rg=0.0764
+
+HE sample size: 16000
+
+Saved to /home/rsb/data/fig3_paperscale/old_native_he_seed1.csv
+Total time: 3.3 min

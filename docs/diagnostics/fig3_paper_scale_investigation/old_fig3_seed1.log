@@ -1,0 +1,57 @@
+/home/rsb/Dropbox/ftsim/xftsim/xftsim/data.py:2: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Running OLD xftsim 5xAM+VT at n=256000, m=4000, seed=1, minMAF=0.05
+     |     4.30 mks in increment_generation
+     |     2.63 mks in reproduce
+     |    21.49 s in compute_phenotypes
+     |     2.24 s in mate
+     |     7.19 s in update_pedigree
+     |     5.53 mks in process
+  gen 0 done (30.9s) [total 30.9s]
+     |     2.53 mks in increment_generation
+     |    19.43 s in reproduce
+     |     7.14 s in compute_phenotypes
+     |     2.78 s in mate
+     |     7.88 s in update_pedigree
+     |     6.07 mks in process
+  gen 1 done (37.2s) [total 68.1s]
+     |     1.01 mks in increment_generation
+     |    15.90 s in reproduce
+     |     6.98 s in compute_phenotypes
+     |     2.65 s in mate
+     |     7.63 s in update_pedigree
+     |     4.67 mks in process
+  gen 2 done (33.2s) [total 101.3s]
+     |     1.19 mks in increment_generation
+     |    15.02 s in reproduce
+     |     7.09 s in compute_phenotypes
+     |     2.61 s in mate
+     |     7.83 s in update_pedigree
+     |     4.69 mks in process
+  gen 3 done (32.5s) [total 133.8s]
+     |     1.31 mks in increment_generation
+     |    13.49 s in reproduce
+     |     5.90 s in compute_phenotypes
+     |     2.17 s in mate
+     |     8.01 s in update_pedigree
+     |     4.04 mks in process
+  gen 4 done (29.6s) [total 163.4s]
+     |   951.00 ns in increment_generation
+     |    11.03 s in reproduce
+     |     6.17 s in compute_phenotypes
+     |     2.25 s in mate
+     |     8.24 s in update_pedigree
+     |     4.94 mks in process
+  gen 5 done (27.7s) [total 191.1s]
+
+Gen 5 TRUE values:
+  h²_true mean = 0.4023
+  rg_true mean = 0.0802
+  one-per-family n: 128000
+
+Gen 5 HE one-per-family (OLD xftsim):
+  h²_HE mean = 0.7625
+  rg_HE mean = 0.5142
+
+Saved to /home/rsb/data/fig3_paperscale/old_fig3_seed1.csv
+Total time: 3.5 min

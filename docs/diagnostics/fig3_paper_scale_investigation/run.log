@@ -1,0 +1,8 @@
+[1/5] 5xAM+VT seed=1 (n=256k, m=4k) ... done (537.5s) gen5 h2_full=nan h2_unrel=0.7513 rg_full=nan rg_unrel=0.5092 | ETA 35.8m
+[2/5] 5xAM+VT seed=2 (n=256k, m=4k) ... done (611.4s) gen5 h2_full=nan h2_unrel=0.7473 rg_full=nan rg_unrel=0.5117 | ETA 28.7m
+[3/5] 5xAM+VT seed=3 (n=256k, m=4k) ... done (621.3s) gen5 h2_full=nan h2_unrel=0.7478 rg_full=nan rg_unrel=0.5178 | ETA 19.7m
+[4/5] 5xAM+VT seed=4 (n=256k, m=4k) ... done (575.1s) gen5 h2_full=nan h2_unrel=0.7417 rg_full=nan rg_unrel=0.5141 | ETA 9.8m
+[5/5] 5xAM+VT seed=5 (n=256k, m=4k) ... done (583.9s) gen5 h2_full=nan h2_unrel=0.7502 rg_full=nan rg_unrel=0.5133 | ETA 0.0m
+
+Total time: 48.9 min
+DONE

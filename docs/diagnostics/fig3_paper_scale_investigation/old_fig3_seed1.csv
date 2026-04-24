@@ -1,0 +1,2 @@
+seed,n,m,theta,r,minMAF,h2_true_mean,rg_true_mean,h2_HE_unrel,rg_HE_unrel,n_unrel,engine
+1,256000,4000,0.05,0.2,0.05,0.4022951959903146,0.08022375424115293,0.7624845761252783,0.5141767626969307,128000,OLD_xftsim

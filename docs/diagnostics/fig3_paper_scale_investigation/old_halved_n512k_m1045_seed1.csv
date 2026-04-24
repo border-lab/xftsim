@@ -1,0 +1,2 @@
+seed,n,m,halved,h2_true_mean,rg_true_mean,h2_HE_unrel,rg_HE_unrel,n_pop,n_unrel,engine
+1,512000,1045,True,0.3856034617466776,0.0759511408119804,0.7217238464090305,0.513526440184614,16000,16000,OLD_xftsim
