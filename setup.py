@@ -41,6 +41,9 @@ setup(
         ],
         'grg': [
             "pygrgl",
+            "msprime",
+            "tskit",
+            "stdpopsim",
         ],
         'docs': [
             "sphinx>=7",

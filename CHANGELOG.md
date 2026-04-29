@@ -28,6 +28,24 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 - **tests/manuscript/**: Manuscript reproduction test suite that validates the
   refactored simulator against published quantitative results (constant-entry
   xAM scenarios from Supplementary Figures S5-S6).
+- **founders.founder_haplotypes_from_stdpopsim_grg**: New helper that simulates
+  founder genotypes via a stdpopsim demographic model (default
+  `HomSap` / `OutOfAfrica_3G09`), converts the resulting TreeSequence to a GRG
+  through the grgl CLI, and returns a `GraphHaplotypeOperator`. Mirrors the
+  existing msprime-based helper but draws samples per stdpopsim population
+  (e.g. `{"YRI": 100, "CEU": 100, "CHB": 100}`). Sub-region selection uses
+  `left`/`right` base-pair coordinates (stdpopsim's `length_multiplier` is
+  deprecated upstream). When `mutation_rate` is not specified, the function
+  falls back to the demographic model's calibrated rate
+  (`model.mutation_rate`) when available, avoiding stdpopsim's
+  contig-vs-model rate-mismatch warning.
+- **tests/integration/test_grg_founders_stdpopsim.py**: Integration test for
+  the new stdpopsim-based founder helper, mirroring `test_grg_founders.py`.
+- **setup.py**: Added `msprime`, `tskit`, and `stdpopsim` to the `grg`
+  extras_require alongside `pygrgl`. These are imported directly at the top
+  of `xftsim/founders.py` for the GRG-based founder helpers and were
+  previously only available transitively. Install with
+  `pip install xftsim[grg]`.
 
 ---
 
