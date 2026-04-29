@@ -95,12 +95,14 @@ class TestDeserializeMatingRegimeErrors:
         with pytest.raises(ValueError, match="Unknown mating regime type"):
             _deserialize_mating_regime({'type': 'FancyMating'})
 
-    def test_custom_class_serializes_type_name(self):
-        """Custom mating class serializes just the type name."""
+    def test_custom_class_raises_on_serialize(self):
+        """Custom mating classes must raise at save time. Previously they
+        silently produced ``{'type': name}`` with all parameters dropped.
+        """
         class CustomMating:
             pass
-        config = _serialize_mating_regime(CustomMating())
-        assert config['type'] == 'CustomMating'
+        with pytest.raises(ValueError, match="[Cc]annot serialize"):
+            _serialize_mating_regime(CustomMating())
 
 
 class TestEmptyPhenotypeIO:
