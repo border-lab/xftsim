@@ -135,6 +135,25 @@ class NSimulation:
         """
         Reconstruct a simulation from a checkpoint directory.
 
+        Restored automatically from the checkpoint
+        ------------------------------------------
+        - architecture, mating regime, recombination map, RNG state,
+          generation counter, retention settings
+        - haplotype, phenotype, and pedigree history
+        - ``sim.results`` (per-generation Statistic outputs accumulated
+          before the checkpoint was written)
+
+        Must be re-supplied at load time
+        --------------------------------
+        - ``statistics``: The Statistic *instances* are not stored in the
+          checkpoint (they may contain non-pickleable user code). The
+          numerical outputs they produced are restored via ``sim.results``,
+          but to keep computing new results after resume you must re-pass
+          ``statistics=[...]`` here. Typically use the same instances that
+          were registered on the original simulation.
+        - ``filters`` and ``callbacks``: same reasoning — re-pass them if
+          you want them active during ``continue_run``.
+
         Parameters
         ----------
         dir_path : str
@@ -144,16 +163,17 @@ class NSimulation:
         recombination_map : RecombinationMap, optional
             Override the saved recombination map. If None, uses the saved one.
         callbacks : list[callable], optional
-            Callbacks for continued execution.
+            Callbacks for continued execution. Not restored from disk.
         filters : dict, optional
-            Filters for continued execution.
+            Filters for continued execution. Not restored from disk.
         statistics : list, optional
-            Statistics for continued execution.
+            Statistics for continued execution. Not restored from disk;
+            ``sim.results`` (the previously computed values) is.
 
         Returns
         -------
         NSimulation
-            A simulation ready for continued execution via run().
+            A simulation ready for continued execution via ``continue_run()``.
         """
         from xftsim.io import load_simulation_checkpoint
 
@@ -198,6 +218,7 @@ class NSimulation:
         sim.pedigree_history = checkpoint['pedigree_history']
         sim.rng = checkpoint['rng']
         sim.generation = checkpoint['generation']
+        sim.results = checkpoint.get('results', [])
 
         return sim
 
