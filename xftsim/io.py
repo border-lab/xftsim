@@ -28,6 +28,7 @@ from __future__ import annotations
 import warnings
 import json
 import os
+import pickle
 import numpy as np
 import numba as nb
 import pandas as pd
@@ -486,18 +487,21 @@ def save_architecture(arch: "xft.arch.Architecture", dir_path: str) -> None:
     """
     from xftsim.arch import (
         GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
-        NoiseComponent, CNoiseComponent, AggregationComponent,
-        MotherComponent, FatherComponent, ParentComponent,
-        _SiblingComponent, _ParentalComponent,
+        NoiseComponent, CNoiseComponent, ThresholdComponent,
+        AggregationComponent, _SiblingComponent, _ParentalComponent,
     )
 
-    os.makedirs(dir_path, exist_ok=True)
+    # Build the in-memory spec list first, before any disk writes, so that an
+    # unsupported component type fails loud without leaving a partial directory
+    # behind. Effect files are accumulated as (path_suffix, EffectSpec) pairs
+    # and written only after the full walk succeeds.
     node_specs = []
+    effects_to_write: list[tuple[str, "xft.neffect.EffectSpec"]] = []
     effect_idx = 0
 
     for node in arch._nodes:
         comp = node.component
-        spec = {
+        spec: dict[str, object] = {
             'outputs': node.outputs,
             'inputs': node.inputs,
             'grouping': node.grouping,
@@ -506,28 +510,48 @@ def save_architecture(arch: "xft.arch.Architecture", dir_path: str) -> None:
 
         if isinstance(comp, HaplotypeGeneticComponent):
             eff_name = f'effect_{effect_idx}'
-            save_effects_npz(comp.effects, os.path.join(dir_path, f'{eff_name}.npz'))
+            effects_to_write.append((f'{eff_name}.npz', comp.effects))
             spec['effect_file'] = f'{eff_name}.npz'
             spec['haplotype'] = comp.haplotype
             effect_idx += 1
         elif isinstance(comp, (GeneticComponent, MVGeneticComponent)):
             eff_name = f'effect_{effect_idx}'
-            save_effects_npz(comp.effects, os.path.join(dir_path, f'{eff_name}.npz'))
+            effects_to_write.append((f'{eff_name}.npz', comp.effects))
             spec['effect_file'] = f'{eff_name}.npz'
             effect_idx += 1
         elif isinstance(comp, NoiseComponent):
             spec['variance'] = comp.variance
         elif isinstance(comp, CNoiseComponent):
             spec['cov'] = comp.cov.tolist()
+        elif isinstance(comp, ThresholdComponent):
+            spec['source'] = comp.source
+            spec['threshold'] = comp.threshold
         elif isinstance(comp, AggregationComponent):
             spec['expression'] = comp.expression
         elif isinstance(comp, _ParentalComponent):
             spec['phenotype_name'] = comp.phenotype_name
         elif isinstance(comp, _SiblingComponent):
             spec['source_name'] = comp.source_name
+        else:
+            # Previously this fell through and wrote a stub spec with only
+            # `component_type`, silently dropping all the component's
+            # parameters; the failure surfaced only at load time. Fail loud
+            # at save time instead so the gap is obvious.
+            raise ValueError(
+                f"Cannot serialize component of type "
+                f"{type(comp).__name__!r} (output(s)={node.outputs}); "
+                "save_architecture supports the built-in components listed "
+                "in xftsim.narch.BUILTINS plus AggregationComponent. "
+                "Adding support requires extending save_architecture / "
+                "load_architecture in xftsim/io.py."
+            )
 
         node_specs.append(spec)
 
+    # All components validated — now safe to write to disk.
+    os.makedirs(dir_path, exist_ok=True)
+    for fname, eff in effects_to_write:
+        save_effects_npz(eff, os.path.join(dir_path, fname))
     with open(os.path.join(dir_path, 'architecture.json'), 'w') as f:
         json.dump(node_specs, f, indent=2)
 
@@ -548,8 +572,8 @@ def load_architecture(dir_path: str) -> "xft.arch.Architecture":
     from xftsim.arch import (
         Architecture, GeneticComponent, MVGeneticComponent,
         HaplotypeGeneticComponent, NoiseComponent, CNoiseComponent,
-        AggregationComponent, MotherComponent, FatherComponent,
-        ParentComponent, BUILTINS, _SIBLING_COMPONENTS,
+        ThresholdComponent, AggregationComponent, MotherComponent,
+        FatherComponent, ParentComponent, _SIBLING_COMPONENTS,
     )
 
     with open(os.path.join(dir_path, 'architecture.json'), 'r') as f:
@@ -569,6 +593,9 @@ def load_architecture(dir_path: str) -> "xft.arch.Architecture":
         ),
         'NoiseComponent': lambda s: NoiseComponent(variance=s['variance']),
         'CNoiseComponent': lambda s: CNoiseComponent(cov=np.array(s['cov'])),
+        'ThresholdComponent': lambda s: ThresholdComponent(
+            source=s['source'], threshold=s['threshold'],
+        ),
         'AggregationComponent': lambda s: AggregationComponent(expression=s['expression']),
         'MotherComponent': lambda s: MotherComponent(phenotype_name=s['phenotype_name']),
         'FatherComponent': lambda s: FatherComponent(phenotype_name=s['phenotype_name']),
@@ -594,13 +621,104 @@ def load_architecture(dir_path: str) -> "xft.arch.Architecture":
     return arch
 
 
+def _save_graph_haplotypes_to_checkpoint(
+    hap: "xft.struct.GraphHaplotypeOperator",
+    hap_dir: str,
+    gen: int,
+) -> None:
+    """Save a GraphHaplotypeOperator natively to a checkpoint dir.
+
+    Writes two files:
+      ``gen_{gen}.grg``          — the GRG, via ``pygrgl.save_grg``.
+      ``gen_{gen}.grg.meta.npz`` — sample/variant metadata sidecar.
+
+    The sidecar is needed because the GRG format only carries iid (not fid /
+    sex) and may not preserve all variant fields, while ``GraphHaplotypeOperator``
+    wraps richer metadata. Without it, fid/sex assigned during simulation
+    would be lost on round-trip.
+    """
+    import pygrgl
+    pygrgl.save_grg(hap._grg, os.path.join(hap_dir, f'gen_{gen}.grg'))
+
+    meta_dict = {
+        'generation': np.array([hap.generation]),
+        'sample_iid': hap.samples.iid,
+        'sample_fid': hap.samples.fid,
+        'sample_sex': hap.samples.sex,
+        'variant_vid': hap.variants.vid,
+    }
+    if hap.variants.chrom is not None:
+        meta_dict['variant_chrom'] = hap.variants.chrom
+    if hap.variants.pos_bp is not None:
+        meta_dict['variant_pos_bp'] = hap.variants.pos_bp
+    if hap.variants.pos_cM is not None:
+        meta_dict['variant_pos_cM'] = hap.variants.pos_cM
+    if hap.variants.af is not None:
+        meta_dict['variant_af'] = hap.variants.af
+    if hap.variants.zero_allele is not None:
+        meta_dict['variant_zero_allele'] = hap.variants.zero_allele
+    if hap.variants.one_allele is not None:
+        meta_dict['variant_one_allele'] = hap.variants.one_allele
+
+    np.savez_compressed(
+        os.path.join(hap_dir, f'gen_{gen}.grg.meta.npz'), **meta_dict,
+    )
+
+
+def _load_graph_haplotypes_from_checkpoint(
+    hap_dir: str, gen: int,
+) -> "xft.struct.GraphHaplotypeOperator":
+    """Inverse of ``_save_graph_haplotypes_to_checkpoint``."""
+    import pygrgl
+    grg = pygrgl.load_immutable_grg(os.path.join(hap_dir, f'gen_{gen}.grg'))
+
+    data = np.load(
+        os.path.join(hap_dir, f'gen_{gen}.grg.meta.npz'), allow_pickle=True,
+    )
+    generation = int(data['generation'][0])
+    samples = xft.struct.SampleMeta(
+        iid=data['sample_iid'],
+        fid=data['sample_fid'],
+        sex=data['sample_sex'],
+        generation=generation,
+    )
+    variants = xft.struct.VariantMeta(
+        vid=data['variant_vid'],
+        chrom=data['variant_chrom'] if 'variant_chrom' in data else None,
+        pos_bp=data['variant_pos_bp'] if 'variant_pos_bp' in data else None,
+        pos_cM=data['variant_pos_cM'] if 'variant_pos_cM' in data else None,
+        af=data['variant_af'] if 'variant_af' in data else None,
+        zero_allele=data['variant_zero_allele'] if 'variant_zero_allele' in data else None,
+        one_allele=data['variant_one_allele'] if 'variant_one_allele' in data else None,
+    )
+    return xft.struct.GraphHaplotypeOperator(
+        grg=grg, generation=generation, samples=samples, variants=variants,
+    )
+
+
 def _serialize_mating_regime(regime: object) -> dict[str, object]:
-    """Serialize a mating regime to a JSON-compatible dict."""
-    from xftsim.mate import RandomMating, LinearAssortativeMating
+    """Serialize a mating regime to a JSON-compatible dict.
+
+    Supported regime types: ``RandomMating``, ``LinearAssortativeMating``,
+    ``GeneralAssortativeMating``, and ``BatchedMating`` (which wraps any of
+    the above and is serialized recursively).
+
+    Raises
+    ------
+    ValueError
+        If the regime is not one of the supported types. Previously this
+        returned a stub dict (just the class name), silently dropping the
+        regime's parameters; the failure surfaced only at load time. We now
+        fail loud at save time so the gap is obvious.
+    """
+    from xftsim.nmate import (
+        RandomMating, LinearAssortativeMating,
+        GeneralAssortativeMating, BatchedMating,
+    )
     if isinstance(regime, LinearAssortativeMating):
         return {
             'type': 'LinearAssortativeMating',
-            'component_names': regime.component_names,
+            'component_names': list(regime.component_names),
             'r': regime.r,
             'offspring_per_pair': regime.offspring_per_pair,
         }
@@ -609,13 +727,47 @@ def _serialize_mating_regime(regime: object) -> dict[str, object]:
             'type': 'RandomMating',
             'offspring_per_pair': regime.offspring_per_pair,
         }
+    elif isinstance(regime, GeneralAssortativeMating):
+        # cross_corr is small (K x K, typically K < 50) so an inline JSON
+        # list keeps the checkpoint inspectable; a sidecar npz would be
+        # nicer for large K but isn't worth the recursion-with-namespacing
+        # complexity that BatchedMating wrapping creates.
+        return {
+            'type': 'GeneralAssortativeMating',
+            'component_names': list(regime.component_names),
+            'cross_corr': regime.cross_corr.tolist(),
+            'offspring_per_pair': regime.offspring_per_pair,
+            'solver_params': dict(regime.solver_params),
+        }
+    elif isinstance(regime, BatchedMating):
+        return {
+            'type': 'BatchedMating',
+            'max_batch_size': regime.max_batch_size,
+            'regime': _serialize_mating_regime(regime.regime),
+        }
     else:
-        return {'type': type(regime).__name__}
+        raise ValueError(
+            f"Cannot serialize mating regime of type "
+            f"{type(regime).__name__!r}; supported types are RandomMating, "
+            "LinearAssortativeMating, GeneralAssortativeMating, and "
+            "BatchedMating. Adding support requires extending "
+            "_serialize_mating_regime / _deserialize_mating_regime in "
+            "xftsim/io.py."
+        )
 
 
 def _deserialize_mating_regime(config: dict[str, object]) -> object:
-    """Deserialize a mating regime from a dict."""
-    from xftsim.mate import RandomMating, LinearAssortativeMating
+    """Deserialize a mating regime from a dict produced by
+    ``_serialize_mating_regime``.
+
+    Note: ``GeneralAssortativeMating`` requires the ``hexaly`` package — if
+    a checkpoint was saved with it but the resuming environment lacks
+    hexaly, deserialization will raise ``ImportError`` at construction.
+    """
+    from xftsim.nmate import (
+        RandomMating, LinearAssortativeMating,
+        GeneralAssortativeMating, BatchedMating,
+    )
     mtype = config['type']
     if mtype == 'RandomMating':
         return RandomMating(offspring_per_pair=config['offspring_per_pair'])
@@ -624,6 +776,18 @@ def _deserialize_mating_regime(config: dict[str, object]) -> object:
             component_names=config['component_names'],
             r=config['r'],
             offspring_per_pair=config['offspring_per_pair'],
+        )
+    elif mtype == 'GeneralAssortativeMating':
+        return GeneralAssortativeMating(
+            component_names=config['component_names'],
+            cross_corr=np.asarray(config['cross_corr'], dtype=np.float64),
+            offspring_per_pair=config['offspring_per_pair'],
+            solver_params=config.get('solver_params'),
+        )
+    elif mtype == 'BatchedMating':
+        return BatchedMating(
+            regime=_deserialize_mating_regime(config['regime']),
+            max_batch_size=config['max_batch_size'],
         )
     else:
         raise ValueError(f"Unknown mating regime type: {mtype}")
@@ -634,8 +798,34 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
     """
     Save a simulation checkpoint to a directory.
 
-    Saves haplotype history (dense only), phenotype history, pedigree history,
-    architecture, generation counter, and RNG state.
+    What is saved
+    -------------
+    - architecture (DAG of ArchComponent — see ``save_architecture`` for the
+      list of supported component types)
+    - mating regime (RandomMating, LinearAssortativeMating,
+      GeneralAssortativeMating, and BatchedMating wrapping any of the
+      above; other regimes raise at save time)
+    - recombination map
+    - generation counter and retention settings
+    - RNG state (so resumed simulations stay deterministic)
+    - haplotype history (DenseHaplotypeArray as compressed .npz;
+      GraphHaplotypeOperator as a native .grg file plus metadata sidecar)
+    - phenotype history and pedigree history
+    - per-generation Statistic results (``sim.results``)
+
+    What is NOT saved
+    -----------------
+    - ``sim.statistics`` (the registered Statistic *instances*) — these are
+      arbitrary user code and may not be pickleable. The *outputs* they
+      produced are saved (in ``sim.results``) but to keep collecting new
+      results after resume you must re-pass ``statistics=...`` to
+      ``NSimulation.from_checkpoint``.
+    - ``sim.filters`` and ``sim.callbacks`` — same reasoning. Re-pass them
+      to ``from_checkpoint`` if you want them active on the resumed run.
+
+    Failures are loud: an unsupported mating regime, architecture component,
+    or haplotype type raises before any disk writes occur, so a partial
+    checkpoint directory is never left behind.
 
     Parameters
     ----------
@@ -644,13 +834,17 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
     dir_path : str
         Directory path (created if it doesn't exist).
     """
+    # Validate the mating regime can be serialized before writing anything
+    # to disk, so a failure here doesn't leave a half-written checkpoint
+    # directory behind.
+    mating_config = _serialize_mating_regime(sim.mating_regime)
+
     os.makedirs(dir_path, exist_ok=True)
 
     # Save architecture
     save_architecture(sim.architecture, os.path.join(dir_path, 'architecture'))
 
     # Save metadata (including mating regime config)
-    mating_config = _serialize_mating_regime(sim.mating_regime)
     meta = {
         'generation': sim.generation,
         'retain_haplotypes': sim.retain_haplotypes,
@@ -676,15 +870,23 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
              has_gauss=np.array([rng_state[3]]),
              cached_gaussian=np.array([rng_state[4]]))
 
-    # Save haplotype history (dense only — GRG founders are not checkpointed)
+    # Save haplotype history. GRG-backed haplotypes are persisted natively as
+    # a .grg file plus a metadata sidecar — materializing to dense would
+    # explode disk usage for whole-genome GRGs (e.g. ~64 GB raw at n=8000,
+    # m=4M) for no information gain.
     hap_dir = os.path.join(dir_path, 'haplotypes')
     os.makedirs(hap_dir, exist_ok=True)
     for gen, hap in sim.haplotype_history.items():
-        if isinstance(hap, xft.struct.DenseHaplotypeArray):
+        if isinstance(hap, xft.struct.GraphHaplotypeOperator):
+            _save_graph_haplotypes_to_checkpoint(hap, hap_dir, gen)
+        elif isinstance(hap, xft.struct.DenseHaplotypeArray):
             save_haplotypes_npz(hap, os.path.join(hap_dir, f'gen_{gen}.npz'))
-        elif isinstance(hap, xft.struct.GraphHaplotypeOperator):
-            # Materialize GRG to dense for checkpointing
-            save_haplotypes_npz(hap.to_dense(), os.path.join(hap_dir, f'gen_{gen}.npz'))
+        else:
+            raise TypeError(
+                f"Cannot checkpoint haplotype of type {type(hap).__name__!r} "
+                f"at generation {gen}; only DenseHaplotypeArray and "
+                "GraphHaplotypeOperator are supported."
+            )
 
     # Save phenotype history
     pheno_dir = os.path.join(dir_path, 'phenotypes')
@@ -712,6 +914,13 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
              phenotype_gens=np.array(list(sim.phenotype_history.keys())),
              pedigree_gens=np.array(list(sim.pedigree_history.keys())))
 
+    # Save per-generation statistic results. Values in GenerationResult.statistics
+    # are dict[str, Any] — user-defined Statistics can return arbitrary objects,
+    # so pickle is the only general serialization. If a user's Statistic returns
+    # something unpickleable, this will raise loudly rather than silently drop.
+    with open(os.path.join(dir_path, 'results.pkl'), 'wb') as f:
+        pickle.dump(sim.results, f)
+
 
 def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     """
@@ -729,7 +938,8 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     -------
     dict
         Keys: architecture, generation, retain_haplotypes, retain_phenotypes,
-        rng_state, haplotype_history, phenotype_history, pedigree_history.
+        rng, haplotype_history, phenotype_history, pedigree_history,
+        recombination_map, mating_regime, results.
     """
     # Load metadata
     with open(os.path.join(dir_path, 'meta.json'), 'r') as f:
@@ -752,14 +962,21 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     # Load history keys
     keys_data = np.load(os.path.join(dir_path, 'history_keys.npz'))
 
-    # Load haplotype history
+    # Load haplotype history. Detect GRG vs dense per-generation by checking
+    # for a sidecar `.grg` file; old checkpoints (which only ever wrote dense
+    # `.npz` files, even for GRG founders) still load via the npz path.
     haplotype_history = {}
     hap_dir = os.path.join(dir_path, 'haplotypes')
     for gen in keys_data['haplotype_gens']:
         gen = int(gen)
-        haplotype_history[gen] = load_haplotypes_npz(
-            os.path.join(hap_dir, f'gen_{gen}.npz')
-        )
+        if os.path.exists(os.path.join(hap_dir, f'gen_{gen}.grg')):
+            haplotype_history[gen] = _load_graph_haplotypes_from_checkpoint(
+                hap_dir, gen,
+            )
+        else:
+            haplotype_history[gen] = load_haplotypes_npz(
+                os.path.join(hap_dir, f'gen_{gen}.npz')
+            )
 
     # Load phenotype history
     phenotype_history = {}
@@ -806,6 +1023,14 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     if 'mating' in meta:
         mating_regime = _deserialize_mating_regime(meta['mating'])
 
+    # Load per-generation statistic results. Missing file → empty list, so
+    # checkpoints produced before this field was persisted still load.
+    results = []
+    results_path = os.path.join(dir_path, 'results.pkl')
+    if os.path.exists(results_path):
+        with open(results_path, 'rb') as f:
+            results = pickle.load(f)
+
     return {
         'architecture': architecture,
         'generation': meta['generation'],
@@ -817,6 +1042,7 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
         'pedigree_history': pedigree_history,
         'recombination_map': recombination_map,
         'mating_regime': mating_regime,
+        'results': results,
     }
 
 
