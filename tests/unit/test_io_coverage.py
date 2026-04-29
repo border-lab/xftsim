@@ -209,12 +209,14 @@ class TestMatingRegimeSerialization:
         assert isinstance(loaded, LinearAssortativeMating)
         assert loaded.r == 0.5
 
-    def test_unknown_mating_type_serialize(self):
-        """Serializing unknown type gives minimal dict."""
+    def test_unknown_mating_type_serialize_raises(self):
+        """Serializing an unsupported regime fails loud at save time rather
+        than silently dropping all its parameters into a stub config.
+        """
         class FakeMating:
             pass
-        config = _serialize_mating_regime(FakeMating())
-        assert config['type'] == 'FakeMating'
+        with pytest.raises(ValueError, match="[Cc]annot serialize"):
+            _serialize_mating_regime(FakeMating())
 
     def test_unknown_mating_type_deserialize_raises(self):
         with pytest.raises(ValueError, match="Unknown mating regime type"):

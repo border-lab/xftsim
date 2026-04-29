@@ -11,6 +11,25 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Fixed
 
+- **save_architecture silently dropping unsupported component parameters**:
+  Same silent-data-loss shape as the mating regime fix. Previously,
+  components not in the hard-coded handler list (`ThresholdComponent`, plus
+  any user-defined `ArchComponent` subclass) had their parameters silently
+  dropped on save and only failed at load time with `Unknown component type`.
+  `save_architecture` now raises `ValueError` immediately for unsupported
+  components and validates the full architecture before any disk writes,
+  so a partial directory is never left behind. Also added native
+  serialization for `ThresholdComponent` (the liability-threshold model).
+- **save_simulation_checkpoint silently dropping mating regime parameters**:
+  Previously, calling `save_simulation_checkpoint` with a mating regime other
+  than `RandomMating` or `LinearAssortativeMating` (e.g. `GeneralAssortativeMating`,
+  `BatchedMating`) appeared to succeed but wrote only the regime's class name to
+  `meta.json` — all parameters (including `cross_corr`, the matrix that defines
+  the experiment) were dropped. The failure surfaced only later, at
+  `from_checkpoint` time, with a `ValueError`. `save_simulation_checkpoint` now
+  raises `ValueError` immediately for unsupported regimes, and validates the
+  regime before any disk writes so a failure doesn't leave a partial checkpoint
+  directory. The deserializer's behavior is unchanged.
 - **LinearAssortativeMating**: Fixed mating score computation to match legacy
   `LinearAssortativeMatingRegime`. The new code was using the mean of
   standardized traits with r as the direct mixing parameter, producing
@@ -25,6 +44,47 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Added
 
+- **Checkpoint support for `GeneralAssortativeMating` and `BatchedMating`**:
+  Previously these regimes raised at save time (after the loud-fail fix in
+  this release). Now `_serialize_mating_regime` / `_deserialize_mating_regime`
+  handle both natively, including the recursion required for `BatchedMating`
+  to wrap any other supported regime. `GeneralAssortativeMating`'s
+  `cross_corr` matrix and `solver_params` round-trip via inline JSON
+  (small K, typically <50). The deserialize step constructs via
+  `__init__`, which still requires `hexaly` to be installed when restoring
+  a `GeneralAssortativeMating` checkpoint — this is the main deployment
+  caveat for resuming high-dimensional xAM simulations on machines
+  without the optimizer.
+- **Checkpoint resume is RNG-state deterministic**: `run(N)` and
+  `run(K) → save → from_checkpoint → continue_run(N-K)` now provably end
+  with byte-identical `self.rng` state (algorithm name, state key,
+  position, Gaussian-cache state). New test
+  `test_checkpoint_resume_rng_is_deterministic` exercises this. Note: the
+  test deliberately does **not** assert byte-equal haplotypes / phenotypes,
+  because meiosis (`xftsim/reproduce.py`) currently uses `np.random`
+  globally inside a `numba.prange` parallel kernel, which is racey and
+  non-deterministic even within a single process. That nondeterminism is
+  pre-existing and orthogonal to checkpointing.
+- **Checkpoints persist GRG-backed founders natively**: When
+  `sim.haplotype_history` contains a `GraphHaplotypeOperator` (typically the
+  founder generation when using `founder_haplotypes_from_msprime_grg` or
+  `founder_haplotypes_from_stdpopsim_grg`), `save_simulation_checkpoint`
+  now writes a `.grg` file plus a metadata sidecar instead of materializing
+  the GRG to a dense int8 haplotype array. This avoids dense-blow-up on
+  whole-genome GRGs (e.g. ~64 GB raw at n=8000, m=4M variants), and the
+  load path detects the `.grg` per-generation so the round-tripped
+  `haplotype_history` keeps the GRG type. Backwards-compatible: older
+  checkpoints that wrote materialized-dense `.npz` for GRG founders still
+  load (as `DenseHaplotypeArray`). `save_simulation_checkpoint` now also
+  raises `TypeError` for haplotype types it doesn't know how to persist,
+  rather than silently skipping them.
+- **Checkpoint preserves per-generation Statistic results**: `save_simulation_checkpoint`
+  now writes `sim.results` (the `list[GenerationResult]` produced by registered
+  `Statistic` objects) to `results.pkl` in the checkpoint directory, and
+  `NSimulation.from_checkpoint` restores it. Long-running simulations that save
+  partway through no longer lose accumulated statistics on resume; new generations
+  from `continue_run` append to the loaded list. Backwards-compatible: checkpoints
+  produced before this change load with `sim.results = []`.
 - **tests/manuscript/**: Manuscript reproduction test suite that validates the
   refactored simulator against published quantitative results (constant-entry
   xAM scenarios from Supplementary Figures S5-S6).
