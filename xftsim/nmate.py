@@ -10,6 +10,7 @@ BatchedMating: wraps any mating regime, splitting individuals into batches.
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 from dataclasses import dataclass
@@ -196,6 +197,23 @@ class LinearAssortativeMating:
         self.r: float = float(r)
         self.offspring_per_pair: int = offspring_per_pair
 
+        # `r` is an exchangeable cross-mate cell-correlation target, so the
+        # feasibility bound is |r| <= 1/K under uncorrelated within-person
+        # traits. At runtime the bound shifts with within-person correlation,
+        # but a construction-time heads-up catches the common mistake of
+        # passing r > 1/K and getting saturated assortment.
+        K = len(self.component_names)
+        if K > 1 and abs(self.r) > 1.0 / K:
+            warnings.warn(
+                f"LinearAssortativeMating: |r|={abs(self.r):.3g} exceeds "
+                f"1/K={1.0/K:.3g} for K={K} traits. Under uncorrelated "
+                "within-person traits this target is infeasible; the "
+                "latent score correlation will saturate at ~1 and the "
+                "realized per-cell cross-mate correlation will fall short "
+                "of r.",
+                stacklevel=2,
+            )
+
     def mate(self, samples: SampleMeta,
              rng: np.random.RandomState | None = None,
              phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
@@ -272,7 +290,20 @@ class LinearAssortativeMating:
         else:
             R = abs(self.r)
 
-        R = min(R, 0.999)  # clamp to valid range
+        # Silently clamping here hides infeasibility (the old legacy regime
+        # just let sqrt(|1-R|) carry an inverted noise term, which masked
+        # the same problem in a different way). Warn loudly — the realized
+        # per-cell cross-mate correlation will fall short of r — then clamp
+        # so the rank-pairing still runs.
+        if R > 1.0:
+            warnings.warn(
+                f"LinearAssortativeMating: realized latent score correlation "
+                f"R={R:.3g} exceeds 1 for r={self.r:.3g}, K={K}. Clamping to "
+                "0.999 (assortment will saturate). Reduce |r| to <= 1/K or "
+                "fewer traits to reach the requested per-cell correlation.",
+                stacklevel=2,
+            )
+            R = 0.999
 
         # Mating score: sqrt(R) * sum + sqrt(1-R) * noise
         # Noise scaled to std of trait sum (matching legacy)
