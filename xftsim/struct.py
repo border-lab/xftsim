@@ -2748,6 +2748,151 @@ class GraphHaplotypeOperator(HaplotypeOperator):
                 f"generation={self.generation})")
 
 
+class StandardizedHaplotypeOperator(HaplotypeOperator):
+    """Wraps a HaplotypeOperator so that ``matvec``/``rmatvec`` act on
+    the column-standardized matrix S = (X - mu) / sigma without
+    materializing S.
+
+    Identities used (mu, sigma broadcast across rows of X):
+
+    - ``S @ u   = H.matvec(u / sigma) - <mu, u / sigma>``
+    - ``S.T @ v = (H.rmatvec(v) - mu * sum(v)) / sigma``
+
+    Defaults follow the HWE convention used elsewhere: ``mu = 2p``,
+    ``sigma = sqrt(2 p (1 - p))`` where ``p`` comes from
+    ``H.recompute_af()``. Loci with ``sigma == 0`` (monomorphic) keep
+    ``sigma = 1`` to avoid division by zero, matching the existing
+    ``standardized_matvec`` implementations.
+
+    All other ``HaplotypeOperator`` methods (``matvec_maternal``,
+    ``matvec_paternal``, ``recompute_af``, ``to_dense``, ``meiosis``,
+    ``__getitem__``) forward to the underlying operator and return
+    raw (un-standardized) results. Re-wrap explicitly if you need
+    standardized semantics on the result.
+
+    Parameters
+    ----------
+    haplotypes : HaplotypeOperator
+        Underlying operator providing raw genotype matvec.
+    means : np.ndarray, optional
+        Per-variant means (length m). Defaults to ``2 * af``.
+    stds : np.ndarray, optional
+        Per-variant standard deviations (length m). Defaults to
+        ``sqrt(2 * af * (1 - af))``. Zeros are replaced with 1.
+    """
+
+    def __init__(
+        self,
+        haplotypes: HaplotypeOperator,
+        means: Optional[np.ndarray] = None,
+        stds: Optional[np.ndarray] = None,
+    ):
+        self._H = haplotypes
+
+        if means is None or stds is None:
+            af = haplotypes.recompute_af()
+            if means is None:
+                means = 2.0 * af
+            if stds is None:
+                stds = np.sqrt(2.0 * af * (1.0 - af))
+
+        means = np.asarray(means, dtype=np.float64)
+        stds = np.asarray(stds, dtype=np.float64).copy()
+        if means.shape != (haplotypes.m,):
+            raise ValueError(
+                f"means shape {means.shape} != (m,) = ({haplotypes.m},)"
+            )
+        if stds.shape != (haplotypes.m,):
+            raise ValueError(
+                f"stds shape {stds.shape} != (m,) = ({haplotypes.m},)"
+            )
+        stds[stds == 0] = 1.0
+
+        self._means = means
+        self._stds = stds
+
+    # --- forwarded metadata ---
+
+    @property
+    def samples(self):
+        return self._H.samples
+
+    @property
+    def variants(self):
+        return self._H.variants
+
+    @property
+    def n(self) -> int:
+        return self._H.n
+
+    @property
+    def m(self) -> int:
+        return self._H.m
+
+    @property
+    def means(self) -> np.ndarray:
+        return self._means
+
+    @property
+    def stds(self) -> np.ndarray:
+        return self._stds
+
+    # --- standardized matrix-vector ops ---
+
+    def matvec(self, v: np.ndarray) -> np.ndarray:
+        """S @ v = H.matvec(v / sigma) - <mu, v / sigma>."""
+        v = np.asarray(v, dtype=np.float64)
+        if v.ndim == 1:
+            v_scaled = v / self._stds
+            raw = self._H.matvec(v_scaled)
+            return raw - self._means @ v_scaled
+        v_scaled = v / self._stds[:, np.newaxis]
+        raw = self._H.matvec(v_scaled)
+        correction = self._means @ v_scaled  # shape (k,)
+        return raw - correction[np.newaxis, :]
+
+    def rmatvec(self, v: np.ndarray) -> np.ndarray:
+        """S.T @ v = (H.rmatvec(v) - mu * sum(v)) / sigma."""
+        v = np.asarray(v, dtype=np.float64)
+        raw = self._H.rmatvec(v)
+        if v.ndim == 1:
+            return (raw - self._means * v.sum()) / self._stds
+        vsum = v.sum(axis=0)  # shape (k,)
+        return (raw - self._means[:, np.newaxis] * vsum[np.newaxis, :]) / self._stds[:, np.newaxis]
+
+    def standardized_matvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
+        """Already standardized: equivalent to ``matvec``.
+
+        The ``af`` argument is ignored; standardization parameters are
+        fixed at construction time.
+        """
+        return self.matvec(v)
+
+    # --- forwarded ops (raw, un-standardized) ---
+
+    def matvec_maternal(self, v: np.ndarray) -> np.ndarray:
+        return self._H.matvec_maternal(v)
+
+    def matvec_paternal(self, v: np.ndarray) -> np.ndarray:
+        return self._H.matvec_paternal(v)
+
+    def recompute_af(self) -> np.ndarray:
+        return self._H.recompute_af()
+
+    def to_dense(self) -> "DenseHaplotypeArray":
+        return self._H.to_dense()
+
+    def meiosis(self, assignment, recombination_map) -> "HaplotypeOperator":
+        return self._H.meiosis(assignment, recombination_map)
+
+    def __getitem__(self, key) -> "HaplotypeOperator":
+        return self._H[key]
+
+    def __repr__(self) -> str:
+        return (f"StandardizedHaplotypeOperator(H={type(self._H).__name__}, "
+                f"n={self.n}, m={self.m})")
+
+
 class NHaplotypeArrayAccessor:
     """
     Accessor class that mimics the xarray .xft interface for DenseHaplotypeArray.

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 from xftsim.filters import TrioView, SibPairView, FilteredView
-from xftsim.struct import NPhenotypeArray
+from xftsim.struct import NPhenotypeArray, StandardizedHaplotypeOperator
 
 
 @dataclass
@@ -155,9 +155,10 @@ class HasemanElstonEstimator(Statistic):
         if not keys:
             return None
 
-        # Build standardized genotype matrix (n x m), per-SNP standardized
-        G = hap.to_diploid_standardized(scale=True).astype(np.float64)
-        n, m = G.shape
+        # Wrap raw haplotypes so matvec/rmatvec act on standardized G
+        # without materializing the (n x m) standardized matrix.
+        S = StandardizedHaplotypeOperator(hap)
+        n, m = S.n, S.m
 
         # Build phenotype matrix (n x k), standardized
         Y = np.column_stack([pheno[k] for k in keys]).astype(np.float64)
@@ -166,9 +167,9 @@ class HasemanElstonEstimator(Statistic):
         Y_std[Y_std < 1e-15] = 1.0
         Y = (Y - Y_mean) / Y_std
 
-        # K Y = G (G' Y) / m  — computed without forming K explicitly
-        GtY = G.T @ Y  # (m, k)
-        KY = G @ GtY / m  # (n, k)
+        # K Y = G (G' Y) / m  — computed without forming K or G explicitly
+        GtY = S.rmatvec(Y)  # (m, k)
+        KY = S.matvec(GtY) / m  # (n, k)
 
         # tr(K^2)
         if self.n_probe > 0 and n > 500:
@@ -176,11 +177,12 @@ class HasemanElstonEstimator(Statistic):
             rng = np.random.RandomState()
             probes = rng.randn(n, self.n_probe)
             # tr(K^2) ≈ (1/l) * tr(P' K^2 P) = (1/l) * ||K P||_F^2
-            KP = G @ (G.T @ probes) / m  # (n, n_probe)
+            KP = S.matvec(S.rmatvec(probes)) / m  # (n, n_probe)
             trK2 = np.sum(KP ** 2) / self.n_probe
         else:
-            # Deterministic: tr(K^2) = tr(G G' G G' / m^2)
-            # = ||G' G||_F^2 / m^2 (avoids forming n x n matrix)
+            # Deterministic: tr(K^2) = ||G' G||_F^2 / m^2.
+            # No cheap operator-only path for this; materialize standardized G.
+            G = hap.to_diploid_standardized(scale=True).astype(np.float64)
             GtG = G.T @ G  # (m, m)
             trK2 = np.sum(GtG ** 2) / (m * m)
 
