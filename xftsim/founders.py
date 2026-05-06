@@ -8,9 +8,6 @@ import xarray as xr
 from nptyping import NDArray, Int8, Int64, Float64, Bool, Shape, Float, Int
 from typing import Any, Hashable, List, Iterable, Callable, Union, Dict
 from functools import cached_property
-import msprime
-import tskit
-import pygrgl
 import tempfile
 import subprocess
 from shutil import which
@@ -191,6 +188,9 @@ def founder_haplotypes_from_msprime_grg(
     xft.struct.GraphHaplotypeOperator
         The operator containing the simulated founder graph and metadata.
     """
+    import msprime
+    import pygrgl
+
     # Step 2: Simulate Ancestry and Mutations
     ts = msprime.sim_ancestry(
         samples=n,
