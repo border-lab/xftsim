@@ -84,12 +84,12 @@ A minimal simulation: 1000 individuals, 200 variants, h2 = 0.5, random mating,
 
 ```python
 import numpy as np
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture
-from xftsim.nmate import RandomMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
-from xftsim.nstats import SampleStatistics
+from xftsim.sim import NSimulation
+from xftsim.stats import SampleStatistics
 from xftsim.founders import founder_haplotypes_uniform_AFs
 
 # 1. Founder haplotypes (n=1000 individuals, m=200 variants)
@@ -177,7 +177,7 @@ fields on `SampleMeta.extra`.
 ### Multivariate Example
 
 ```python
-from xftsim.neffect import MultivariateEffects
+from xftsim.effect import MultivariateEffects
 
 eff = MultivariateEffects.from_h2_rg(h2=[0.6, 0.4], rg=0.3, m=200, seed=1)
 

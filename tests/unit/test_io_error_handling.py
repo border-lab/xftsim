@@ -25,11 +25,11 @@ from xftsim.io import (
     save_simulation_checkpoint, load_simulation_checkpoint,
     _deserialize_mating_regime,
 )
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.nmate import RandomMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

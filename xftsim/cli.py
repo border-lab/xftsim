@@ -216,13 +216,13 @@ def build_simulation_from_config(config: dict):
         On invalid configuration.
     """
     from xftsim.founders import founder_haplotypes_uniform_AFs
-    from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
-    from xftsim.narch import Architecture
-    from xftsim.nmate import RandomMating, LinearAssortativeMating
+    from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
+    from xftsim.arch import Architecture
+    from xftsim.mate import RandomMating, LinearAssortativeMating
     from xftsim.reproduce import RecombinationMap
-    from xftsim.nstats import SampleStatistics
-    from xftsim.nfilter import TrioFilter, SibPairFilter
-    from xftsim.nsim import NSimulation
+    from xftsim.stats import SampleStatistics
+    from xftsim.filters import TrioFilter, SibPairFilter
+    from xftsim.sim import NSimulation
 
     # --- Founders ---
     founder_cfg = config.get("founder", {})
@@ -439,8 +439,8 @@ def resume(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Extra detail"),
 ):
     """Resume a simulation from a checkpoint directory."""
-    from xftsim.nsim import NSimulation
-    from xftsim.nstats import SampleStatistics
+    from xftsim.sim import NSimulation
+    from xftsim.stats import SampleStatistics
 
     mode = _detect_output_mode(plain, rich_flag)
     out = _Output(mode=mode, quiet=quiet, verbose=verbose)

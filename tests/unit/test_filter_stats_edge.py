@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
-from xftsim.nfilter import TrioFilter, SibPairFilter, TrioView, SibPairView
-from xftsim.nstats import SampleStatistics, GenerationResult
+from xftsim.filters import TrioFilter, SibPairFilter, TrioView, SibPairView
+from xftsim.stats import SampleStatistics, GenerationResult
 
 
 def _make_phenotype(n=20, keys=None, fid=None, seed=42):

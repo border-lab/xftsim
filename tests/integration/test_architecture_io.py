@@ -14,13 +14,13 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent,
     MotherComponent, FatherComponent, ParentComponent,
     SiblingMeanComponent, SiblingCountComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.io import save_architecture, load_architecture
 
 import sys, os

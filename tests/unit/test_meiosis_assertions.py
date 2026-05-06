@@ -5,13 +5,12 @@ Tests:
 1. meiosis assertions: dimension mismatch, index OOB, dtype checks
 2. RecombinationMap: constructor edge cases, chromosome boundary handling
 3. RecombinationMap.from_haplotypes
-4. Meiosis class: basic operation
 """
 import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.reproduce import RecombinationMap, meiosis, Meiosis
+from xftsim.reproduce import RecombinationMap, meiosis
 
 
 def _make_hap(n=10, m=5, seed=42):
@@ -158,35 +157,3 @@ class TestRecombinationMapEdges:
         assert '0.5' in r
 
 
-class TestMeiosisClass:
-    def test_constructor_xor(self):
-        """Meiosis requires exactly one of p or rmap."""
-        rmap = RecombinationMap.constant_map(m=5, p=0.5)
-        # Both provided should fail
-        with pytest.raises(AssertionError):
-            Meiosis(rmap=rmap, p=0.5)
-        # Neither provided should fail
-        with pytest.raises(AssertionError):
-            Meiosis()
-        # Just rmap should work
-        m_obj = Meiosis(rmap=rmap)
-        assert m_obj.recombination_map is rmap
-        # Just p should work
-        m_obj2 = Meiosis(p=0.3)
-        assert m_obj2._p == 0.3
-
-    def test_get_recombination_map_with_rmap(self):
-        """get_recombination_map returns stored map when rmap provided."""
-        rmap = RecombinationMap.constant_map(m=5, p=0.5)
-        m_obj = Meiosis(rmap=rmap)
-        hap = _make_hap(n=10, m=5)
-        result = m_obj.get_recombination_map(hap)
-        assert result is rmap
-
-    def test_get_recombination_map_with_p(self):
-        """get_recombination_map generates map from haplotypes when p provided."""
-        m_obj = Meiosis(p=0.3)
-        hap = _make_hap(n=10, m=7)
-        result = m_obj.get_recombination_map(hap)
-        assert isinstance(result, RecombinationMap)
-        assert result.m == 7

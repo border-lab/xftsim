@@ -18,11 +18,11 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.neffect import AdditiveEffects
-from xftsim.nmate import RandomMating
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import AdditiveEffects
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 
 def _simple_sim(n=50, m=10, retain_haplotypes=1, retain_phenotypes=2, seed=42):

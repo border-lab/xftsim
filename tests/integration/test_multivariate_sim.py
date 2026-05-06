@@ -3,9 +3,9 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.nsim import NSimulation
-from xftsim.nfilter import TrioFilter, SibPairFilter
-from xftsim.nstats import SampleStatistics
+from xftsim.sim import NSimulation
+from xftsim.filters import TrioFilter, SibPairFilter
+from xftsim.stats import SampleStatistics
 
 
 def _run_biv_sim(n_gen=3, seed=42, filters=None, statistics=None):

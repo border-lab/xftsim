@@ -18,7 +18,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import _tokenize, _shunting_yard, _evaluate_expression
+from xftsim.arch import _tokenize, _shunting_yard, _evaluate_expression
 from xftsim.struct import SampleMeta, NPhenotypeArray
 
 

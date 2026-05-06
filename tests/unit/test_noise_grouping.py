@@ -10,7 +10,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import NoiseComponent, CNoiseComponent, ArchNode
+from xftsim.arch import NoiseComponent, CNoiseComponent, ArchNode
 from xftsim.struct import SampleMeta, NPhenotypeArray, DenseHaplotypeArray, VariantMeta
 
 

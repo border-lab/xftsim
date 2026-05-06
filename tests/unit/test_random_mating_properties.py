@@ -14,7 +14,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.nmate import RandomMating
+from xftsim.mate import RandomMating
 from xftsim.struct import SampleMeta
 
 

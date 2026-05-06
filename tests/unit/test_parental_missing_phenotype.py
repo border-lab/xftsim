@@ -11,7 +11,7 @@ import pytest
 import warnings
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
-from xftsim.narch import ArchNode, MotherComponent, FatherComponent, ParentComponent
+from xftsim.arch import ArchNode, MotherComponent, FatherComponent, ParentComponent
 
 
 def _make_context():

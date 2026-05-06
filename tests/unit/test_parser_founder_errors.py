@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from xftsim.parser import parse_formula
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 
 
 class TestFounderNoiseErrors:

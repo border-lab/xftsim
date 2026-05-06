@@ -20,11 +20,11 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.neffect import AdditiveEffects
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import AdditiveEffects
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
 
 

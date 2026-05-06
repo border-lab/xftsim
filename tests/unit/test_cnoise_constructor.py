@@ -13,7 +13,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import CNoiseComponent
+from xftsim.arch import CNoiseComponent
 
 
 class TestCNoiseConstructor:

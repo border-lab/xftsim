@@ -18,7 +18,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
     SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
     ArchNode,

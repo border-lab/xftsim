@@ -430,11 +430,11 @@ grg construct input.vcf.gz -j 4 -o out.grg  # VCF → GRG
 ### Current xftsim (for reference)
 ```python
 from xftsim.founders import founder_haplotypes_uniform_AFs
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.nmate import RandomMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 from xftsim.io import load_grg
 
 hap = founder_haplotypes_uniform_AFs(n=1000, m=500)

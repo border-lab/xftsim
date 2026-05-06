@@ -3,13 +3,13 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, NoiseComponent, AggregationComponent, ArchNode,
     SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
     SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
     _SIBLING_COMPONENTS,
 )
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 from xftsim.parser import parse_formula
 
 
@@ -179,7 +179,7 @@ class TestSiblingErrors:
         expected = {'sibling_mean', 'sibling_sum', 'sibling_any',
                     'sibling_count', 'sibling_eldest', 'sibling_youngest'}
         assert expected.issubset(set(_SIBLING_COMPONENTS.keys()))
-        from xftsim.narch import BUILTINS
+        from xftsim.arch import BUILTINS
         assert expected.issubset(set(BUILTINS.keys()))
 
 

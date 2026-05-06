@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, DenseHaplotypeArray, VariantMeta, NPhenotypeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, AggregationComponent, NoiseComponent,
     _tokenize, _shunting_yard, _evaluate_expression,
 )

@@ -3,10 +3,10 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating, LinearAssortativeMating
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.neffect import AdditiveEffects
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating, LinearAssortativeMating
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import AdditiveEffects
 from xftsim.reproduce import RecombinationMap
 from xftsim.io import save_simulation_checkpoint
 

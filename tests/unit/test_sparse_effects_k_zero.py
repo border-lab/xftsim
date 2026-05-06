@@ -10,7 +10,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import SparseEffects
+from xftsim.effect import SparseEffects
 
 
 class TestSparseEffectsKZero:

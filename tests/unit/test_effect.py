@@ -3,7 +3,7 @@ Unit tests for EffectSpec classes.
 """
 import numpy as np
 import pytest
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 
 
 class TestAdditiveEffects:
@@ -120,14 +120,14 @@ class TestSparseEffectsIntegration:
 
     def test_sparse_with_genetic_component(self):
         """SparseEffects should work as a drop-in for GeneticComponent."""
-        from xftsim.narch import GeneticComponent
+        from xftsim.arch import GeneticComponent
         from tests.testdata import TestGenomes
 
         eff = SparseEffects.from_h2(h2=0.5, m=100, k_causal=10, seed=42)
         gc = GeneticComponent(effects=eff)
         hap = TestGenomes.simple(n=50, m=100, seed=42)
 
-        from xftsim.narch import ArchNode
+        from xftsim.arch import ArchNode
         from xftsim.struct import NPhenotypeArray
         node = ArchNode(outputs=['Y.G'], component=gc, inputs=[])
         pheno = NPhenotypeArray(samples=hap.samples)
@@ -137,7 +137,7 @@ class TestSparseEffectsIntegration:
 
     def test_sparse_in_formula(self):
         """SparseEffects should work via formula-based Architecture."""
-        from xftsim.narch import Architecture
+        from xftsim.arch import Architecture
 
         eff = SparseEffects.from_h2(h2=0.5, m=50, k_causal=5, seed=42)
         arch = Architecture.from_formula("""
@@ -149,9 +149,9 @@ class TestSparseEffectsIntegration:
 
     def test_sparse_sim_runs(self):
         """Full simulation with SparseEffects should complete."""
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nsim import NSimulation
-        from xftsim.nmate import RandomMating
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.sim import NSimulation
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         from tests.testdata import TestSimulation
 

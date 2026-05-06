@@ -22,13 +22,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from xftsim.struct import (
     SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray,
 )
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
 )
-from xftsim.nmate import RandomMating
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
 
 # Suppress repetitive warnings during benchmarks

@@ -260,11 +260,11 @@ Architectures can also be built programmatically using
 
 .. code-block:: python
 
-   from xftsim.narch import (
+   from xftsim.arch import (
        Architecture, ArchNode,
        GeneticComponent, NoiseComponent, AggregationComponent,
    )
-   from xftsim.neffect import AdditiveEffects
+   from xftsim.effect import AdditiveEffects
 
    arch = Architecture()
 
@@ -284,4 +284,4 @@ Architectures can also be built programmatically using
        inputs=['height.G', 'height.E'],
    ))
 
-See :doc:`../api/narch` for full class documentation.
+See :doc:`../api/arch` for full class documentation.

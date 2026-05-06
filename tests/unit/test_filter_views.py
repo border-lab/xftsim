@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
-from xftsim.nfilter import TrioFilter, SibPairFilter, TrioView, SibPairView
+from xftsim.filters import TrioFilter, SibPairFilter, TrioView, SibPairView
 
 
 def _make_pheno(n, keys, fid=None, generation=0):

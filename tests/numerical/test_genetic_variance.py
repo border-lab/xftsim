@@ -16,8 +16,8 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.narch import Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.arch import Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 
 
 class TestGeneticVariance:

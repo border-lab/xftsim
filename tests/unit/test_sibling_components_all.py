@@ -7,7 +7,7 @@ SiblingEldestComponent, SiblingYoungestComponent.
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     SiblingAnyComponent, SiblingCountComponent,
     SiblingEldestComponent, SiblingYoungestComponent,
     ArchNode,

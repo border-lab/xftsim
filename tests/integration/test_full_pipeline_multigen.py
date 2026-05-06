@@ -13,16 +13,16 @@ import pytest
 import tempfile
 import shutil
 
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent,
 )
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
-from xftsim.nfilter import TrioFilter, SibPairFilter
-from xftsim.nstats import SampleStatistics
+from xftsim.sim import NSimulation
+from xftsim.filters import TrioFilter, SibPairFilter
+from xftsim.stats import SampleStatistics
 from xftsim.io import save_simulation_checkpoint
 
 import sys, os

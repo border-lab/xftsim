@@ -21,12 +21,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
-from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
+from xftsim.sim import NSimulation
+from xftsim.stats import SampleStatistics, HasemanElstonEstimator
 
 # ── Parameters ──────────────────────────────────────────────────────────────
 

@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
-from xftsim.nfilter import TrioFilter, TrioView
+from xftsim.filters import TrioFilter, TrioView
 
 
 def _make_pheno(n, keys=None, seed=42):

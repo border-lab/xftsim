@@ -11,7 +11,7 @@ Targets:
 import numpy as np
 import pytest
 
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
 from xftsim.parser import parse_formula
 
@@ -57,12 +57,12 @@ class TestMatingStatisticsEdgeCases:
     def _build_trio_sim(self, n=40, m=10, assortative=False, gens=2):
         """Run a small simulation that produces pedigrees and trios for stats."""
         from xftsim.founders import founder_haplotypes_uniform_AFs
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nmate import RandomMating, LinearAssortativeMating
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.mate import RandomMating, LinearAssortativeMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nsim import NSimulation
-        from xftsim.nstats import SampleStatistics, MatingStatistics
-        from xftsim.nfilter import TrioFilter
+        from xftsim.sim import NSimulation
+        from xftsim.stats import SampleStatistics, MatingStatistics
+        from xftsim.filters import TrioFilter
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=n, m=m)
@@ -125,7 +125,7 @@ class TestMatingStatisticsEdgeCases:
 class TestNmateRngDefault:
     def test_random_mating_rng_none(self):
         """RandomMating.mate with rng=None creates default RNG."""
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         samples = SampleMeta(iid=np.arange(10))
         rm = RandomMating(offspring_per_pair=2)
         assignment = rm.mate(samples, rng=None)
@@ -133,7 +133,7 @@ class TestNmateRngDefault:
 
     def test_assortative_mating_rng_none(self):
         """LinearAssortativeMating.mate with rng=None creates default RNG."""
-        from xftsim.nmate import LinearAssortativeMating
+        from xftsim.mate import LinearAssortativeMating
         samples = SampleMeta(iid=np.arange(10))
         phenotypes = NPhenotypeArray(
             samples=samples,
@@ -158,7 +158,7 @@ class TestNGWASNonDensePath:
 
     def test_gwas_with_mock_operator(self):
         """GWAS should work by calling to_dense() on non-Dense operator."""
-        from xftsim.ngwas import GWAS
+        from xftsim.gwas import GWAS
 
         # Create a concrete DenseHaplotypeArray
         geno = np.random.RandomState(42).randint(0, 2, (20, 5, 2)).astype(np.int8)
@@ -205,7 +205,7 @@ class TestSiblingMeanDirect:
 
     def test_sibling_mean_compute_directly(self):
         """Call SiblingMeanComponent.compute() directly with a mock ArchNode."""
-        from xftsim.narch import SiblingMeanComponent, ArchNode
+        from xftsim.arch import SiblingMeanComponent, ArchNode
 
         # Create test data
         n = 10

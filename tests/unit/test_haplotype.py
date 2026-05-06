@@ -268,7 +268,7 @@ class TestDenseHaplotypeArrayMeiosis:
         return DenseHaplotypeArray(genotypes=geno, samples=sm)
 
     def test_returns_dense_haplotype_array(self):
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         hap = self._make_parents()
         rmap = RecombinationMap.constant_map(m=50, p=0.5)
@@ -278,7 +278,7 @@ class TestDenseHaplotypeArrayMeiosis:
         assert isinstance(offspring, DenseHaplotypeArray)
 
     def test_offspring_shape(self):
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         hap = self._make_parents()
         rmap = RecombinationMap.constant_map(m=50, p=0.5)
@@ -290,7 +290,7 @@ class TestDenseHaplotypeArrayMeiosis:
         assert offspring.genotypes.shape[2] == 2
 
     def test_generation_incremented(self):
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         hap = self._make_parents()
         rmap = RecombinationMap.constant_map(m=50, p=0.5)
@@ -300,7 +300,7 @@ class TestDenseHaplotypeArrayMeiosis:
         assert offspring.generation == 1
 
     def test_variants_inherited(self):
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         vm = VariantMeta(vid=np.arange(50), chrom=np.array([1]*25 + [2]*25))
         hap = self._make_parents()
@@ -312,7 +312,7 @@ class TestDenseHaplotypeArrayMeiosis:
         np.testing.assert_array_equal(offspring.vid, hap.vid)
 
     def test_alleles_binary(self):
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         hap = self._make_parents()
         rmap = RecombinationMap.constant_map(m=50, p=0.5)

@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nmate import LinearAssortativeMating
+from xftsim.mate import LinearAssortativeMating
 
 
 def _make_deterministic_phenotypes(n=100, seed=42):

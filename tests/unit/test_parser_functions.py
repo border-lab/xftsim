@@ -23,8 +23,8 @@ from xftsim.parser import (
     _parse_parental, _parse_sibling, _parse_aggregation,
     _parse_haplotypeGenetic,
 )
-from xftsim.narch import ArchNode
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.arch import ArchNode
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 
 
 class TestExtractGrouping:

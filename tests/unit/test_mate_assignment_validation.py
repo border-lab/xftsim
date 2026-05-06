@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nmate import NMateAssignment, RandomMating, LinearAssortativeMating
+from xftsim.mate import NMateAssignment, RandomMating, LinearAssortativeMating
 
 
 class TestNMateAssignmentValidation:

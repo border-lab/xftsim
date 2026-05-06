@@ -12,13 +12,13 @@ import pytest
 import os
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.neffect import AdditiveEffects
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import AdditiveEffects
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nstats import SampleStatistics
-from xftsim.nfilter import TrioFilter
+from xftsim.stats import SampleStatistics
+from xftsim.filters import TrioFilter
 from xftsim.io import save_simulation_checkpoint
 
 import sys

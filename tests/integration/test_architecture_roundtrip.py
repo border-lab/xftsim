@@ -13,8 +13,8 @@ import pytest
 import tempfile
 import shutil
 
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent,
     MotherComponent,

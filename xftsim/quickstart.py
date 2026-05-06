@@ -7,13 +7,13 @@ on top of the current ``NSimulation`` / ``Architecture`` / ``nmate`` stack.
 
 API translation table (legacy -> current)
 -----------------------------------------
-    xft.sim.Simulation                                -> xftsim.nsim.NSimulation
-    xft.arch.GCTA_Architecture(h2=..., ...)           -> xftsim.narch.Architecture
-                                                         + xftsim.neffect.AdditiveEffects.from_h2
+    xft.sim.Simulation                                -> xftsim.sim.NSimulation
+    xft.arch.GCTA_Architecture(h2=..., ...)           -> xftsim.arch.Architecture
+                                                         + xftsim.effect.AdditiveEffects.from_h2
     xft.reproduce.RecombinationMap.constant_map_from_haplotypes
                                                       -> RecombinationMap.from_haplotypes
-    xft.mate.LinearAssortativeMatingRegime            -> xftsim.nmate.LinearAssortativeMating
-    xft.stats.MatingStatistics / SampleStatistics /   -> xftsim.nstats.MatingStatistics /
+    xft.mate.LinearAssortativeMatingRegime            -> xftsim.mate.LinearAssortativeMating
+    xft.stats.MatingStatistics / SampleStatistics /   -> xftsim.stats.MatingStatistics /
         HasemanElstonEstimator                              SampleStatistics /
                                                             HasemanElstonEstimator
     xft.proc.LimitMemory(n_haplotype_generations=1)   -> NSimulation(retain_haplotypes=1, ...)
@@ -25,12 +25,12 @@ import numpy as np
 import pandas as pd
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture
-from xftsim.nmate import LinearAssortativeMating
-from xftsim.nfilter import TrioFilter
-from xftsim.nsim import NSimulation
-from xftsim.nstats import (
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture
+from xftsim.mate import LinearAssortativeMating
+from xftsim.filters import TrioFilter
+from xftsim.sim import NSimulation
+from xftsim.stats import (
     SampleStatistics,
     HasemanElstonEstimator,
     MatingStatistics,

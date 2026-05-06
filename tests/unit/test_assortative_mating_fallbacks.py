@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nmate import LinearAssortativeMating, RandomMating
+from xftsim.mate import LinearAssortativeMating, RandomMating
 
 
 def _make_phenotypes(n, seed=42):

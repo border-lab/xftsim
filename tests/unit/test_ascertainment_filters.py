@@ -4,7 +4,7 @@ Tests for UnrelatedFilter, AscertainmentFilter, and SubsampleFilter.
 import numpy as np
 import pytest
 
-from xftsim.nfilter import (
+from xftsim.filters import (
     Filter, FilteredView,
     UnrelatedFilter, UnrelatedView,
     AscertainmentFilter, AscertainedView,

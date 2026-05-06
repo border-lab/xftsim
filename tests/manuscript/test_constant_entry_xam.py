@@ -27,12 +27,12 @@ import numpy as np
 import pytest
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture
-from xftsim.nmate import LinearAssortativeMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture
+from xftsim.mate import LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
-from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
+from xftsim.sim import NSimulation
+from xftsim.stats import SampleStatistics, HasemanElstonEstimator
 
 
 def _build_constant_entry_sim(
@@ -329,7 +329,7 @@ class TestRandomMatingBaseline:
     """Under random mating, genetic correlations should remain near zero."""
 
     def test_rg_near_zero(self):
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
 
         hap = founder_haplotypes_uniform_AFs(n=8000, m=1000)
 

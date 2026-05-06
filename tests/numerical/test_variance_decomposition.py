@@ -11,8 +11,8 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

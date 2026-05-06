@@ -12,7 +12,7 @@ from xftsim.io import (
     save_phenotypes_npz, load_phenotypes_npz,
     save_effects_npz, load_effects_npz,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -86,8 +86,8 @@ class TestPhenotypeIO:
 
     def test_roundtrip_from_simulation(self, tmp_path):
         """Phenotypes from a real simulation should round-trip."""
-        from xftsim.nsim import NSimulation
-        from xftsim.nmate import RandomMating
+        from xftsim.sim import NSimulation
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
         hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
@@ -166,7 +166,7 @@ class TestArchitectureIO:
     def test_roundtrip_simple(self, tmp_path):
         """Simple genetic + noise + aggregation should round-trip."""
         from xftsim.io import save_architecture, load_architecture
-        from xftsim.narch import (
+        from xftsim.arch import (
             Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
         )
         eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
@@ -187,7 +187,7 @@ class TestArchitectureIO:
     def test_roundtrip_effects_match(self, tmp_path):
         """Loaded architecture should have identical effects."""
         from xftsim.io import save_architecture, load_architecture
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 
         eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
         arch = Architecture()
@@ -207,7 +207,7 @@ class TestArchitectureIO:
     def test_roundtrip_multivariate(self, tmp_path):
         """MVGeneticComponent + CNoiseComponent should round-trip."""
         from xftsim.io import save_architecture, load_architecture
-        from xftsim.narch import (
+        from xftsim.arch import (
             Architecture, MVGeneticComponent, CNoiseComponent, AggregationComponent,
         )
         eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=20, seed=42)
@@ -229,7 +229,7 @@ class TestArchitectureIO:
     def test_roundtrip_vertical_transmission(self, tmp_path):
         """ParentComponent should round-trip."""
         from xftsim.io import save_architecture, load_architecture
-        from xftsim.narch import (
+        from xftsim.arch import (
             Architecture, GeneticComponent, NoiseComponent,
             ParentComponent, AggregationComponent,
         )
@@ -250,7 +250,7 @@ class TestArchitectureIO:
     def test_roundtrip_produces_identical_phenotypes(self, tmp_path):
         """Loaded architecture should produce identical phenotypes."""
         from xftsim.io import save_architecture, load_architecture
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 
         eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
         arch = Architecture()
@@ -275,9 +275,9 @@ class TestArchitectureIO:
 
 class TestSimulationCheckpoint:
     def _make_sim(self, m=20, n=100, seed=42):
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nsim import NSimulation
-        from xftsim.nmate import RandomMating
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.sim import NSimulation
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=seed)
@@ -405,14 +405,14 @@ class TestSimulationCheckpoint:
         loaded = load_simulation_checkpoint(dir_path)
 
         assert loaded['mating_regime'] is not None
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         assert isinstance(loaded['mating_regime'], RandomMating)
         assert loaded['mating_regime'].offspring_per_pair == 2
 
     def test_checkpoint_resume(self, tmp_path):
         """Simulation should be resumable from checkpoint via from_checkpoint."""
         from xftsim.io import save_simulation_checkpoint
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
 
         sim = self._make_sim()
         sim.run(3)
@@ -429,7 +429,7 @@ class TestSimulationCheckpoint:
     def test_checkpoint_resume_preserves_gen0_yg(self, tmp_path):
         """Resumed simulation should have the same gen-0 Y.G (if still in history)."""
         from xftsim.io import save_simulation_checkpoint
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
 
         sim = self._make_sim()
         sim.run(2)
@@ -524,8 +524,8 @@ class TestIOEdgeCases:
     def test_checkpoint_retention_values_preserved(self, tmp_path):
         """Retention settings should be preserved in checkpoint."""
         from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
-        from xftsim.nsim import NSimulation
-        from xftsim.nmate import RandomMating
+        from xftsim.sim import NSimulation
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
         hap = TestSimulation.founder_haplotypes(n=100, m=20)
@@ -560,7 +560,7 @@ class TestIOEdgeCases:
     def test_architecture_with_sibling_roundtrip(self, tmp_path):
         """Architecture with sibling component should roundtrip."""
         from xftsim.io import save_architecture, load_architecture
-        from xftsim.narch import Architecture, NoiseComponent, SiblingMeanComponent, AggregationComponent
+        from xftsim.arch import Architecture, NoiseComponent, SiblingMeanComponent, AggregationComponent
 
         arch = Architecture()
         arch.add('X', NoiseComponent(variance=1.0))

@@ -10,14 +10,14 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent,
     HaplotypeGeneticComponent, NoiseComponent, AggregationComponent,
 )
-from xftsim.nmate import RandomMating
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

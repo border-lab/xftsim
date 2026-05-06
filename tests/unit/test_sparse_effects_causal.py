@@ -12,8 +12,8 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import SparseEffects, AdditiveEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import SparseEffects, AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 
 import sys, os

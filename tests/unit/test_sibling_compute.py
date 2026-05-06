@@ -6,7 +6,7 @@ Tests each sibling component with known inputs and groups.
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
     SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
 )
@@ -149,7 +149,7 @@ class TestSiblingMissingSource:
     def test_missing_source_raises(self):
         """Source not in phenotypes should raise ValueError."""
         from xftsim.struct import SampleMeta, NPhenotypeArray
-        from xftsim.narch import ArchNode
+        from xftsim.arch import ArchNode
         import sys, os
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
         from testdata import TestSimulation

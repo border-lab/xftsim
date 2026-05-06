@@ -11,10 +11,10 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.neffect import AdditiveEffects
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import AdditiveEffects
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap, meiosis
 
 import sys, os

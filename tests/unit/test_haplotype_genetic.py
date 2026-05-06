@@ -3,11 +3,11 @@ import numpy as np
 import pytest
 
 from xftsim.struct import DenseHaplotypeArray, NPhenotypeArray, SampleMeta, VariantMeta
-from xftsim.narch import (
+from xftsim.arch import (
     HaplotypeGeneticComponent, GeneticComponent, Architecture, AggregationComponent,
     ArchNode,
 )
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 from xftsim.parser import parse_formula
 
 

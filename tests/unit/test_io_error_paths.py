@@ -17,8 +17,8 @@ import os
 import json
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.neffect import AdditiveEffects, SparseEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects, SparseEffects
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MotherComponent,
 )

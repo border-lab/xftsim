@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.nmate import NMateAssignment, RandomMating
+from xftsim.mate import NMateAssignment, RandomMating
 from xftsim.reproduce import RecombinationMap
 
 

@@ -8,9 +8,9 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.nstats import SampleStatistics, GenerationResult
-from xftsim.nsim import NSimulation
-from xftsim.nfilter import TrioFilter
+from xftsim.stats import SampleStatistics, GenerationResult
+from xftsim.sim import NSimulation
+from xftsim.filters import TrioFilter
 
 
 class TestSampleStatistics:
@@ -86,7 +86,7 @@ class TestSimWithStats:
 
     def test_custom_statistic(self):
         """Custom Statistic subclass should work in the simulation."""
-        from xftsim.nstats import Statistic
+        from xftsim.stats import Statistic
 
         class MeanStatistic(Statistic):
             def estimate(self, phenotype_history, filtered_views, generation, **kwargs):
@@ -170,7 +170,7 @@ class TestSampleStatisticsEdgeCases:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime(offspring_per_pair=3)
         rmap = TestSimulation.recombination_map(m=50)
-        from xftsim.nfilter import SibPairFilter
+        from xftsim.filters import SibPairFilter
         sim = NSimulation(
             hap, arch, rm, rmap, seed=42,
             retain_phenotypes=10,

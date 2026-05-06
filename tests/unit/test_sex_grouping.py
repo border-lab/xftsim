@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import _resolve_grouping, NoiseComponent, ArchNode
+from xftsim.arch import _resolve_grouping, NoiseComponent, ArchNode
 
 
 def _make_hap_with_sex(n=10, m=3, generation=0):

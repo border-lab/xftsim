@@ -20,12 +20,12 @@ import pandas as pd
 import scipy.stats as stats
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture
-from xftsim.nmate import GeneralAssortativeMating, BatchedMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture
+from xftsim.mate import GeneralAssortativeMating, BatchedMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
-from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
+from xftsim.sim import NSimulation
+from xftsim.stats import SampleStatistics, HasemanElstonEstimator
 
 # ── Parameters ──────────────────────────────────────────────────────────────
 

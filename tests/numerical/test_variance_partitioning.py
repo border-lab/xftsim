@@ -8,16 +8,16 @@ of Y.G / variance of Y approximates h2.
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture,
     GeneticComponent,
     MVGeneticComponent,
     NoiseComponent,
     AggregationComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 import sys
 import os

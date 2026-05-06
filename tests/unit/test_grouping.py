@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation, TestMeta
 
 from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, NoiseComponent, CNoiseComponent, AggregationComponent, ArchNode,
 )
 from xftsim.parser import parse_formula
@@ -209,7 +209,7 @@ class TestParserPipeSyntax:
 
     def test_invalid_grouping_on_genetic(self):
         """Grouping on genetic should raise error."""
-        from xftsim.neffect import AdditiveEffects
+        from xftsim.effect import AdditiveEffects
         eff = AdditiveEffects.from_h2(0.5, 10)
         with pytest.raises(ValueError, match="does not accept"):
             parse_formula("G ~ genetic(eff) | FID", effects={'eff': eff})

@@ -16,7 +16,7 @@ import pytest
 import warnings
 
 from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray, DenseHaplotypeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, ArchNode,
     MotherComponent, FatherComponent, ParentComponent,
     NoiseComponent,

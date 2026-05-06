@@ -4,14 +4,14 @@ Unit tests for the formula parser.
 import numpy as np
 import pytest
 from xftsim.parser import parse_formula
-from xftsim.narch import (
+from xftsim.arch import (
     ArchNode, Architecture, GeneticComponent, MVGeneticComponent,
     HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent,
     MotherComponent, FatherComponent, ParentComponent,
     SiblingMeanComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 
 
 @pytest.fixture

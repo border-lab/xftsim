@@ -17,7 +17,7 @@ import tempfile
 import os
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.io import (
     save_haplotypes_npz, load_haplotypes_npz,
     save_phenotypes_npz, load_phenotypes_npz,

@@ -21,7 +21,7 @@ import pytest
 from testdata import TestSimulation
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.reproduce import RecombinationMap, meiosis
-from xftsim.nmate import NMateAssignment
+from xftsim.mate import NMateAssignment
 
 
 def _make_hap(n, m, seed=42, chrom=None):

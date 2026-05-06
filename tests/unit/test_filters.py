@@ -8,10 +8,10 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.nfilter import TrioFilter, SibPairFilter, TrioView, SibPairView
+from xftsim.filters import TrioFilter, SibPairFilter, TrioView, SibPairView
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating
 
 
 class TestTrioFilter:

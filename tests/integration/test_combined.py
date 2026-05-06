@@ -9,16 +9,16 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating, LinearAssortativeMating
-from xftsim.narch import (
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating, LinearAssortativeMating
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     ParentComponent, MotherComponent, FatherComponent,
     SiblingMeanComponent,
 )
-from xftsim.neffect import AdditiveEffects
-from xftsim.nfilter import TrioFilter, SibPairFilter
-from xftsim.nstats import SampleStatistics
+from xftsim.effect import AdditiveEffects
+from xftsim.filters import TrioFilter, SibPairFilter
+from xftsim.stats import SampleStatistics
 from xftsim.reproduce import RecombinationMap
 
 
@@ -114,8 +114,8 @@ class TestCombinedVTAssortative:
         """Bivariate traits with VT + assortative mating + stats for 5 generations."""
         m, n = 30, 400
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=42)
-        from xftsim.neffect import MultivariateEffects
-        from xftsim.narch import MVGeneticComponent, CNoiseComponent
+        from xftsim.effect import MultivariateEffects
+        from xftsim.arch import MVGeneticComponent, CNoiseComponent
 
         mv_eff = MultivariateEffects.from_h2_rg(h2=[0.4, 0.3], rg=0.2, m=m, seed=123)
         cov_e = np.array([[0.3, 0.05], [0.05, 0.4]])

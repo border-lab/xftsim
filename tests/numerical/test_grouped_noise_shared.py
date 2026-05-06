@@ -8,9 +8,9 @@ correlation even with no genetic component.
 import numpy as np
 import pytest
 
-from xftsim.narch import Architecture, NoiseComponent, AggregationComponent
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating
+from xftsim.arch import Architecture, NoiseComponent, AggregationComponent
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
 import sys, os

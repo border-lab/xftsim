@@ -12,10 +12,10 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent, ArchNode,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.struct import NPhenotypeArray
 
 import sys, os

@@ -11,8 +11,8 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent
-from xftsim.neffect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent
+from xftsim.effect import AdditiveEffects
 
 
 class TestArchitectureConstructorFormula:

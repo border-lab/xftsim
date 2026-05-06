@@ -17,7 +17,7 @@ import ast
 import re
 from typing import Optional
 
-from xftsim.narch import (
+from xftsim.arch import (
     ArchNode, ArchComponent, GeneticComponent, MVGeneticComponent,
     HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent, ThresholdComponent, AggregationComponent,
@@ -25,7 +25,7 @@ from xftsim.narch import (
     _SIBLING_COMPONENTS,
     BUILTINS,
 )
-from xftsim.neffect import EffectSpec
+from xftsim.effect import EffectSpec
 
 
 def parse_formula(formula: str,

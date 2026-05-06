@@ -12,7 +12,7 @@ import pytest
 import warnings
 
 from xftsim.struct import SampleMeta, DenseHaplotypeArray, VariantMeta, PedigreeArray
-from xftsim.narch import _resolve_grouping
+from xftsim.arch import _resolve_grouping
 
 
 def _make_hap(n=10, m=3, generation=0, extra=None):

@@ -9,11 +9,11 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import MultivariateEffects
-from xftsim.narch import Architecture, MVGeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.nmate import RandomMating
+from xftsim.effect import MultivariateEffects
+from xftsim.arch import Architecture, MVGeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

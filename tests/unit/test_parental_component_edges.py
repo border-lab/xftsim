@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 import warnings
 
-from xftsim.narch import (
+from xftsim.arch import (
     MotherComponent, FatherComponent, ParentComponent,
     NoiseComponent, ArchNode,
 )

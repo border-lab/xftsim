@@ -1,12 +1,12 @@
 """
-Unit tests for reproduce module: RecombinationMap, meiosis, Meiosis class.
+Unit tests for reproduce module: RecombinationMap, meiosis.
 """
 import numpy as np
 import pytest
 
-from xftsim.reproduce import RecombinationMap, meiosis, Meiosis
+from xftsim.reproduce import RecombinationMap, meiosis
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.nmate import RandomMating
+from xftsim.mate import RandomMating
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -207,57 +207,6 @@ class TestMeiosisFunction:
         pat = np.array([1], dtype=np.int64)
         result = meiosis(parent_hap, rmap, mat, pat)
         assert result.shape == (1, 50, 2)
-
-
-# ── Meiosis class ──────────────────────────────────────────────────────────
-
-class TestMeiosisClass:
-    def test_with_rmap(self):
-        rmap = RecombinationMap.constant_map(m=50, p=0.5)
-        m = Meiosis(rmap=rmap)
-        assert m.recombination_map is rmap
-        assert m._p is None
-
-    def test_with_p(self):
-        m = Meiosis(p=0.3)
-        assert m.recombination_map is None
-        assert m._p == 0.3
-
-    def test_both_raises(self):
-        rmap = RecombinationMap.constant_map(m=10, p=0.5)
-        with pytest.raises(AssertionError):
-            Meiosis(rmap=rmap, p=0.3)
-
-    def test_neither_raises(self):
-        with pytest.raises(AssertionError):
-            Meiosis()
-
-    def test_get_recombination_map_with_rmap(self):
-        rmap = RecombinationMap.constant_map(m=50, p=0.5)
-        m = Meiosis(rmap=rmap)
-        hap = TestSimulation.founder_haplotypes(n=10, m=50)
-        returned = m.get_recombination_map(hap)
-        assert returned is rmap
-
-    def test_get_recombination_map_with_p(self):
-        m = Meiosis(p=0.3)
-        hap = TestSimulation.founder_haplotypes(n=10, m=50)
-        returned = m.get_recombination_map(hap)
-        assert isinstance(returned, RecombinationMap)
-        assert returned.m == 50
-
-    def test_reproduce(self):
-        from xftsim.mate import MateAssignment
-        hap = TestSimulation.founder_haplotypes(n=100, m=50)
-        rmap = RecombinationMap.constant_map(m=50, p=0.5)
-        m = Meiosis(rmap=rmap)
-        rm = RandomMating(offspring_per_pair=2)
-        ma = rm.mate(hap.samples, rng=np.random.RandomState(42))
-
-        # Meiosis.reproduce expects old-style MateAssignment — skip if unavailable
-        # Instead, test that the class can be constructed and used with rmap
-        returned = m.get_recombination_map(hap)
-        assert returned.m == 50
 
 
 class TestSingleLocusMeiosis:

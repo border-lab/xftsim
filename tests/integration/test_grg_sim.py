@@ -5,10 +5,10 @@ import pytest
 pygrgl = pytest.importorskip("pygrgl")
 
 from xftsim.struct import GraphHaplotypeOperator, DenseHaplotypeArray, SampleMeta
-from xftsim.nsim import NSimulation
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.nmate import RandomMating
+from xftsim.sim import NSimulation
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from tests.testdata import TestGRG
 

@@ -8,14 +8,14 @@ import pytest
 import tempfile
 import os
 
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent,
     MotherComponent, FatherComponent, ParentComponent,
     SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
     SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.io import save_architecture, load_architecture
 
 

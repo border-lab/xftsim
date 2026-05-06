@@ -30,13 +30,13 @@ import numpy as np
 import pandas as pd
 
 from xftsim.founders import founder_haplotypes_uniform_AFs
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture
-from xftsim.nmate import LinearAssortativeMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture
+from xftsim.mate import LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
-from xftsim.nstats import SampleStatistics, HasemanElstonEstimator
-from xftsim.ngwas import GWAS
+from xftsim.sim import NSimulation
+from xftsim.stats import SampleStatistics, HasemanElstonEstimator
+from xftsim.gwas import GWAS
 
 # ── Parameters (matched to ey_sim.py) ────────────────────────────────────
 

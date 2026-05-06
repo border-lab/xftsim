@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta
-from xftsim.nmate import NMateAssignment, RandomMating
+from xftsim.mate import NMateAssignment, RandomMating
 
 
 class TestNMateAssignmentValidation:

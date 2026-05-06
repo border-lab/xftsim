@@ -12,8 +12,8 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import Architecture, HaplotypeGeneticComponent
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.arch import Architecture, HaplotypeGeneticComponent
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.parser import parse_formula
 
 
@@ -94,7 +94,7 @@ class TestCNoiseParser:
 class TestParentalParser:
     def test_mother_basic(self):
         """mother(Y) should parse to MotherComponent."""
-        from xftsim.narch import MotherComponent
+        from xftsim.arch import MotherComponent
         arch = Architecture.from_formula('Y.VT ~ mother(Y)')
         assert len(arch._nodes) == 1
         assert isinstance(arch._nodes[0].component, MotherComponent)
@@ -102,19 +102,19 @@ class TestParentalParser:
 
     def test_father_basic(self):
         """father(Y) should parse to FatherComponent."""
-        from xftsim.narch import FatherComponent
+        from xftsim.arch import FatherComponent
         arch = Architecture.from_formula('Y.VT ~ father(Y)')
         assert isinstance(arch._nodes[0].component, FatherComponent)
 
     def test_parent_basic(self):
         """parent(Y) should parse to ParentComponent."""
-        from xftsim.narch import ParentComponent
+        from xftsim.arch import ParentComponent
         arch = Architecture.from_formula('Y.VT ~ parent(Y)')
         assert isinstance(arch._nodes[0].component, ParentComponent)
 
     def test_mother_with_founder_noise(self):
         """mother(Y, founder=noise(0.3)) should set founder_component."""
-        from xftsim.narch import MotherComponent, NoiseComponent
+        from xftsim.arch import MotherComponent, NoiseComponent
         arch = Architecture.from_formula('Y.VT ~ mother(Y, founder=noise(0.3))')
         comp = arch._nodes[0].component
         assert isinstance(comp, MotherComponent)
@@ -140,7 +140,7 @@ class TestParentalParser:
 class TestSiblingParser:
     def test_sibling_mean_basic(self):
         """sibling_mean(Y) should parse when Y is defined."""
-        from xftsim.narch import SiblingMeanComponent
+        from xftsim.arch import SiblingMeanComponent
         arch = Architecture.from_formula("""
             Y ~ noise(1.0)
             Y.sib ~ sibling_mean(Y)
@@ -157,7 +157,7 @@ class TestSiblingParser:
 
     def test_all_sibling_functions(self):
         """All 6 sibling functions should parse."""
-        from xftsim.narch import (
+        from xftsim.arch import (
             SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
             SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
         )
@@ -207,7 +207,7 @@ class TestGroupingParser:
             Y ~ noise(1.0)
             Y.sib ~ sibling_mean(Y) | FID
         """)
-        from xftsim.narch import SiblingMeanComponent
+        from xftsim.arch import SiblingMeanComponent
         sib_nodes = [n for n in arch._nodes
                      if isinstance(n.component, SiblingMeanComponent)]
         assert len(sib_nodes) == 1

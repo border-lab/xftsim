@@ -18,7 +18,7 @@ from xftsim.io import (
     save_phenotypes_npz, load_phenotypes_npz,
     save_effects_npz, load_effects_npz,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 
 
 class TestHaplotypesRoundtrip:

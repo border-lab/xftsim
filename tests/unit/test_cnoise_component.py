@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import CNoiseComponent, ArchNode
+from xftsim.arch import CNoiseComponent, ArchNode
 
 
 def _make_hap(n=10, m=3):

@@ -39,7 +39,7 @@ class Pedigree:
         Returns the subgraph of nodes in the most recent K generations.
     _add_edges_from_arrays(x, y):
         Adds edges from arrays x and y.
-    add_offspring(mating: xft.mate.MateAssignment):
+    add_offspring(mating: xft.mate.NMateAssignment):
         Adds offspring nodes and edges to the pedigree based on a MateAssignment object.
     _get_trios():
         TODO
@@ -168,14 +168,14 @@ class Pedigree:
         self.G.add_edges_from([(xx, yy) for (xx, yy) in zip(x.unique_identifier, y.unique_identifier)])
 
     def _add_offspring(self,
-                      mating: xft.mate.MateAssignment,
+                      mating: xft.mate.NMateAssignment,
                       ):
         """
         Adds offspring nodes and edges to the pedigree based on a MateAssignment object.
 
         Parameters
         ----------
-        mating : xft.mate.MateAssignment
+        mating : xft.mate.NMateAssignment
             The MateAssignment object containing mating information.
         """
         self._add_edges_from_indexes(

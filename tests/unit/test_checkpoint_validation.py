@@ -15,13 +15,13 @@ import json
 import os
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     CNoiseComponent, MVGeneticComponent, MotherComponent, FatherComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.nmate import RandomMating, LinearAssortativeMating
-from xftsim.nsim import NSimulation
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.mate import RandomMating, LinearAssortativeMating
+from xftsim.sim import NSimulation
 from xftsim.reproduce import RecombinationMap
 
 import sys

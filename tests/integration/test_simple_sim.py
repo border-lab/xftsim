@@ -3,8 +3,8 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating
 
 
 def _run_sim(n_gen=3, seed=42, callbacks=None, **kwargs):

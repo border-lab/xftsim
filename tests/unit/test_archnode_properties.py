@@ -11,7 +11,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     ArchNode, NoiseComponent, GeneticComponent, AggregationComponent,
     CNoiseComponent, MVGeneticComponent, HaplotypeGeneticComponent,
     MotherComponent, FatherComponent, ParentComponent,
@@ -19,7 +19,7 @@ from xftsim.narch import (
     SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
     BUILTINS,
 )
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 
 
 class TestArchNodeConstruction:

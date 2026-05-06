@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.nmate import RandomMating, NMateAssignment
+from xftsim.mate import RandomMating, NMateAssignment
 
 
 def _make_haplotypes(n, seed=42):

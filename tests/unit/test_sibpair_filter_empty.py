@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nfilter import SibPairFilter
+from xftsim.filters import SibPairFilter
 
 
 def _make_pheno(n, fids, seed=42):

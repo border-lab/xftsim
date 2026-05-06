@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.narch import _resolve_grouping
+from xftsim.arch import _resolve_grouping
 
 
 def _make_hap(n=10, m=3, extra=None):

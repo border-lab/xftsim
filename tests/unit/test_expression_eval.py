@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.narch import _tokenize, _shunting_yard, _evaluate_expression
+from xftsim.arch import _tokenize, _shunting_yard, _evaluate_expression
 
 
 def _make_pheno(n=5, **kwargs):

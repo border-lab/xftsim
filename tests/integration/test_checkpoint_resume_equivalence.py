@@ -20,14 +20,14 @@ import tempfile
 import shutil
 import os
 
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent,
     AggregationComponent, ParentComponent,
 )
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
 
 import sys

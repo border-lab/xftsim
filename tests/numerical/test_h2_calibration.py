@@ -12,11 +12,11 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MVGeneticComponent, CNoiseComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

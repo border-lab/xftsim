@@ -6,13 +6,13 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating, LinearAssortativeMating
-from xftsim.narch import (
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating, LinearAssortativeMating
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent,
     CNoiseComponent, AggregationComponent, ParentComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.reproduce import RecombinationMap
 
 

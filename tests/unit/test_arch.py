@@ -4,12 +4,12 @@ Unit tests for Architecture, ArchNode, toposort, and execution.
 import warnings
 import numpy as np
 import pytest
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, ArchNode, GeneticComponent, NoiseComponent,
     AggregationComponent, MVGeneticComponent, CNoiseComponent,
     _resolve_grouping,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.struct import (
     DenseHaplotypeArray, NPhenotypeArray, SampleMeta, PedigreeArray,
 )
@@ -143,7 +143,7 @@ class TestToposort:
         # We can't really create a cycle through AggregationComponent
         # because inputs are extracted at creation time, but we can
         # force a cycle by manually creating nodes.
-        from xftsim.narch import ArchNode
+        from xftsim.arch import ArchNode
         node_a = ArchNode(outputs=['a'], component=NoiseComponent(variance=1.0),
                           inputs=['b'])
         node_b = ArchNode(outputs=['b'], component=NoiseComponent(variance=1.0),
@@ -250,20 +250,20 @@ class TestErrorHandling:
 
     def test_cnoise_non_square_cov(self):
         """CNoiseComponent with non-square cov should raise."""
-        from xftsim.narch import CNoiseComponent
+        from xftsim.arch import CNoiseComponent
         with pytest.raises(ValueError, match="square matrix"):
             CNoiseComponent(cov=np.ones((2, 3)))
 
     def test_haplotype_genetic_invalid_haplotype(self):
         """HaplotypeGeneticComponent with invalid haplotype arg should raise."""
-        from xftsim.narch import HaplotypeGeneticComponent
+        from xftsim.arch import HaplotypeGeneticComponent
         eff = AdditiveEffects.from_h2(h2=0.5, m=20, seed=42)
         with pytest.raises(ValueError, match="maternal.*paternal"):
             HaplotypeGeneticComponent(effects=eff, haplotype='both')
 
     def test_assortative_r_out_of_range(self):
         """LinearAssortativeMating with |r| >= 1 should raise."""
-        from xftsim.nmate import LinearAssortativeMating
+        from xftsim.mate import LinearAssortativeMating
         with pytest.raises(ValueError, match="r must be"):
             LinearAssortativeMating(component_names=['Y'], r=1.0)
         with pytest.raises(ValueError, match="r must be"):
@@ -291,14 +291,14 @@ class TestErrorHandling:
 
     def test_repr_all_components(self, effects, haplotypes):
         """repr() should not crash for any component type."""
-        from xftsim.narch import (
+        from xftsim.arch import (
             GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
             NoiseComponent, CNoiseComponent, AggregationComponent,
             MotherComponent, FatherComponent, ParentComponent,
             SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
             SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
         )
-        from xftsim.neffect import MultivariateEffects
+        from xftsim.effect import MultivariateEffects
         mv_eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=effects.m, seed=42)
         components = [
             GeneticComponent(effects),
@@ -334,7 +334,7 @@ class TestErrorHandling:
 
     def test_archnode_repr(self, effects):
         """ArchNode repr should work."""
-        from xftsim.narch import ArchNode
+        from xftsim.arch import ArchNode
         node = ArchNode(
             outputs=['Y.G'],
             component=GeneticComponent(effects),

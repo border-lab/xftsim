@@ -10,19 +10,19 @@ These are the ``n*`` modules that replace the legacy architecture.
 
    * - Module
      - Description
-   * - :doc:`nsim`
+   * - :doc:`sim`
      - Forward-time simulation loop (``NSimulation``)
-   * - :doc:`narch`
+   * - :doc:`arch`
      - Architecture DAG, components, and nodes
-   * - :doc:`neffect`
+   * - :doc:`effect`
      - Genetic effect specifications (``EffectSpec``, ``AdditiveEffects``, etc.)
-   * - :doc:`nmate`
+   * - :doc:`mate`
      - Mate assignment (``RandomMating``, ``LinearAssortativeMating``)
-   * - :doc:`nfilter`
+   * - :doc:`filters`
      - Filters and filtered views (trios, sib-pairs)
-   * - :doc:`nstats`
+   * - :doc:`stats`
      - Per-generation statistics
-   * - :doc:`ngwas`
+   * - :doc:`gwas`
      - GWAS and polygenic scores
    * - :doc:`io`
      - Serialization and I/O
@@ -36,13 +36,13 @@ These are the ``n*`` modules that replace the legacy architecture.
 .. toctree::
    :hidden:
 
-   nsim
-   narch
-   neffect
-   nmate
-   nfilter
-   nstats
-   ngwas
+   sim
+   arch
+   effect
+   mate
+   filters
+   stats
+   gwas
    io
    struct
    parser

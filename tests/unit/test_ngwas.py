@@ -1,5 +1,5 @@
 """
-Unit tests for xftsim.ngwas — GWAS and PGS modules.
+Unit tests for xftsim.gwas — GWAS and PGS modules.
 
 Covers:
 - GWAS beta recovery with known effect sizes
@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.ngwas import GWAS, GWASResult, PGS
+from xftsim.gwas import GWAS, GWASResult, PGS
 
 
 # ---------------------------------------------------------------------------

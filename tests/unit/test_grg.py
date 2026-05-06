@@ -206,7 +206,7 @@ class TestMeiosis:
         return GraphHaplotypeOperator(tiny._grg, samples=samples)
 
     def test_meiosis_returns_dense(self, tiny):
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
         tiny_copy = self._make_balanced_grg(tiny)
@@ -219,7 +219,7 @@ class TestMeiosis:
 
     def test_meiosis_offspring_count(self, tiny):
         """Meiosis should produce expected number of offspring."""
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
         tiny_copy = self._make_balanced_grg(tiny)
@@ -232,7 +232,7 @@ class TestMeiosis:
 
     def test_offspring_alleles_from_parents(self, tiny):
         """Each offspring allele should be present in the corresponding parent."""
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
         tiny_copy = self._make_balanced_grg(tiny)
@@ -268,7 +268,7 @@ class TestMeiosis:
 
     def test_meiosis_variant_meta_preserved(self, tiny):
         """Offspring should inherit variant metadata from parents."""
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
         tiny_copy = self._make_balanced_grg(tiny)

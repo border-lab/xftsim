@@ -20,8 +20,8 @@ import pytest
 from xftsim.struct import (
     SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent,
     HaplotypeGeneticComponent, NoiseComponent, CNoiseComponent,
     AggregationComponent, MotherComponent, FatherComponent,
@@ -192,7 +192,7 @@ class TestEffectsSaveLoadCoverage:
 
 class TestMatingRegimeSerialization:
     def test_random_mating_roundtrip(self):
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         rm = RandomMating(offspring_per_pair=3)
         config = _serialize_mating_regime(rm)
         assert config['type'] == 'RandomMating'
@@ -201,7 +201,7 @@ class TestMatingRegimeSerialization:
         assert loaded.offspring_per_pair == 3
 
     def test_assortative_mating_roundtrip(self):
-        from xftsim.nmate import LinearAssortativeMating
+        from xftsim.mate import LinearAssortativeMating
         am = LinearAssortativeMating(component_names=['Y'], r=0.5, offspring_per_pair=2)
         config = _serialize_mating_regime(am)
         assert config['type'] == 'LinearAssortativeMating'
@@ -228,9 +228,9 @@ class TestMatingRegimeSerialization:
 class TestCheckpointCoverage:
     def _make_sim(self, arch=None, n=20, m=10):
         from xftsim.founders import founder_haplotypes_uniform_AFs
-        from xftsim.nmate import RandomMating
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=n, m=m)
@@ -251,9 +251,9 @@ class TestCheckpointCoverage:
         return sim
 
     def test_checkpoint_with_assortative_mating(self, tmp_path):
-        from xftsim.nmate import LinearAssortativeMating
+        from xftsim.mate import LinearAssortativeMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
         from xftsim.founders import founder_haplotypes_uniform_AFs
 
         np.random.seed(42)
@@ -501,11 +501,11 @@ class TestGraphHaplotypeCheckpoint:
         """GraphHaplotypeOperator should be materialized to dense on checkpoint."""
         from xftsim.io import load_grg, save_simulation_checkpoint, load_simulation_checkpoint
         from xftsim.struct import GraphHaplotypeOperator
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.neffect import AdditiveEffects
-        from xftsim.nmate import RandomMating
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.effect import AdditiveEffects
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
         from tests.testdata import TestGRG
 
         # Load GRG as the founder haplotypes

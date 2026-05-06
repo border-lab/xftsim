@@ -418,13 +418,13 @@ def load_phenotypes_npz(path: str) -> xft.struct.NPhenotypeArray:
     return xft.struct.NPhenotypeArray(samples=samples, values=values)
 
 
-def save_effects_npz(effects: "xft.neffect.EffectSpec", path: str) -> None:
+def save_effects_npz(effects: "xft.effect.EffectSpec", path: str) -> None:
     """
     Save an EffectSpec (any subclass) to compressed numpy format.
 
     Parameters
     ----------
-    effects : xft.neffect.EffectSpec
+    effects : xft.effect.EffectSpec
         The effect specification to save.
     path : str
         The path to save to.
@@ -438,7 +438,7 @@ def save_effects_npz(effects: "xft.neffect.EffectSpec", path: str) -> None:
     np.savez_compressed(path, **save_dict)
 
 
-def load_effects_npz(path: str) -> "xft.neffect.EffectSpec":
+def load_effects_npz(path: str) -> "xft.effect.EffectSpec":
     """
     Load an EffectSpec from compressed numpy format.
 
@@ -449,10 +449,10 @@ def load_effects_npz(path: str) -> "xft.neffect.EffectSpec":
 
     Returns
     -------
-    xft.neffect.EffectSpec
+    xft.effect.EffectSpec
         The loaded effect specification (concrete subclass).
     """
-    from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+    from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 
     data = np.load(path, allow_pickle=True)
     effects = data['effects']
@@ -473,18 +473,18 @@ def load_effects_npz(path: str) -> "xft.neffect.EffectSpec":
     )
 
 
-def save_architecture(arch: "xft.narch.Architecture", dir_path: str) -> None:
+def save_architecture(arch: "xft.arch.Architecture", dir_path: str) -> None:
     """
     Save an Architecture to a directory (JSON metadata + effect .npz files).
 
     Parameters
     ----------
-    arch : xft.narch.Architecture
+    arch : xft.arch.Architecture
         The architecture to save.
     dir_path : str
         Directory path (created if it doesn't exist).
     """
-    from xftsim.narch import (
+    from xftsim.arch import (
         GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
         NoiseComponent, CNoiseComponent, AggregationComponent,
         MotherComponent, FatherComponent, ParentComponent,
@@ -532,7 +532,7 @@ def save_architecture(arch: "xft.narch.Architecture", dir_path: str) -> None:
         json.dump(node_specs, f, indent=2)
 
 
-def load_architecture(dir_path: str) -> "xft.narch.Architecture":
+def load_architecture(dir_path: str) -> "xft.arch.Architecture":
     """
     Load an Architecture from a directory.
 
@@ -543,9 +543,9 @@ def load_architecture(dir_path: str) -> "xft.narch.Architecture":
 
     Returns
     -------
-    xft.narch.Architecture
+    xft.arch.Architecture
     """
-    from xftsim.narch import (
+    from xftsim.arch import (
         Architecture, GeneticComponent, MVGeneticComponent,
         HaplotypeGeneticComponent, NoiseComponent, CNoiseComponent,
         AggregationComponent, MotherComponent, FatherComponent,
@@ -596,7 +596,7 @@ def load_architecture(dir_path: str) -> "xft.narch.Architecture":
 
 def _serialize_mating_regime(regime: object) -> dict[str, object]:
     """Serialize a mating regime to a JSON-compatible dict."""
-    from xftsim.nmate import RandomMating, LinearAssortativeMating
+    from xftsim.mate import RandomMating, LinearAssortativeMating
     if isinstance(regime, LinearAssortativeMating):
         return {
             'type': 'LinearAssortativeMating',
@@ -615,7 +615,7 @@ def _serialize_mating_regime(regime: object) -> dict[str, object]:
 
 def _deserialize_mating_regime(config: dict[str, object]) -> object:
     """Deserialize a mating regime from a dict."""
-    from xftsim.nmate import RandomMating, LinearAssortativeMating
+    from xftsim.mate import RandomMating, LinearAssortativeMating
     mtype = config['type']
     if mtype == 'RandomMating':
         return RandomMating(offspring_per_pair=config['offspring_per_pair'])
@@ -629,7 +629,7 @@ def _deserialize_mating_regime(config: dict[str, object]) -> object:
         raise ValueError(f"Unknown mating regime type: {mtype}")
 
 
-def save_simulation_checkpoint(sim: "xft.nsim.NSimulation",
+def save_simulation_checkpoint(sim: "xft.sim.NSimulation",
                                dir_path: str) -> None:
     """
     Save a simulation checkpoint to a directory.
@@ -639,7 +639,7 @@ def save_simulation_checkpoint(sim: "xft.nsim.NSimulation",
 
     Parameters
     ----------
-    sim : xft.nsim.NSimulation
+    sim : xft.sim.NSimulation
         The simulation to checkpoint.
     dir_path : str
         Directory path (created if it doesn't exist).

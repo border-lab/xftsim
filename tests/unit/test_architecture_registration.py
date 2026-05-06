@@ -11,8 +11,8 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.neffect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import AdditiveEffects
 
 
 class TestArchitectureRegistration:
@@ -28,8 +28,8 @@ class TestArchitectureRegistration:
         arch = Architecture()
         arch.add('Y.E', NoiseComponent(variance=1.0))
         # Try to add a second node that includes 'Y.E' in its outputs
-        from xftsim.neffect import MultivariateEffects
-        from xftsim.narch import MVGeneticComponent
+        from xftsim.effect import MultivariateEffects
+        from xftsim.arch import MVGeneticComponent
         mv = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.2, m=10, seed=42)
         with pytest.raises(ValueError, match="Duplicate output name"):
             arch.add(['Y.E', 'Y2.G'], MVGeneticComponent(mv))

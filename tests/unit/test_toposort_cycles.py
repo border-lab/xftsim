@@ -13,10 +13,10 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, ArchNode, NoiseComponent, AggregationComponent, GeneticComponent,
 )
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 
 
 class TestCycleDetection:

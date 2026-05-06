@@ -18,15 +18,15 @@ from xftsim.io import (
     save_architecture, load_architecture,
     _serialize_mating_regime, _deserialize_mating_regime,
 )
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent,
     HaplotypeGeneticComponent, NoiseComponent, CNoiseComponent,
     AggregationComponent, MotherComponent, FatherComponent,
     SiblingMeanComponent, SiblingSumComponent, SiblingCountComponent,
     SiblingEldestComponent, SiblingYoungestComponent, SiblingAnyComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.mate import RandomMating, LinearAssortativeMating
 
 
 class TestHaplotypeGeneticRoundtrip:

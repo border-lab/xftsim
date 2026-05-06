@@ -12,16 +12,16 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     SiblingMeanComponent, SiblingSumComponent, SiblingCountComponent,
     SiblingEldestComponent, SiblingYoungestComponent, SiblingAnyComponent,
 )
-from xftsim.neffect import AdditiveEffects
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating
+from xftsim.effect import AdditiveEffects
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nfilter import SibPairFilter
+from xftsim.filters import SibPairFilter
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

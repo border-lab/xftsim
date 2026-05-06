@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import warnings
 
-from xftsim.narch import _resolve_grouping
+from xftsim.arch import _resolve_grouping
 from xftsim.struct import SampleMeta, DenseHaplotypeArray, VariantMeta, PedigreeArray
 
 

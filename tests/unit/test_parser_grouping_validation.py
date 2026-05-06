@@ -11,8 +11,8 @@ Tests:
 """
 import pytest
 
-from xftsim.narch import Architecture
-from xftsim.neffect import AdditiveEffects
+from xftsim.arch import Architecture
+from xftsim.effect import AdditiveEffects
 from xftsim.parser import _extract_grouping, parse_formula
 
 

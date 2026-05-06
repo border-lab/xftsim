@@ -10,13 +10,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
 from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MotherComponent, FatherComponent, ParentComponent, ArchNode,
 )
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 from xftsim.parser import parse_formula
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 
 class TestMotherComponent:

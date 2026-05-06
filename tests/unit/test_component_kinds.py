@@ -13,8 +13,8 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.arch import (
     GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent,
     AggregationComponent,

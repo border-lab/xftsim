@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nmate import RandomMating, LinearAssortativeMating, NMateAssignment
+from xftsim.mate import RandomMating, LinearAssortativeMating, NMateAssignment
 
 
 class TestRandomMatingEdgeCases:

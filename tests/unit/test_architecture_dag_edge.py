@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import Architecture, NoiseComponent, AggregationComponent, GeneticComponent
-from xftsim.neffect import AdditiveEffects
+from xftsim.arch import Architecture, NoiseComponent, AggregationComponent, GeneticComponent
+from xftsim.effect import AdditiveEffects
 
 
 def _make_hap(n=20, m=5):

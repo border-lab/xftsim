@@ -26,8 +26,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nfilter import SibPairFilter
-from xftsim.nsim import NSimulation
+from xftsim.filters import SibPairFilter
+from xftsim.sim import NSimulation
 
 
 def _make_pheno_with_fids(n, fids, seed=42):

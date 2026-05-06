@@ -8,12 +8,12 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation, TestEffects
 
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, MVGeneticComponent, NoiseComponent, AggregationComponent,
 )
-from xftsim.neffect import MultivariateEffects
+from xftsim.effect import MultivariateEffects
 from xftsim.parser import parse_formula
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 
 class TestMVGeneticComponent:
@@ -57,7 +57,7 @@ class TestMVGeneticComponent:
     def test_values_correct(self, hap, mv_effects):
         """MVGenetic values should match direct standardized_matvec."""
         comp = MVGeneticComponent(mv_effects)
-        from xftsim.narch import ArchNode
+        from xftsim.arch import ArchNode
         node = ArchNode(outputs=['a', 'b'], component=comp)
         result = comp.compute(node, hap, None, rng=np.random.RandomState(42))
         expected = hap.standardized_matvec(mv_effects.effects)

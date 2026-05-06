@@ -15,8 +15,8 @@ import numpy as np
 import pytest
 
 from xftsim.parser import parse_formula
-from xftsim.narch import HaplotypeGeneticComponent, CNoiseComponent
-from xftsim.neffect import AdditiveEffects
+from xftsim.arch import HaplotypeGeneticComponent, CNoiseComponent
+from xftsim.effect import AdditiveEffects
 
 
 class TestParserCnoiseErrors:

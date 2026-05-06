@@ -12,8 +12,8 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import MotherComponent, FatherComponent, ParentComponent
-from xftsim.narch import NoiseComponent
+from xftsim.arch import MotherComponent, FatherComponent, ParentComponent
+from xftsim.arch import NoiseComponent
 from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
 
 
@@ -66,7 +66,7 @@ class TestParentalComponentCompute:
         """MotherComponent should return mother's phenotype."""
         parent_pheno, offspring_pheno, ped = self._make_scenario()
 
-        from xftsim.narch import ArchNode
+        from xftsim.arch import ArchNode
         from xftsim.struct import DenseHaplotypeArray, VariantMeta
         hap = DenseHaplotypeArray(
             np.zeros((4, 5, 2), dtype=np.int8),
@@ -90,7 +90,7 @@ class TestParentalComponentCompute:
         """ParentComponent should return (mother + father) / 2."""
         parent_pheno, offspring_pheno, ped = self._make_scenario()
 
-        from xftsim.narch import ArchNode
+        from xftsim.arch import ArchNode
         from xftsim.struct import DenseHaplotypeArray, VariantMeta
         hap = DenseHaplotypeArray(
             np.zeros((4, 5, 2), dtype=np.int8),

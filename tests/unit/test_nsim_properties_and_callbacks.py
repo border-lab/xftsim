@@ -14,11 +14,11 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.nmate import RandomMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -129,7 +129,7 @@ class TestRunEdgeCases:
 
     def test_results_populated(self):
         """Results should be populated even without statistics."""
-        from xftsim.nstats import SampleStatistics
+        from xftsim.stats import SampleStatistics
         sim = _make_sim()
         sim.statistics = [SampleStatistics()]
         sim.run(2)

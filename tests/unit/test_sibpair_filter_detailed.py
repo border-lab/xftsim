@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nfilter import SibPairFilter, SibPairView
+from xftsim.filters import SibPairFilter, SibPairView
 
 
 def _make_pheno_with_fids(fids, values=None):

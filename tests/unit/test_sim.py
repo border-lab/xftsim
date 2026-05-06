@@ -5,14 +5,14 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
-from xftsim.nmate import NMateAssignment, RandomMating
-from xftsim.narch import (
+from xftsim.mate import NMateAssignment, RandomMating
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MVGeneticComponent, HaplotypeGeneticComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -594,8 +594,8 @@ class TestNSimulationEdgeCases:
 
     def test_with_filters_and_statistics(self, sim_components):
         """Simulation with both filters and statistics."""
-        from xftsim.nstats import SampleStatistics
-        from xftsim.nfilter import SibPairFilter
+        from xftsim.stats import SampleStatistics
+        from xftsim.filters import SibPairFilter
         hap, arch, rm, rmap = sim_components
         rm_3 = RandomMating(offspring_per_pair=3)
         sim = NSimulation(

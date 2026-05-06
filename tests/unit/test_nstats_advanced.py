@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nfilter import TrioView, SibPairView
-from xftsim.nstats import (
+from xftsim.filters import TrioView, SibPairView
+from xftsim.stats import (
     HasemanElstonEstimator,
     ParentOffspringRegression,
     MatingStatistics,
@@ -56,8 +56,8 @@ def _make_trio_view(y_off, y_mom, y_dad, keys=None):
 
 def _make_he_sim_data(n=500, m=100, h2=0.5, seed=42):
     """Create haplotypes + phenotypes for HE unit tests."""
-    from xftsim.neffect import AdditiveEffects
-    from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+    from xftsim.effect import AdditiveEffects
+    from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 
     hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=seed)
     eff = AdditiveEffects.from_h2(h2=h2, m=m, seed=seed + 1)

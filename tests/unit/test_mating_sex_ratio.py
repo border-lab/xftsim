@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta
-from xftsim.nmate import RandomMating
+from xftsim.mate import RandomMating
 
 
 def _make_samples(n=20, sex=None):

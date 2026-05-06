@@ -19,15 +19,15 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
 )
-from xftsim.neffect import AdditiveEffects
-from xftsim.nmate import RandomMating
+from xftsim.effect import AdditiveEffects
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
-from xftsim.nstats import SampleStatistics
-from xftsim.nfilter import TrioFilter, SibPairFilter
+from xftsim.sim import NSimulation
+from xftsim.stats import SampleStatistics
+from xftsim.filters import TrioFilter, SibPairFilter
 
 
 def _make_sim(n=20, m=10, h2=0.5, seed=42, **kwargs):

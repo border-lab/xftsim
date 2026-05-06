@@ -15,17 +15,17 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MVGeneticComponent, CNoiseComponent, MotherComponent,
     HaplotypeGeneticComponent, SiblingMeanComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nfilter import TrioFilter, SibPairFilter
-from xftsim.nstats import SampleStatistics
+from xftsim.filters import TrioFilter, SibPairFilter
+from xftsim.stats import SampleStatistics
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

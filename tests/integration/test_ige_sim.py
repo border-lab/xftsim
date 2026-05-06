@@ -3,12 +3,12 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.nsim import NSimulation
-from xftsim.narch import (
+from xftsim.sim import NSimulation
+from xftsim.arch import (
     Architecture, GeneticComponent, HaplotypeGeneticComponent,
     NoiseComponent, AggregationComponent,
 )
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 
 
 def _run_ige_sim(n_gen=3, seed=42, arch=None):

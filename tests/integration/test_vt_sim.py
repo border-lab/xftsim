@@ -4,12 +4,12 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.nsim import NSimulation
-from xftsim.narch import (
+from xftsim.sim import NSimulation
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MotherComponent, FatherComponent, ParentComponent,
 )
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 
 
 def _run_vt_sim(n_gen=3, seed=42, vt_weight=0.3, arch=None):

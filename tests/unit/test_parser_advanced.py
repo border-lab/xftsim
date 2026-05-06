@@ -18,14 +18,14 @@ import numpy as np
 import pytest
 
 from xftsim.parser import parse_formula, _extract_grouping
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture,
     GeneticComponent, NoiseComponent, CNoiseComponent, AggregationComponent,
     MVGeneticComponent, HaplotypeGeneticComponent,
     MotherComponent, FatherComponent, ParentComponent,
     SiblingMeanComponent, SiblingSumComponent, SiblingCountComponent,
 )
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects
 
 
 class TestExtractGrouping:

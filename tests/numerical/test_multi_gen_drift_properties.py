@@ -13,11 +13,11 @@ Tests covering genetic and phenotypic properties across multiple generations:
 import numpy as np
 import pytest
 
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 import sys
 import os
@@ -378,8 +378,8 @@ class TestMultiGenerationDriftProperties:
         rg_design = 0.6
         seed = 333
 
-        from xftsim.neffect import MultivariateEffects
-        from xftsim.narch import MVGeneticComponent
+        from xftsim.effect import MultivariateEffects
+        from xftsim.arch import MVGeneticComponent
 
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=seed)
         eff = MultivariateEffects.from_h2_rg(h2=h2, rg=rg_design, m=m, seed=seed + 100)

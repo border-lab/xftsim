@@ -13,7 +13,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import AggregationComponent, Architecture, NoiseComponent
+from xftsim.arch import AggregationComponent, Architecture, NoiseComponent
 
 
 class TestExtractNames:

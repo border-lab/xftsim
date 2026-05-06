@@ -13,15 +13,15 @@ import pytest
 import tempfile
 import os
 
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 from xftsim.io import (
     save_effects_npz, load_effects_npz,
     save_architecture, load_architecture,
     _serialize_mating_regime, _deserialize_mating_regime,
     save_haplotypes_npz, load_haplotypes_npz,
 )
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 
 

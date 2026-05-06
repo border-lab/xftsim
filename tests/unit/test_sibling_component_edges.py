@@ -10,13 +10,13 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     SiblingMeanComponent, SiblingSumComponent,
     ArchNode,
 )
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 
 
 def _run_sim(n_gen=3, seed=42):

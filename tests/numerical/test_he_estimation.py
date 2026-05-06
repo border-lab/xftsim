@@ -22,18 +22,18 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.neffect import AdditiveEffects
-from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.effect import AdditiveEffects
+from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
-from xftsim.nstats import (
+from xftsim.sim import NSimulation
+from xftsim.stats import (
     HasemanElstonEstimator,
     ParentOffspringRegression,
     MatingStatistics,
     SampleStatistics,
 )
-from xftsim.nfilter import TrioFilter, SibPairFilter
+from xftsim.filters import TrioFilter, SibPairFilter
 
 
 def _make_sim(n=1000, m=50, h2=0.5, offspring_per_pair=2,

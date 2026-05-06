@@ -11,7 +11,7 @@ Tests cover:
 import pytest
 
 from xftsim.parser import parse_formula
-from xftsim.narch import (
+from xftsim.arch import (
     SiblingMeanComponent,
     SiblingSumComponent,
     SiblingAnyComponent,

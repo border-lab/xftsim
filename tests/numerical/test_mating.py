@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.nmate import RandomMating, LinearAssortativeMating
-from xftsim.neffect import AdditiveEffects
+from xftsim.mate import RandomMating, LinearAssortativeMating
+from xftsim.effect import AdditiveEffects
 
 N = 2000
 M = 50
@@ -96,8 +96,8 @@ class TestAssortativeMatingNumerical:
         (Deterministic test with fixed seed.)
         """
         from tests.testdata import TestSimulation
-        from xftsim.nsim import NSimulation
-        from xftsim.nstats import SampleStatistics
+        from xftsim.sim import NSimulation
+        from xftsim.stats import SampleStatistics
 
         hap = TestSimulation.founder_haplotypes(n=1000, m=50, seed=42)
         arch = TestSimulation.simple_architecture(m=50, h2=0.5, seed=123)

@@ -345,12 +345,12 @@ class TestRunSimulation:
     def sim_and_output(self):
         """Minimal simulation for testing the runner."""
         from xftsim.founders import founder_haplotypes_uniform_AFs
-        from xftsim.neffect import AdditiveEffects
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nmate import RandomMating
+        from xftsim.effect import AdditiveEffects
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nstats import SampleStatistics
-        from xftsim.nsim import NSimulation
+        from xftsim.stats import SampleStatistics
+        from xftsim.sim import NSimulation
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=30, m=10)
@@ -419,11 +419,11 @@ class TestInfoCommand:
         """info with valid checkpoint shows properties."""
         from xftsim.cli import app
         from xftsim.founders import founder_haplotypes_uniform_AFs
-        from xftsim.neffect import AdditiveEffects
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nmate import RandomMating
+        from xftsim.effect import AdditiveEffects
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
         from xftsim.io import save_simulation_checkpoint
         from typer.testing import CliRunner
 
@@ -558,11 +558,11 @@ class TestResumeCommand:
         from typer.testing import CliRunner
         from xftsim.cli import app
         from xftsim.founders import founder_haplotypes_uniform_AFs
-        from xftsim.neffect import AdditiveEffects
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nmate import RandomMating
+        from xftsim.effect import AdditiveEffects
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
         from xftsim.io import save_simulation_checkpoint
 
         np.random.seed(42)
@@ -806,11 +806,11 @@ class TestInfoRichMode:
         from typer.testing import CliRunner
         from xftsim.cli import app
         from xftsim.founders import founder_haplotypes_uniform_AFs
-        from xftsim.neffect import AdditiveEffects
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nmate import RandomMating
+        from xftsim.effect import AdditiveEffects
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
         from xftsim.io import save_simulation_checkpoint
 
         np.random.seed(42)
@@ -893,12 +893,12 @@ class TestRunSimulationRichProgress:
 
     def test_run_simulation_rich_mode(self):
         from xftsim.founders import founder_haplotypes_uniform_AFs
-        from xftsim.neffect import AdditiveEffects
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nmate import RandomMating
+        from xftsim.effect import AdditiveEffects
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nstats import SampleStatistics
-        from xftsim.nsim import NSimulation
+        from xftsim.stats import SampleStatistics
+        from xftsim.sim import NSimulation
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=30, m=10)
@@ -927,11 +927,11 @@ class TestRunSimulationFailure:
 
     def test_run_simulation_exception(self, monkeypatch):
         from xftsim.founders import founder_haplotypes_uniform_AFs
-        from xftsim.neffect import AdditiveEffects
-        from xftsim.narch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.nmate import RandomMating
+        from xftsim.effect import AdditiveEffects
+        from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.nsim import NSimulation
+        from xftsim.sim import NSimulation
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=30, m=10)

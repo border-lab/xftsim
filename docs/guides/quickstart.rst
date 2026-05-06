@@ -29,11 +29,11 @@ environmental noise:
 
    import numpy as np
    from xftsim.struct import DenseHaplotypeArray, SampleMeta, VariantMeta
-   from xftsim.neffect import AdditiveEffects
-   from xftsim.narch import Architecture
-   from xftsim.nmate import RandomMating
+   from xftsim.effect import AdditiveEffects
+   from xftsim.arch import Architecture
+   from xftsim.mate import RandomMating
    from xftsim.reproduce import RecombinationMap
-   from xftsim.nsim import NSimulation
+   from xftsim.sim import NSimulation
 
    # --- Founder haplotypes ---
    n_samples = 200

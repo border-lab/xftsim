@@ -15,7 +15,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 
 
 class TestAdditiveEdgeCases:

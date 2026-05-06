@@ -16,7 +16,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     AggregationComponent, ArchNode,
     _tokenize, _shunting_yard, _evaluate_expression,
 )

@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.nstats import SampleStatistics, GenerationResult
+from xftsim.stats import SampleStatistics, GenerationResult
 
 
 def _make_pheno(n, **kwargs):

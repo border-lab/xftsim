@@ -3,10 +3,10 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.neffect import AdditiveEffects, MultivariateEffects
-from xftsim.narch import Architecture
-from xftsim.nsim import NSimulation
-from xftsim.nmate import RandomMating
+from xftsim.effect import AdditiveEffects, MultivariateEffects
+from xftsim.arch import Architecture
+from xftsim.sim import NSimulation
+from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from tests.testdata import TestSimulation
 
@@ -55,7 +55,7 @@ class TestFormulaSimple:
         # Formula sim
         sim1 = _run_formula_sim(formula, effects={'eff': eff}, n_gen=1, seed=42)
         # Programmatic sim
-        from xftsim.narch import GeneticComponent, NoiseComponent, AggregationComponent
+        from xftsim.arch import GeneticComponent, NoiseComponent, AggregationComponent
         arch2 = Architecture()
         arch2.add('Y.G', GeneticComponent(eff))
         arch2.add('Y.E', NoiseComponent(variance=0.5))

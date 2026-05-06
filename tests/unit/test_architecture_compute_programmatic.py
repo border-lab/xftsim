@@ -14,11 +14,11 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent,
     AggregationComponent, ArchNode,
 )
-from xftsim.neffect import AdditiveEffects
+from xftsim.effect import AdditiveEffects
 from xftsim.struct import NPhenotypeArray
 
 import sys, os

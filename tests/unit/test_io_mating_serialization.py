@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from xftsim.io import _serialize_mating_regime, _deserialize_mating_regime
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.mate import RandomMating, LinearAssortativeMating
 
 
 class TestRandomMatingRoundtrip:

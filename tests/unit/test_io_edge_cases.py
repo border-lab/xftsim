@@ -23,15 +23,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.neffect import AdditiveEffects, MultivariateEffects, SparseEffects
-from xftsim.narch import (
+from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, CNoiseComponent,
     AggregationComponent, SiblingMeanComponent, SiblingSumComponent,
     MotherComponent,
 )
-from xftsim.nmate import RandomMating, LinearAssortativeMating
+from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.nsim import NSimulation
+from xftsim.sim import NSimulation
 from xftsim.io import (
     save_haplotypes_npz, load_haplotypes_npz,
     save_phenotypes_npz, load_phenotypes_npz,

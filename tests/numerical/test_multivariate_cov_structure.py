@@ -10,8 +10,8 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.neffect import MultivariateEffects
-from xftsim.narch import Architecture, MVGeneticComponent, NoiseComponent, AggregationComponent
+from xftsim.effect import MultivariateEffects
+from xftsim.arch import Architecture, MVGeneticComponent, NoiseComponent, AggregationComponent
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
