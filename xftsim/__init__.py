@@ -65,12 +65,12 @@ from . import index       ## indexing
 from . import struct      ## data structures
 from . import reproduce   ## sexual reproduction and phenotypic transmission
 from . import founders    ## creation / import of founder haplotypes
+from . import mate        ## mate assignment
 from . import ped         ## pedigree objects
 from . import io          ## input/output
 from . import effect      ## effect specs
 from . import arch        ## architecture system
 from . import parser      ## formula parser
-from . import mate        ## mate assignment
 from . import filters     ## filters (trio, sib-pair)
 from . import stats       ## statistics
 from . import gwas        ## GWAS and PGS
