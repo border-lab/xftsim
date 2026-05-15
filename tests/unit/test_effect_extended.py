@@ -1,5 +1,5 @@
 """
-Extended edge case tests for neffect module.
+Extended edge case tests for effect module.
 
 Tests:
 1. AdditiveEffects with h2=0 → all effects zero

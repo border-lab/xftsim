@@ -238,14 +238,14 @@ xftsim demo UGRM                # run a built-in demo simulation
 
 | Module | Description |
 |--------|-------------|
-| `nsim` | `Simulation` -- forward-time simulation loop |
-| `narch` | `Architecture`, `ArchNode`, component classes |
-| `neffect` | `EffectSpec` hierarchy (additive, multivariate, sparse) |
+| `sim` | `Simulation` -- forward-time simulation loop |
+| `arch` | `Architecture`, `ArchNode`, component classes |
+| `effect` | `EffectSpec` hierarchy (additive, multivariate, sparse) |
 | `parser` | Formula DSL parser |
-| `nmate` | Mate assignment (`RandomMating`, `LinearAssortativeMating`) |
-| `nfilter` | Filters (`TrioFilter`, `SibPairFilter`) for structured views |
-| `nstats` | Per-generation statistics (`SampleStatistics`) |
-| `ngwas` | GWAS and PGS computation |
+| `mate` | Mate assignment (`RandomMating`, `LinearAssortativeMating`) |
+| `filter` | Filters (`TrioFilter`, `SibPairFilter`) for structured views |
+| `stats` | Per-generation statistics (`SampleStatistics`) |
+| `gwas` | GWAS and PGS computation |
 | `struct` | Core data structures (`DenseHaplotypeArray`, `PhenotypeArray`, `SampleMeta`, `PedigreeArray`) |
 | `founders` | Founder haplotype generation |
 | `reproduce` | Meiosis and `RecombinationMap` |

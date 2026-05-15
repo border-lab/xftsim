@@ -1,5 +1,5 @@
 """
-Advanced unit tests for neffect.py edge cases.
+Advanced unit tests for effect.py edge cases.
 
 Tests covering:
 1. MultivariateEffects k property for k=1, k=2, k=3

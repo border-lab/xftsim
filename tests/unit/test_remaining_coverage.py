@@ -1,12 +1,12 @@
 """
-Tests for remaining small coverage gaps in parser.py, nstats.py, nmate.py, ngwas.py.
+Tests for remaining small coverage gaps in parser.py, stats.py, mate.py, gwas.py.
 
 Targets:
 - parser.py lines 221, 227, 266 (mvGenetic/haplotypeGenetic error paths)
-- nstats.py lines 270, 283-284, 290 (MatingStatistics spouse correlation edge cases)
-- nmate.py lines 113, 207 (rng=None fallback paths)
-- ngwas.py line 100 (non-DenseHaplotypeArray path in GWAS)
-- narch.py line 571 (sibling _resolve_grouping returning None)
+- stats.py lines 270, 283-284, 290 (MatingStatistics spouse correlation edge cases)
+- mate.py lines 113, 207 (rng=None fallback paths)
+- gwas.py line 100 (non-DenseHaplotypeArray path in GWAS)
+- arch.py line 571 (sibling _resolve_grouping returning None)
 """
 import numpy as np
 import pytest
@@ -50,7 +50,7 @@ class TestParserHaplotypeGeneticErrors:
 
 
 # ---------------------------------------------------------------------------
-# nstats.py: MatingStatistics edge cases
+# stats.py: MatingStatistics edge cases
 # ---------------------------------------------------------------------------
 
 class TestMatingStatisticsEdgeCases:
@@ -119,7 +119,7 @@ class TestMatingStatisticsEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# nmate.py: rng=None defaults
+# mate.py: rng=None defaults
 # ---------------------------------------------------------------------------
 
 class TestNmateRngDefault:
@@ -145,7 +145,7 @@ class TestNmateRngDefault:
 
 
 # ---------------------------------------------------------------------------
-# ngwas.py: non-DenseHaplotypeArray path
+# gwas.py: non-DenseHaplotypeArray path
 # ---------------------------------------------------------------------------
 
 class TestNGWASNonDensePath:
@@ -197,11 +197,11 @@ class TestNGWASNonDensePath:
 
 
 # ---------------------------------------------------------------------------
-# narch.py: _SiblingComponent grouping=None path
+# arch.py: _SiblingComponent grouping=None path
 # ---------------------------------------------------------------------------
 
 class TestSiblingMeanDirect:
-    """Test _SiblingComponent.compute() directly to cover narch.py lines 571+."""
+    """Test _SiblingComponent.compute() directly to cover arch.py lines 571+."""
 
     def test_sibling_mean_compute_directly(self):
         """Call SiblingMeanComponent.compute() directly with a mock ArchNode."""

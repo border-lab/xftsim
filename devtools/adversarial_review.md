@@ -131,7 +131,7 @@ The review should produce a structured report:
 
 ## When to Run
 
-- **Always**: Changes to `struct.py`, `nstats.py`, `neffect.py`, `narch.py`
+- **Always**: Changes to `struct.py`, `stats.py`, `effect.py`, `arch.py`
 - **Always**: Changes to numerical tests (`tests/numerical/`)
-- **Recommended**: Changes to `nsim.py`, `mate.py`, `reproduce.py`
+- **Recommended**: Changes to `sim.py`, `mate.py`, `reproduce.py`
 - **Optional**: Changes to I/O, documentation, tooling

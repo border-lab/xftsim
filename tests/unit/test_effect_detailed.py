@@ -1,5 +1,5 @@
 """
-Unit tests for neffect.py edge cases and properties.
+Unit tests for effect.py edge cases and properties.
 
 Tests:
 1. AdditiveEffects.from_h2 boundary values (h2=0, h2=1)

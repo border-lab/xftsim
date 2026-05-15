@@ -3,7 +3,7 @@ Quickstart simulation for xftsim, ported to the refactored API.
 
 Reproduces the spirit of the legacy ReadTheDocs quickstart
 (https://xftsim.readthedocs.io/en/latest/gettingstarted/quickstart.html)
-on top of the current ``Simulation`` / ``Architecture`` / ``nmate`` stack.
+on top of the current ``Simulation`` / ``Architecture`` / ``mate`` stack.
 
 API translation table (legacy -> current)
 -----------------------------------------

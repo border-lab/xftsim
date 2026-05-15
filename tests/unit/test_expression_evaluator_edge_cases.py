@@ -1,7 +1,7 @@
 """
 Unit tests for shunting-yard expression evaluator edge cases.
 
-Targets _tokenize, _shunting_yard, _evaluate_expression in narch.py.
+Targets _tokenize, _shunting_yard, _evaluate_expression in arch.py.
 
 Tests:
 1. Division by zero produces inf/nan

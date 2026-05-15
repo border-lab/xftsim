@@ -387,9 +387,9 @@ The manuscript (`current_manu_draft.md`) is the source of mathematical truth.
 
 Run adversarial review on every commit that touches:
 - `struct.py` (standardization, matvec, haplotype operations)
-- `nstats.py` / `stats.py` (HE estimator, GWAS, statistics)
-- `neffect.py` / `effect.py` (effect sizes, h2 targeting)
-- `narch.py` / `arch.py` (phenotype generation, VT)
+- `stats.py` / `stats.py` (HE estimator, GWAS, statistics)
+- `effect.py` / `effect.py` (effect sizes, h2 targeting)
+- `arch.py` / `arch.py` (phenotype generation, VT)
 - `tests/numerical/` (numerical validation tests)
 
 ### How to run

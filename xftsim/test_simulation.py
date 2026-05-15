@@ -9,7 +9,7 @@ read. Sharing here restores that behavior — the gen-0 founder draws for
 parental wealth are the same draws seen by both aggregations, so the
 expected gen-0 corr(edu.vert, wealth.vert) matches the paper.
 
-NOTE: The new nstats.HasemanElstonEstimator runs on the full sample (no
+NOTE: The new stats.HasemanElstonEstimator runs on the full sample (no
 RandomSiblingSubsampleFilter equivalent). ey_sim.py filters to a k=4000
 sibling subsample before HE; HE estimates here will be on the full
 unfiltered population, which under xAM slightly inflates HE h² vs. the

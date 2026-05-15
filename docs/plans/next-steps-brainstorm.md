@@ -228,7 +228,7 @@ stdpopsim species catalog
 21. **grapp GWAS on simulation output**
     - After simulation, export haplotypes to GRG format
     - Run `grapp assoc` (association testing) on simulated data
-    - Compare with xftsim's built-in `ngwas.py` GWAS
+    - Compare with xftsim's built-in `gwas.py` GWAS
     - Useful for validating GWAS methods under known architectures
 
 22. **grapp PCA for population structure verification**
@@ -358,7 +358,7 @@ xftsim/
 ├── reproduce.py      # EXISTING: RecombinationMap enhancements go here
 ├── io.py             # EXISTING: add PLINK/VCF readers, tree_sequence_to_grg wrapper
 ├── struct.py         # EXISTING: no changes needed (DenseHaplotypeArray, GraphHaplotypeOperator)
-├── narch.py          # EXISTING: GxE component if needed
+├── arch.py          # EXISTING: GxE component if needed
 └── ...
 ```
 

@@ -42,27 +42,27 @@ comprehensive documentation and testing.
 
 #### Core modules
 
-- **narch.py** -- Architecture system built on a DAG of `ArchNode` objects with
+- **arch.py** -- Architecture system built on a DAG of `ArchNode` objects with
   topological-sort execution. `Architecture` class supports both programmatic
   construction (`arch.add()`) and formula parsing (`Architecture.from_formula()`).
-- **nsim.py** -- `Simulation` generation loop: meiosis, phenotype computation,
+- **sim.py** -- `Simulation` generation loop: meiosis, phenotype computation,
   mating, retention policy, callbacks, early stopping. Stores results as
   `GenerationResult` objects. Supports `run()`, `continue_run()`, and
   `from_checkpoint()`.
-- **neffect.py** -- `EffectSpec` ABC with three concrete implementations:
+- **effect.py** -- `EffectSpec` ABC with three concrete implementations:
   `AdditiveEffects` (dense per-variant weights), `MultivariateEffects`
   (multi-trait effect matrices), and `SparseEffects` (k-causal-variant model
   via `from_h2()`).
-- **nmate.py** -- `MateAssignment` dataclass and mating regimes:
+- **mate.py** -- `MateAssignment` dataclass and mating regimes:
   `RandomMating` (sex-aware shuffle-pair-expand) and
   `LinearAssortativeMating` (rank-order pairing on standardized phenotypic
   composite with configurable `r`).
-- **nfilter.py** -- `Filter` ABC with implementations: `TrioFilter` (parent-
+- **filter.py** -- `Filter` ABC with implementations: `TrioFilter` (parent-
   offspring trios with cross-generation lookup), `SibPairFilter` (vectorized
   sibling-pair extraction), `UnrelatedFilter`, `AscertainmentFilter`, and
   `SubsampleFilter`. `TrioView` and `SibPairView` dataclasses for downstream
   analysis.
-- **nstats.py** -- `Statistic` ABC with implementations:
+- **stats.py** -- `Statistic` ABC with implementations:
   `SampleStatistics` (within-sample covariance matrices),
   `HasemanElstonEstimator`, `ParentOffspringRegression`, and
   `MatingStatistics`. `GenerationResult` dataclass for per-generation storage.
@@ -90,7 +90,7 @@ comprehensive documentation and testing.
     regime, recombination map, metadata)
   - `load_grg` -- GRG file to `GraphHaplotypeOperator` with optional BIM
   - `genotypes_to_pseudo_haplotypes` -- conversion utility
-- **ngwas.py** -- Vectorized GWAS (beta/SE/t/p per variant) and PGS scoring
+- **gwas.py** -- Vectorized GWAS (beta/SE/t/p per variant) and PGS scoring
   (raw and standardized). Works with any `HaplotypeOperator` backend.
 - **cli.py** -- Command-line interface built on `typer` + `rich`:
   - `xftsim run` -- run simulation from YAML/JSON config
@@ -153,8 +153,8 @@ comprehensive documentation and testing.
 #### Testing (3400+ tests)
 
 - Organized into `tests/unit/`, `tests/integration/`, `tests/numerical/`
-- Unit tests for every module: struct, neffect, narch, parser, nsim, nmate,
-  nfilter, nstats, io, ngwas, cli, reproduce, haplotype operations, GRG
+- Unit tests for every module: struct, effect, arch, parser, sim, mate,
+  filter, stats, io, gwas, cli, reproduce, haplotype operations, GRG
 - Integration tests: formula-based simulations, multi-generation pipelines,
   VT + assortative mating, filters + statistics + callbacks, checkpoint
   resume, CLI end-to-end (subprocess-based), architecture I/O round-trip
@@ -175,12 +175,12 @@ comprehensive documentation and testing.
 
 #### Documentation
 
-- Sphinx API reference (`docs/api/`): 12 RST files covering nsim, narch,
-  neffect, nmate, nfilter, nstats, ngwas, io, struct, parser, cli
+- Sphinx API reference (`docs/api/`): 12 RST files covering sim, arch,
+  effect, mate, filter, stats, gwas, io, struct, parser, cli
 - Sphinx guides (`docs/guides/`): quickstart, formula DSL reference
 - Sphinx configuration with autodoc, intersphinx, viewcode, nbsphinx
-- Numpy-style docstrings across all new modules (nsim, narch, neffect, nmate,
-  nfilter, nstats, io, struct, parser, ngwas, founders)
+- Numpy-style docstrings across all new modules (sim, arch, effect, mate,
+  filter, stats, io, struct, parser, gwas, founders)
 - Design document: `docs/plans/2026-02-05-refactor-design.md`
 - Testing specification: `docs/plans/testing-spec.md`
 - Daily development notes in `docs/plans/devnotes/`
@@ -234,13 +234,13 @@ comprehensive documentation and testing.
 - **I/O**: Replaced scattered save/load functions with a unified serialization
   stack supporting all data types, architectures, and full simulation
   checkpoints.
-- **DemoSimulation**: Rewrote to use new system (`Simulation` + `narch` +
-  `nmate`) while preserving the same public API.
+- **DemoSimulation**: Rewrote to use new system (`Simulation` + `arch` +
+  `mate`) while preserving the same public API.
 - **README.md**: Complete rewrite reflecting the new API, formula DSL, quick
   start example, feature list, and module reference table.
 - **Type hints**: Added `from __future__ import annotations` and PEP 604
-  union syntax across 10 modules (nsim, narch, neffect, nmate, nfilter,
-  nstats, parser, io, founders, ngwas).
+  union syntax across 10 modules (sim, arch, effect, mate, filter,
+  stats, parser, io, founders, gwas).
 - **Founder generation**: Replaced per-variant Python loop with vectorized
   numpy broadcasting in `founders.py`.
 

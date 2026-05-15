@@ -1,5 +1,5 @@
 """
-Unit tests for the shunting-yard expression evaluator in narch.py.
+Unit tests for the shunting-yard expression evaluator in arch.py.
 
 Tests:
 1. _tokenize: numbers, identifiers, operators, scientific notation, dotted names

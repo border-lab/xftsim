@@ -1,5 +1,5 @@
 """
-Unit tests for nfilter and nstats edge cases.
+Unit tests for filter and stats edge cases.
 
 Tests:
 1. TrioFilter: gen 0 returns None, pruned parent gen, key mismatch
