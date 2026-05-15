@@ -24,7 +24,7 @@ from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, Aggregat
 from xftsim.effect import AdditiveEffects
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
 
 
@@ -38,7 +38,7 @@ def _make_sim(n=50, m=10, seed=42, mating=None):
     if mating is None:
         mating = RandomMating(offspring_per_pair=2)
     rmap = RecombinationMap.constant_map(m=m)
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=mating,
@@ -129,7 +129,7 @@ class TestCheckpointContinue:
         with tempfile.TemporaryDirectory() as tmpdir:
             checkpoint_dir = os.path.join(tmpdir, 'ckpt')
             save_simulation_checkpoint(sim, checkpoint_dir)
-            restored = NSimulation.from_checkpoint(checkpoint_dir)
+            restored = Simulation.from_checkpoint(checkpoint_dir)
             restored.continue_run(2)
             assert restored.generation == 4  # 2 + 2 more
 

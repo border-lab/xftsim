@@ -23,7 +23,7 @@ from xftsim.arch import (
     SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
     ArchNode,
 )
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 
 
 def _make_env(n, fid, source_name='Y', source_values=None):
@@ -32,7 +32,7 @@ def _make_env(n, fid, source_name='Y', source_values=None):
     vm = VariantMeta(vid=np.array(['v0']))
     geno = np.ones((n, 1, 2), dtype=np.int8)
     hap = DenseHaplotypeArray(genotypes=geno, samples=sm, variants=vm)
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     if source_values is not None:
         pheno._values[source_name] = np.asarray(source_values, dtype=np.float64)
     else:

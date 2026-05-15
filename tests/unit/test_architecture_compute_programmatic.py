@@ -19,7 +19,7 @@ from xftsim.arch import (
     AggregationComponent, ArchNode,
 )
 from xftsim.effect import AdditiveEffects
-from xftsim.struct import NPhenotypeArray
+from xftsim.struct import PhenotypeArray
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -58,7 +58,7 @@ class TestArchitectureComputeProgrammatic:
         np.testing.assert_allclose(pheno['Y'], pheno['Y.G'] + pheno['Y.E'])
 
     def test_compute_creates_phenotype_if_none(self):
-        """compute() with phenotypes=None creates a fresh NPhenotypeArray."""
+        """compute() with phenotypes=None creates a fresh PhenotypeArray."""
         n, m = 20, 5
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=42)
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=42)
@@ -67,7 +67,7 @@ class TestArchitectureComputeProgrammatic:
         arch.add('Y.G', GeneticComponent(eff))
 
         pheno = arch.compute(hap)
-        assert isinstance(pheno, NPhenotypeArray)
+        assert isinstance(pheno, PhenotypeArray)
         assert 'Y.G' in pheno
 
     def test_compute_uses_existing_phenotype(self):
@@ -79,7 +79,7 @@ class TestArchitectureComputeProgrammatic:
         arch = Architecture()
         arch.add('Y.G', GeneticComponent(eff))
 
-        existing = NPhenotypeArray(hap.samples)
+        existing = PhenotypeArray(hap.samples)
         existing['pre'] = np.ones(n)
         result = arch.compute(hap, phenotypes=existing)
         assert result is existing  # same object

@@ -3,9 +3,9 @@ Unit tests for checkpoint validation and IO error paths.
 
 Tests:
 1. _deserialize_mating_regime unknown type
-2. NSimulation.from_checkpoint missing mating regime
-3. NSimulation.from_checkpoint missing recombination map
-4. NSimulation._validate effect dimension mismatch
+2. Simulation.from_checkpoint missing mating regime
+3. Simulation.from_checkpoint missing recombination map
+4. Simulation._validate effect dimension mismatch
 5. IO: save/load architecture roundtrip with CNoiseComponent
 6. IO: save/load architecture roundtrip with sibling components
 """
@@ -14,14 +14,14 @@ import pytest
 import json
 import os
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray, PedigreeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     CNoiseComponent, MVGeneticComponent, MotherComponent, FatherComponent,
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.mate import RandomMating, LinearAssortativeMating
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.reproduce import RecombinationMap
 
 import sys
@@ -62,7 +62,7 @@ class TestDeserializeMatingRegime:
         assert restored.component_names == ['Y']
 
 
-# ── NSimulation.from_checkpoint ──────────────────────────────────────────────
+# ── Simulation.from_checkpoint ──────────────────────────────────────────────
 
 class TestFromCheckpointValidation:
     def _make_and_save_checkpoint(self, tmp_path, include_mating=True, include_rmap=True):
@@ -78,7 +78,7 @@ class TestFromCheckpointValidation:
         mate = RandomMating(offspring_per_pair=2) if include_mating else None
         rmap = RecombinationMap.constant_map(m=m, p=0.5) if include_rmap else None
         if mate is not None and rmap is not None:
-            sim = NSimulation(hap, arch, mate, rmap, seed=42)
+            sim = Simulation(hap, arch, mate, rmap, seed=42)
             sim.run(2)
             save_simulation_checkpoint(sim, str(tmp_path / 'ckpt'))
         return str(tmp_path / 'ckpt')
@@ -86,7 +86,7 @@ class TestFromCheckpointValidation:
     def test_from_checkpoint_works(self, tmp_path):
         """Basic from_checkpoint should work when checkpoint is complete."""
         ckpt_dir = self._make_and_save_checkpoint(tmp_path)
-        sim = NSimulation.from_checkpoint(ckpt_dir)
+        sim = Simulation.from_checkpoint(ckpt_dir)
         assert sim.generation >= 1
 
     def test_from_checkpoint_no_mating_in_checkpoint(self, tmp_path):
@@ -102,13 +102,13 @@ class TestFromCheckpointValidation:
             json.dump(meta, f)
 
         with pytest.raises(ValueError, match="[Nn]o mating regime"):
-            NSimulation.from_checkpoint(ckpt_dir)
+            Simulation.from_checkpoint(ckpt_dir)
 
     def test_from_checkpoint_override_mating(self, tmp_path):
         """from_checkpoint with explicit mating regime overrides saved one."""
         ckpt_dir = self._make_and_save_checkpoint(tmp_path)
         new_mate = RandomMating(offspring_per_pair=4)
-        sim = NSimulation.from_checkpoint(ckpt_dir, mating_regime=new_mate)
+        sim = Simulation.from_checkpoint(ckpt_dir, mating_regime=new_mate)
         assert sim.mating_regime.offspring_per_pair == 4
 
     def test_from_checkpoint_no_rmap_in_checkpoint(self, tmp_path):
@@ -120,10 +120,10 @@ class TestFromCheckpointValidation:
             os.remove(rmap_path)
 
         with pytest.raises((ValueError, FileNotFoundError)):
-            NSimulation.from_checkpoint(ckpt_dir)
+            Simulation.from_checkpoint(ckpt_dir)
 
 
-# ── NSimulation._validate ────────────────────────────────────────────────────
+# ── Simulation._validate ────────────────────────────────────────────────────
 
 class TestSimulationValidation:
     def test_validate_dimension_mismatch_raises(self):
@@ -138,7 +138,7 @@ class TestSimulationValidation:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         with pytest.raises(ValueError, match="[Ee]ffect dimension mismatch"):
             sim.run(1)
 
@@ -158,7 +158,7 @@ class TestSimulationValidation:
         arch.add('Y2', AggregationComponent('Y2.G + Y2.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         with pytest.raises(ValueError, match="[Ee]ffect dimension mismatch"):
             sim.run(1)
 
@@ -237,10 +237,10 @@ class TestSimulationCheckpointFull:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(3)
         save_simulation_checkpoint(sim, str(tmp_path / 'ckpt'))
-        restored = NSimulation.from_checkpoint(str(tmp_path / 'ckpt'))
+        restored = Simulation.from_checkpoint(str(tmp_path / 'ckpt'))
         assert restored.generation == sim.generation
 
     def test_checkpoint_continue_run(self, tmp_path):
@@ -255,10 +255,10 @@ class TestSimulationCheckpointFull:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
         save_simulation_checkpoint(sim, str(tmp_path / 'ckpt'))
-        restored = NSimulation.from_checkpoint(str(tmp_path / 'ckpt'))
+        restored = Simulation.from_checkpoint(str(tmp_path / 'ckpt'))
         restored.continue_run(3)
         assert restored.generation == sim.generation + 3
         # All phenotypes should be finite
@@ -277,9 +277,9 @@ class TestSimulationCheckpointFull:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = LinearAssortativeMating(component_names=['Y'], r=0.5, offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
         save_simulation_checkpoint(sim, str(tmp_path / 'ckpt'))
-        restored = NSimulation.from_checkpoint(str(tmp_path / 'ckpt'))
+        restored = Simulation.from_checkpoint(str(tmp_path / 'ckpt'))
         assert isinstance(restored.mating_regime, LinearAssortativeMating)
         assert restored.mating_regime.r == 0.5

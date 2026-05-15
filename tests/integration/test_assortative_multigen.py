@@ -13,7 +13,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics
 
 import sys, os
@@ -34,7 +34,7 @@ def _make_sim(n=400, m=50, r=0.0, seed=42):
     else:
         mate = LinearAssortativeMating(component_names=['Y'], r=r, offspring_per_pair=2)
 
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mate,
         recombination_map=RecombinationMap.constant_map(m=m),

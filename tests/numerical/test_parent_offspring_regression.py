@@ -22,7 +22,7 @@ from xftsim.arch import (
 from xftsim.effect import AdditiveEffects
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics
 from xftsim.filters import TrioFilter
 
@@ -41,7 +41,7 @@ class TestParentOffspringCorrelation:
 
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap,
             seed=42, retain_phenotypes=2,
@@ -76,7 +76,7 @@ class TestGeneticValueCorrelation:
 
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap,
             seed=42, retain_phenotypes=2,
@@ -110,7 +110,7 @@ class TestSiblingCorrelation:
 
         mating = RandomMating(offspring_per_pair=4)  # 4 siblings per family
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap,
             seed=42,
@@ -155,7 +155,7 @@ class TestVTInflation:
 
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m)
-        sim1 = NSimulation(
+        sim1 = Simulation(
             founder_haplotypes=hap1, architecture=arch1,
             mating_regime=mating, recombination_map=rmap,
             seed=42, retain_phenotypes=2,
@@ -172,7 +172,7 @@ class TestVTInflation:
         arch2.add('Y', AggregationComponent('Y.G + Y.VT + Y.E'),
                  inputs=['Y.G', 'Y.VT', 'Y.E'])
 
-        sim2 = NSimulation(
+        sim2 = Simulation(
             founder_haplotypes=hap2, architecture=arch2,
             mating_regime=mating, recombination_map=rmap,
             seed=42, retain_phenotypes=2,

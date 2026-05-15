@@ -11,7 +11,7 @@ from xftsim.arch import (
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.struct import (
-    DenseHaplotypeArray, NPhenotypeArray, SampleMeta, PedigreeArray,
+    DenseHaplotypeArray, PhenotypeArray, SampleMeta, PedigreeArray,
 )
 
 
@@ -163,7 +163,7 @@ class TestExecution:
         arch.add('height.E', NoiseComponent(variance=0.5))
         arch.add('height', AggregationComponent('height.G + height.E'))
         result = arch.compute(haplotypes, rng=np.random.RandomState(42))
-        assert isinstance(result, NPhenotypeArray)
+        assert isinstance(result, PhenotypeArray)
         assert 'height.G' in result
         assert 'height.E' in result
         assert 'height' in result
@@ -215,9 +215,9 @@ class TestExecution:
         np.testing.assert_allclose(result['g'], expected)
 
     def test_compute_returns_same_phenotype_array(self, haplotypes):
-        """When passed an existing NPhenotypeArray, writes into it."""
+        """When passed an existing PhenotypeArray, writes into it."""
         sm = haplotypes.samples
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         arch = Architecture()
         arch.add('x', NoiseComponent(variance=1.0))
         result = arch.compute(haplotypes, phenotypes=pheno, rng=np.random.RandomState(0))

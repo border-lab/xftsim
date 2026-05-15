@@ -21,7 +21,7 @@ import pytest
 from testdata import TestSimulation
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.reproduce import RecombinationMap, meiosis
-from xftsim.mate import NMateAssignment
+from xftsim.mate import MateAssignment
 
 
 def _make_hap(n, m, seed=42, chrom=None):
@@ -37,9 +37,9 @@ def _make_hap(n, m, seed=42, chrom=None):
 
 
 def _make_assignment(n_offspring, maternal_idx, paternal_idx, generation=1):
-    """Helper to create NMateAssignment."""
+    """Helper to create MateAssignment."""
     sm = SampleMeta(iid=np.arange(n_offspring), generation=generation)
-    return NMateAssignment(
+    return MateAssignment(
         offspring_samples=sm,
         maternal_idx=np.array(maternal_idx, dtype=np.int64),
         paternal_idx=np.array(paternal_idx, dtype=np.int64),

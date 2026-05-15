@@ -14,7 +14,7 @@ import pytest
 
 from xftsim.arch import MotherComponent, FatherComponent, ParentComponent
 from xftsim.arch import NoiseComponent
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray
 
 
 class TestParentalComponentRepr:
@@ -46,11 +46,11 @@ class TestParentalComponentCompute:
     def _make_scenario(self):
         """Create parent and offspring phenotypes + pedigree."""
         parent_sm = SampleMeta(iid=np.arange(10), generation=0)
-        parent_pheno = NPhenotypeArray(parent_sm)
+        parent_pheno = PhenotypeArray(parent_sm)
         parent_pheno['Y'] = np.arange(10, dtype=np.float64)
 
         offspring_sm = SampleMeta(iid=np.arange(4), generation=1)
-        offspring_pheno = NPhenotypeArray(offspring_sm)
+        offspring_pheno = PhenotypeArray(offspring_sm)
         offspring_pheno['Y'] = np.zeros(4)
 
         # Offspring 0,1 from parents (0,5); offspring 2,3 from parents (1,6)

@@ -20,7 +20,7 @@ from xftsim.arch import (
 )
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.filters import TrioFilter, SibPairFilter
 from xftsim.stats import SampleStatistics
 from xftsim.io import save_simulation_checkpoint
@@ -43,7 +43,7 @@ class TestFullPipelineMultigen:
 
         gen_log = []
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=LinearAssortativeMating(
                 component_names=['Y'], r=0.3, offspring_per_pair=2,
@@ -71,7 +71,7 @@ class TestFullPipelineMultigen:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -95,7 +95,7 @@ class TestFullPipelineMultigen:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -119,7 +119,7 @@ class TestFullPipelineMultigen:
         arch.add('Y1', AggregationComponent('Y1.G + Y1.E'))
         arch.add('Y2', AggregationComponent('Y2.G + Y2.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -145,7 +145,7 @@ class TestFullPipelineMultigen:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -157,7 +157,7 @@ class TestFullPipelineMultigen:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            loaded = NSimulation.from_checkpoint(tmpdir)
+            loaded = Simulation.from_checkpoint(tmpdir)
             loaded.continue_run(2)
             keys_after = set(loaded.phenotypes.keys)
             assert keys_after == keys_before

@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from xftsim.struct import DenseHaplotypeArray, NPhenotypeArray, SampleMeta, VariantMeta
+from xftsim.struct import DenseHaplotypeArray, PhenotypeArray, SampleMeta, VariantMeta
 from xftsim.arch import (
     HaplotypeGeneticComponent, GeneticComponent, Architecture, AggregationComponent,
     ArchNode,
@@ -30,7 +30,7 @@ class TestHaplotypeGeneticComponent:
         eff = _make_effects(m=hap.m)
         comp = HaplotypeGeneticComponent(eff, haplotype='maternal')
         node = ArchNode(outputs=['Y.mat'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno)
         expected = hap.genotypes[:, :, 0].astype(np.float64) @ eff.effects
         np.testing.assert_allclose(result, expected)
@@ -40,7 +40,7 @@ class TestHaplotypeGeneticComponent:
         eff = _make_effects(m=hap.m)
         comp = HaplotypeGeneticComponent(eff, haplotype='paternal')
         node = ArchNode(outputs=['Y.pat'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno)
         expected = hap.genotypes[:, :, 1].astype(np.float64) @ eff.effects
         np.testing.assert_allclose(result, expected)
@@ -53,7 +53,7 @@ class TestHaplotypeGeneticComponent:
         pat_comp = HaplotypeGeneticComponent(eff, haplotype='paternal')
         dip_comp = GeneticComponent(eff)
         node = ArchNode(outputs=['tmp'], component=mat_comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         mat = mat_comp.compute(node, hap, pheno)
         pat = pat_comp.compute(node, hap, pheno)
         dip = dip_comp.compute(node, hap, pheno)

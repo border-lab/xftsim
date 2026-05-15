@@ -9,7 +9,7 @@ Tests cover:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.filters import TrioView, SibPairView
 from xftsim.stats import (
     HasemanElstonEstimator,
@@ -27,15 +27,15 @@ from testdata import TestSimulation
 # ---------------------------------------------------------------------------
 
 def _make_pheno(n, **kwargs):
-    """Quick NPhenotypeArray from keyword arrays."""
+    """Quick PhenotypeArray from keyword arrays."""
     sm = SampleMeta(iid=np.arange(n))
-    return NPhenotypeArray(samples=sm, values=kwargs)
+    return PhenotypeArray(samples=sm, values=kwargs)
 
 
 def _make_pheno_with_fid(n, fid, **kwargs):
-    """NPhenotypeArray with explicit FIDs."""
+    """PhenotypeArray with explicit FIDs."""
     sm = SampleMeta(iid=np.arange(n), fid=fid)
-    return NPhenotypeArray(samples=sm, values=kwargs)
+    return PhenotypeArray(samples=sm, values=kwargs)
 
 
 def _make_trio_view(y_off, y_mom, y_dad, keys=None):

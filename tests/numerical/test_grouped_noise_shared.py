@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from xftsim.arch import Architecture, NoiseComponent, AggregationComponent
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -28,7 +28,7 @@ class TestGroupedNoiseShared:
         )
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         # Gen 1 offspring: siblings share same FID and same noise
@@ -60,7 +60,7 @@ class TestGroupedNoiseShared:
         )
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         pheno = sim.phenotype_history[1]
@@ -88,7 +88,7 @@ class TestGroupedNoiseShared:
         )
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         pheno = sim.phenotype_history[1]

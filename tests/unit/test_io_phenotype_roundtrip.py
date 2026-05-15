@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 import tempfile
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 from xftsim.io import (
     save_phenotypes_npz, load_phenotypes_npz,
@@ -26,7 +26,7 @@ from xftsim.io import (
 class TestPhenotypeIO:
     def test_single_key_roundtrip(self):
         sm = SampleMeta(iid=np.arange(10))
-        pheno = NPhenotypeArray(sm)
+        pheno = PhenotypeArray(sm)
         pheno['Y'] = np.random.RandomState(42).randn(10)
 
         with tempfile.NamedTemporaryFile(suffix='.npz') as f:
@@ -37,7 +37,7 @@ class TestPhenotypeIO:
 
     def test_multiple_keys_roundtrip(self):
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(sm)
+        pheno = PhenotypeArray(sm)
         pheno['A'] = np.ones(5)
         pheno['B'] = np.ones(5) * 2
         pheno['C'] = np.ones(5) * 3
@@ -55,7 +55,7 @@ class TestPhenotypeIO:
             fid=np.array([1, 1, 2]),
             sex=np.array([0, 1, 0]),
         )
-        pheno = NPhenotypeArray(sm)
+        pheno = PhenotypeArray(sm)
         pheno['Y'] = np.array([1.0, 2.0, 3.0])
 
         with tempfile.NamedTemporaryFile(suffix='.npz') as f:

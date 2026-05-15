@@ -14,7 +14,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.mate import LinearAssortativeMating
 
 
@@ -23,7 +23,7 @@ def _make_deterministic_phenotypes(n=100, seed=42):
     rng = np.random.RandomState(seed)
     sex = np.tile([0, 1], n // 2)
     sm = SampleMeta(iid=np.arange(n), sex=sex)
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     pheno['Y'] = rng.normal(5.0, 2.0, size=n)
     return sm, pheno
 
@@ -66,7 +66,7 @@ class TestCompositeStandardization:
         rng = np.random.RandomState(42)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
 
         # Component A: high values for first 50
         # Component B: high values for last 50
@@ -89,7 +89,7 @@ class TestCompositeStandardization:
         n = 100
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = np.random.RandomState(42).normal(0, 1, n)
         pheno['C'] = np.ones(n) * 5.0  # constant = zero variance
 
@@ -149,7 +149,7 @@ class TestRankOrderPairing:
         n = 100
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = np.random.RandomState(42).normal(0, 1, n)
         # 'Z' is NOT in phenotypes
         mate = LinearAssortativeMating(
@@ -164,7 +164,7 @@ class TestRankOrderPairing:
         n = 100
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = np.random.RandomState(42).normal(0, 1, n)
         # Neither 'A' nor 'B' is in phenotypes
         mate = LinearAssortativeMating(

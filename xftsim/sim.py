@@ -1,7 +1,7 @@
 """
 New simulation loop for the refactored xftsim.
 
-NSimulation: forward-time genetics simulation using the new data structures,
+Simulation: forward-time genetics simulation using the new data structures,
 architecture DAG, and mate assignment system.
 """
 from __future__ import annotations
@@ -11,16 +11,16 @@ from typing import Callable
 import numpy as np
 
 from xftsim.struct import (
-    HaplotypeOperator, NPhenotypeArray, PedigreeArray,
+    HaplotypeOperator, PhenotypeArray, PedigreeArray,
 )
 from xftsim.arch import Architecture
-from xftsim.mate import NMateAssignment, RandomMating
+from xftsim.mate import MateAssignment, RandomMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.filters import Filter, FilteredView
 from xftsim.stats import GenerationResult, Statistic
 
 
-class NSimulation:
+class Simulation:
     """Forward-time genetics simulation.
 
     Orchestrates the simulation loop: for each generation, performs meiosis
@@ -35,7 +35,7 @@ class NSimulation:
     architecture : Architecture
         Phenogenetic architecture (DAG of ArchNodes).
     mating_regime : RandomMating or LinearAssortativeMating
-        Mating strategy that produces NMateAssignment each generation.
+        Mating strategy that produces MateAssignment each generation.
     recombination_map : RecombinationMap
         Recombination probabilities for meiosis.
     retain_haplotypes : int
@@ -58,7 +58,7 @@ class NSimulation:
         Current generation number.
     haplotype_history : dict[int, HaplotypeOperator]
         Generation -> haplotype data mapping (pruned by retention policy).
-    phenotype_history : dict[int, NPhenotypeArray]
+    phenotype_history : dict[int, PhenotypeArray]
         Generation -> phenotype data mapping (pruned by retention policy).
     pedigree_history : dict[int, PedigreeArray]
         Generation -> pedigree mapping (pruned by retention policy).
@@ -82,7 +82,7 @@ class NSimulation:
     >>> arch.add('Y.E', NoiseComponent(0.5))
     >>> arch.add('Y', AggregationComponent('Y.G + Y.E'))
     >>> rmap = RecombinationMap.uniform(m=50, p=0.01)
-    >>> sim = NSimulation(hap, arch, RandomMating(), rmap, seed=1)
+    >>> sim = Simulation(hap, arch, RandomMating(), rmap, seed=1)
     >>> sim.run(n_generations=3)
     >>> sim.generation
     2
@@ -96,7 +96,7 @@ class NSimulation:
         recombination_map: RecombinationMap,
         retain_haplotypes: int = 1,
         retain_phenotypes: int = 2,
-        callbacks: list[Callable[[NSimulation], None]] | None = None,
+        callbacks: list[Callable[[Simulation], None]] | None = None,
         filters: dict[str, Filter] | None = None,
         statistics: list[Statistic] | None = None,
         seed: int | None = None,
@@ -106,7 +106,7 @@ class NSimulation:
         self.recombination_map: RecombinationMap = recombination_map
         self.retain_haplotypes: int = retain_haplotypes
         self.retain_phenotypes: int = retain_phenotypes
-        self.callbacks: list[Callable[[NSimulation], None]] = callbacks or []
+        self.callbacks: list[Callable[[Simulation], None]] = callbacks or []
         self.filters: dict[str, Filter] = filters or {}
         self.statistics: list[Statistic] = statistics or []
         self.rng: np.random.RandomState = np.random.RandomState(seed)
@@ -116,9 +116,9 @@ class NSimulation:
         self.haplotype_history: dict[int, HaplotypeOperator] = {
             0: founder_haplotypes,
         }
-        self.phenotype_history: dict[int, NPhenotypeArray] = {}
+        self.phenotype_history: dict[int, PhenotypeArray] = {}
         self.pedigree_history: dict[int, PedigreeArray] = {}
-        self._mate_assignments: dict[int, NMateAssignment] = {}
+        self._mate_assignments: dict[int, MateAssignment] = {}
 
         # Results from statistics
         self.results: list[GenerationResult] = []
@@ -129,9 +129,9 @@ class NSimulation:
     def from_checkpoint(cls, dir_path: str,
                         mating_regime: RandomMating | None = None,
                         recombination_map: RecombinationMap | None = None,
-                        callbacks: list[Callable[[NSimulation], None]] | None = None,
+                        callbacks: list[Callable[[Simulation], None]] | None = None,
                         filters: dict[str, Filter] | None = None,
-                        statistics: list[Statistic] | None = None) -> NSimulation:
+                        statistics: list[Statistic] | None = None) -> Simulation:
         """
         Reconstruct a simulation from a checkpoint directory.
 
@@ -152,7 +152,7 @@ class NSimulation:
 
         Returns
         -------
-        NSimulation
+        Simulation
             A simulation ready for continued execution via run().
         """
         from xftsim.io import load_simulation_checkpoint
@@ -207,7 +207,7 @@ class NSimulation:
         return self.haplotype_history[self.generation]
 
     @property
-    def phenotypes(self) -> NPhenotypeArray:
+    def phenotypes(self) -> PhenotypeArray:
         """Current generation's phenotypes."""
         return self.phenotype_history[self.generation]
 
@@ -427,5 +427,5 @@ class NSimulation:
             cb(self)
 
     def __repr__(self) -> str:
-        return (f"NSimulation(generation={self.generation}, "
+        return (f"Simulation(generation={self.generation}, "
                 f"n={self.haplotypes.n}, m={self.haplotypes.m})")

@@ -12,7 +12,7 @@ import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.reproduce import RecombinationMap, meiosis
-from xftsim.mate import NMateAssignment
+from xftsim.mate import MateAssignment
 
 
 def _count_switches(offspring_geno, parent_geno, parent_idx, hap_col):

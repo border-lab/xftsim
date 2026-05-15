@@ -31,7 +31,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture
 from xftsim.mate import LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics, HasemanElstonEstimator
 
 
@@ -42,7 +42,7 @@ def _build_constant_entry_sim(
     n_individuals: int = 8000,
     n_loci: int = 1000,
     seed: int = 42,
-) -> NSimulation:
+) -> Simulation:
     """Build a constant-entry xAM simulation.
 
     Parameters
@@ -62,7 +62,7 @@ def _build_constant_entry_sim(
 
     Returns
     -------
-    NSimulation ready to run.
+    Simulation ready to run.
     """
     trait_names = [f"Y{i+1}" for i in range(n_traits)]
 
@@ -94,7 +94,7 @@ def _build_constant_entry_sim(
 
     rmap = RecombinationMap(p=0.5, m=n_loci)
 
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=mating,
@@ -110,7 +110,7 @@ def _build_constant_entry_sim(
     return sim
 
 
-def _extract_mean_rg(sim: NSimulation, generation: int) -> float:
+def _extract_mean_rg(sim: Simulation, generation: int) -> float:
     """Extract mean off-diagonal genetic correlation from HE at a generation.
 
     The HE estimator stores _cov_g (genetic covariance matrix in
@@ -143,7 +143,7 @@ def _extract_mean_rg(sim: NSimulation, generation: int) -> float:
     raise ValueError(f"Generation {generation} not found in results")
 
 
-def _run_and_report(sim: NSimulation, n_gen: int = 6, target_gen: int = 5):
+def _run_and_report(sim: Simulation, n_gen: int = 6, target_gen: int = 5):
     """Run simulation and return mean rg at target generation."""
     sim.run(n_generations=n_gen)
     return _extract_mean_rg(sim, target_gen)
@@ -347,7 +347,7 @@ class TestRandomMatingBaseline:
 
         arch = Architecture(formula="\n".join(lines), effects=effects)
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(),

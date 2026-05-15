@@ -131,8 +131,8 @@ class TestGroupedNoise:
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['Y.E'], component=comp, inputs=[], grouping='FID')
         rng = np.random.RandomState(42)
-        from xftsim.struct import NPhenotypeArray
-        pheno = NPhenotypeArray(samples=sm)
+        from xftsim.struct import PhenotypeArray
+        pheno = PhenotypeArray(samples=sm)
         result = comp.compute(node, hap, pheno, rng=rng)
 
         # Same family should have same value
@@ -156,8 +156,8 @@ class TestGroupedNoise:
         comp = CNoiseComponent(cov=cov)
         node = ArchNode(outputs=['A', 'B'], component=comp, inputs=[], grouping='FID')
         rng = np.random.RandomState(42)
-        from xftsim.struct import NPhenotypeArray
-        pheno = NPhenotypeArray(samples=sm)
+        from xftsim.struct import PhenotypeArray
+        pheno = PhenotypeArray(samples=sm)
         result = comp.compute(node, hap, pheno, rng=rng)
 
         # Result should be (n, k)
@@ -174,8 +174,8 @@ class TestGroupedNoise:
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['Y.E'], component=comp, inputs=[])
         rng = np.random.RandomState(42)
-        from xftsim.struct import NPhenotypeArray
-        pheno = NPhenotypeArray(samples=hap.samples)
+        from xftsim.struct import PhenotypeArray
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno, rng=rng)
         assert result.shape == (10,)
         # Very unlikely all 10 values are the same

@@ -27,7 +27,7 @@ from xftsim.arch import (
 )
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
 
 import sys
@@ -43,7 +43,7 @@ def _make_simple_sim(n=100, m=20, h2=0.5, seed=42, **kwargs):
     arch.add('Y.G', GeneticComponent(eff))
     arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
     arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
@@ -65,7 +65,7 @@ def _make_bivariate_sim(n=100, m=20, h2=None, rg=0.3, seed=42, **kwargs):
     arch.add('trait2.E', NoiseComponent(variance=1.0 - h2[1]))
     arch.add('trait1', AggregationComponent('trait1.G + trait1.E'))
     arch.add('trait2', AggregationComponent('trait2.G + trait2.E'))
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
@@ -84,7 +84,7 @@ def _make_vt_sim(n=100, m=20, h2=0.5, vt_weight=0.3, seed=42, **kwargs):
     arch.add('Y.VT', ParentComponent('Y', founder_component=NoiseComponent(variance=0.5)))
     arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
     arch.add('Y', AggregationComponent(f'Y.G + {vt_weight} * Y.VT + Y.E'))
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
@@ -114,7 +114,7 @@ class TestCheckpointResumeEquivalence:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim1, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
 
             # State at checkpoint should match exactly
             np.testing.assert_allclose(
@@ -143,7 +143,7 @@ class TestCheckpointResumeEquivalence:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             sim_resumed.continue_run(2)  # gen 2, 3
 
             # Check phenotypes are valid
@@ -261,7 +261,7 @@ class TestCheckpointResumeEquivalence:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             assert sim_resumed.generation == 2
 
             # Run 3 more generations
@@ -288,7 +288,7 @@ class TestCheckpointResumeEquivalence:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             sim_resumed.continue_run(2)  # gen 2, 3
 
             # Check both traits are present and valid
@@ -323,7 +323,7 @@ class TestCheckpointResumeEquivalence:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             sim_resumed.continue_run(2)  # gen 2, 3
 
             # Check VT components are present and valid
@@ -358,7 +358,7 @@ class TestCheckpointResumeEquivalence:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             sim_resumed.continue_run(2)  # gen 2, 3
 
             # Check phenotypes are valid
@@ -398,7 +398,7 @@ class TestCheckpointResumeEquivalence:
             assert 4 in checkpoint['phenotype_history']
 
             # Resume should work
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             assert sim_resumed.generation == 4
             sim_resumed.continue_run(1)
             assert sim_resumed.generation == 5
@@ -420,14 +420,14 @@ class TestCheckpointResumeEquivalence:
         try:
             # First checkpoint
             save_simulation_checkpoint(sim, tmpdir1)
-            sim = NSimulation.from_checkpoint(tmpdir1)
+            sim = Simulation.from_checkpoint(tmpdir1)
             sim.continue_run(2)  # gen 2, 3
 
             tmpdir2 = tempfile.mkdtemp()
             try:
                 # Second checkpoint
                 save_simulation_checkpoint(sim, tmpdir2)
-                sim = NSimulation.from_checkpoint(tmpdir2)
+                sim = Simulation.from_checkpoint(tmpdir2)
                 sim.continue_run(2)  # gen 4, 5
 
                 # Check final state is valid
@@ -456,7 +456,7 @@ class TestCheckpointResumeEquivalence:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             sim_resumed.continue_run(2)
 
             # Check haplotype structure
@@ -495,7 +495,7 @@ class TestCheckpointResumeEquivalence:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim2, tmpdir)
-            sim2_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim2_resumed = Simulation.from_checkpoint(tmpdir)
             sim2_resumed.continue_run(2)
             ped_resumed = sim2_resumed.pedigree_history[3]
             mat_resumed = ped_resumed.maternal_idx.copy()

@@ -45,7 +45,7 @@ comprehensive documentation and testing.
 - **narch.py** -- Architecture system built on a DAG of `ArchNode` objects with
   topological-sort execution. `Architecture` class supports both programmatic
   construction (`arch.add()`) and formula parsing (`Architecture.from_formula()`).
-- **nsim.py** -- `NSimulation` generation loop: meiosis, phenotype computation,
+- **nsim.py** -- `Simulation` generation loop: meiosis, phenotype computation,
   mating, retention policy, callbacks, early stopping. Stores results as
   `GenerationResult` objects. Supports `run()`, `continue_run()`, and
   `from_checkpoint()`.
@@ -53,7 +53,7 @@ comprehensive documentation and testing.
   `AdditiveEffects` (dense per-variant weights), `MultivariateEffects`
   (multi-trait effect matrices), and `SparseEffects` (k-causal-variant model
   via `from_h2()`).
-- **nmate.py** -- `NMateAssignment` dataclass and mating regimes:
+- **nmate.py** -- `MateAssignment` dataclass and mating regimes:
   `RandomMating` (sex-aware shuffle-pair-expand) and
   `LinearAssortativeMating` (rank-order pairing on standardized phenotypic
   composite with configurable `r`).
@@ -81,7 +81,7 @@ comprehensive documentation and testing.
     parameter positions
 - **io.py** -- Full serialization stack:
   - `save/load_haplotypes_npz` -- DenseHaplotypeArray round-trip
-  - `save/load_phenotypes_npz` -- NPhenotypeArray round-trip
+  - `save/load_phenotypes_npz` -- PhenotypeArray round-trip
   - `save/load_effects_npz` -- EffectSpec round-trip (all three subclasses)
   - `save/load_architecture` -- Architecture via JSON metadata + effect .npz
     files, handling all component types
@@ -133,11 +133,11 @@ comprehensive documentation and testing.
 - `GraphHaplotypeOperator(HaplotypeOperator)` -- pygrgl-backed GRG
   implementation using graph traversals for matvec/AF without materialization;
   meiosis and getitem delegate to dense
-- `NPhenotypeArray` -- dict-like phenotype container with set/get/contains/
+- `PhenotypeArray` -- dict-like phenotype container with set/get/contains/
   keys/subset operations
 - `PedigreeArray` -- offspring-indexed pedigree with maternal/paternal index
   arrays
-- `NHaplotypeArrayAccessor` -- compatibility accessor for legacy code
+- `HaplotypeArrayAccessor` -- compatibility accessor for legacy code
 
 #### GRG integration
 
@@ -212,7 +212,7 @@ comprehensive documentation and testing.
 
 - **Data backend**: Replaced xarray-based data structures (~220 usages) with
   numpy-backed arrays and frozen dataclasses (`SampleMeta`, `VariantMeta`,
-  `NPhenotypeArray`, `PedigreeArray`). The xarray accessor pattern is removed
+  `PhenotypeArray`, `PedigreeArray`). The xarray accessor pattern is removed
   in favor of direct attribute access.
 - **Effect system**: Replaced old `AdditiveEffects` (xarray-backed, tied to
   `ComponentIndex`) with `EffectSpec` ABC and three implementations
@@ -222,19 +222,19 @@ comprehensive documentation and testing.
   construction with a DAG-based `Architecture` class. Components are added
   via `arch.add()` or parsed from formula strings. Execution order is
   determined automatically by topological sort.
-- **Simulation loop**: Replaced `XftSimulation` with `NSimulation`. The new
+- **Simulation loop**: Replaced `XftSimulation` with `Simulation`. The new
   loop is: meiosis -> phenotype computation (via architecture DAG) -> mating
   -> repeat, with configurable retention policy for memory management.
 - **Mating**: Replaced `MatingRegime`/`RandomMatingRegime` with `RandomMating`
   and `LinearAssortativeMating`. The new mating system uses sex-aware
-  shuffle-pair-expand and produces `NMateAssignment` dataclasses.
+  shuffle-pair-expand and produces `MateAssignment` dataclasses.
 - **Filters and statistics**: Replaced old filter/stats system with new ABC-
   based `Filter` and `Statistic` hierarchies. Filters are now cross-generation
   aware (`filter.apply(generation, phenotype_history, pedigree_history)`).
 - **I/O**: Replaced scattered save/load functions with a unified serialization
   stack supporting all data types, architectures, and full simulation
   checkpoints.
-- **DemoSimulation**: Rewrote to use new system (`NSimulation` + `narch` +
+- **DemoSimulation**: Rewrote to use new system (`Simulation` + `narch` +
   `nmate`) while preserving the same public API.
 - **README.md**: Complete rewrite reflecting the new API, formula DSL, quick
   start example, feature list, and module reference table.

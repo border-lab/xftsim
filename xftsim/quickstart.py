@@ -3,11 +3,11 @@ Quickstart simulation for xftsim, ported to the refactored API.
 
 Reproduces the spirit of the legacy ReadTheDocs quickstart
 (https://xftsim.readthedocs.io/en/latest/gettingstarted/quickstart.html)
-on top of the current ``NSimulation`` / ``Architecture`` / ``nmate`` stack.
+on top of the current ``Simulation`` / ``Architecture`` / ``nmate`` stack.
 
 API translation table (legacy -> current)
 -----------------------------------------
-    xft.sim.Simulation                                -> xftsim.sim.NSimulation
+    xft.sim.Simulation                                -> xftsim.sim.Simulation
     xft.arch.GCTA_Architecture(h2=..., ...)           -> xftsim.arch.Architecture
                                                          + xftsim.effect.AdditiveEffects.from_h2
     xft.reproduce.RecombinationMap.constant_map_from_haplotypes
@@ -16,7 +16,7 @@ API translation table (legacy -> current)
     xft.stats.MatingStatistics / SampleStatistics /   -> xftsim.stats.MatingStatistics /
         HasemanElstonEstimator                              SampleStatistics /
                                                             HasemanElstonEstimator
-    xft.proc.LimitMemory(n_haplotype_generations=1)   -> NSimulation(retain_haplotypes=1, ...)
+    xft.proc.LimitMemory(n_haplotype_generations=1)   -> Simulation(retain_haplotypes=1, ...)
     sim.results_store[gen][...]                       -> sim.results[i].statistics[...]
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture
 from xftsim.mate import LinearAssortativeMating
 from xftsim.filters import TrioFilter
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import (
     SampleStatistics,
     HasemanElstonEstimator,
@@ -48,8 +48,8 @@ RECOMB_P = 0.1
 SPOUSAL_R = 0.5
 
 
-def build_sim() -> NSimulation:
-    """Construct the quickstart NSimulation."""
+def build_sim() -> Simulation:
+    """Construct the quickstart Simulation."""
     np.random.seed(SEED)
 
     # 1. Founder haplotypes: 8000 individuals at 1000 diploid sites.
@@ -93,7 +93,7 @@ def build_sim() -> NSimulation:
 
     # 6. Tie everything together. retain_haplotypes=1 plays the role of the
     #    legacy LimitMemory(n_haplotype_generations=1) post-processor.
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=founder_haplotypes,
         architecture=architecture,
         mating_regime=mating_regime,
@@ -106,7 +106,7 @@ def build_sim() -> NSimulation:
     )
 
 
-def summarize(sim: NSimulation) -> pd.DataFrame:
+def summarize(sim: Simulation) -> pd.DataFrame:
     """Collect per-generation HE rg, phenotypic rg, and spouse correlations."""
     rows = []
     for result in sim.results:
@@ -147,8 +147,8 @@ def summarize(sim: NSimulation) -> pd.DataFrame:
     return pd.DataFrame.from_records(rows)
 
 
-def phenotypes_to_dataframe(sim: NSimulation) -> pd.DataFrame:
-    """Convert the current generation's NPhenotypeArray to a DataFrame."""
+def phenotypes_to_dataframe(sim: Simulation) -> pd.DataFrame:
+    """Convert the current generation's PhenotypeArray to a DataFrame."""
     pheno = sim.phenotypes
     data = {key: pheno[key] for key in pheno.keys}
     df = pd.DataFrame(data)

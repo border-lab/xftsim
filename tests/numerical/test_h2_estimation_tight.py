@@ -24,7 +24,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import HasemanElstonEstimator, SampleStatistics
 
 import sys, os
@@ -43,7 +43,7 @@ def _estimate_h2(n=2000, m=200, h2_design=0.5, noise_var=None, seed=42):
     arch.add('Y.E', NoiseComponent(variance=noise_var))
     arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
 
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
         recombination_map=RecombinationMap.constant_map(m=m),
@@ -131,7 +131,7 @@ class TestHEAtGeneration0:
         arch.add('Y.E', NoiseComponent(variance=noise_var))
         arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),

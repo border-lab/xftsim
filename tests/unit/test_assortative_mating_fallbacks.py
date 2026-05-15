@@ -11,7 +11,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.mate import LinearAssortativeMating, RandomMating
 
 
@@ -19,7 +19,7 @@ def _make_phenotypes(n, seed=42):
     """Create simple phenotypes with 'Y' key."""
     rng = np.random.RandomState(seed)
     sm = SampleMeta(iid=np.arange(n), sex=np.tile([0, 1], n // 2))
-    pheno = NPhenotypeArray(sm)
+    pheno = PhenotypeArray(sm)
     pheno['Y'] = rng.normal(0, 1, n)
     return sm, pheno
 
@@ -61,7 +61,7 @@ class TestAssortativeFallbacks:
     def test_zero_variance_phenotype(self):
         """Phenotype with zero variance → sd=0 branch, composites not normalized."""
         sm = SampleMeta(iid=np.arange(100), sex=np.tile([0, 1], 50))
-        pheno = NPhenotypeArray(sm)
+        pheno = PhenotypeArray(sm)
         pheno['Y'] = np.ones(100) * 5.0  # constant, sd=0
 
         am = LinearAssortativeMating(
@@ -76,7 +76,7 @@ class TestAssortativeFallbacks:
     def test_no_females_raises(self):
         """All-male population should raise ValueError."""
         sm = SampleMeta(iid=np.arange(10), sex=np.ones(10, dtype=int))
-        pheno = NPhenotypeArray(sm)
+        pheno = PhenotypeArray(sm)
         pheno['Y'] = np.random.normal(0, 1, 10)
 
         am = LinearAssortativeMating(
@@ -89,7 +89,7 @@ class TestAssortativeFallbacks:
     def test_no_males_raises(self):
         """All-female population should raise ValueError."""
         sm = SampleMeta(iid=np.arange(10), sex=np.zeros(10, dtype=int))
-        pheno = NPhenotypeArray(sm)
+        pheno = PhenotypeArray(sm)
         pheno['Y'] = np.random.normal(0, 1, 10)
 
         am = LinearAssortativeMating(

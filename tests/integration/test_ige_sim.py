@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.arch import (
     Architecture, GeneticComponent, HaplotypeGeneticComponent,
     NoiseComponent, AggregationComponent,
@@ -22,7 +22,7 @@ def _run_ige_sim(n_gen=3, seed=42, arch=None):
         arch.add('Y', AggregationComponent('Y.mat + Y.pat + Y.E'))
     rmap = TestSimulation.recombination_map(m=50)
     mate = TestSimulation.mating_regime()
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mate, recombination_map=rmap,
         retain_phenotypes=5, retain_haplotypes=5, seed=seed,

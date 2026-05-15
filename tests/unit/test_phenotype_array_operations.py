@@ -1,5 +1,5 @@
 """
-Unit tests for NPhenotypeArray operations.
+Unit tests for PhenotypeArray operations.
 
 Tests:
 1. Setting and getting values
@@ -15,13 +15,13 @@ import numpy as np
 import pytest
 import warnings
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 
 def _make_pheno(n=10, keys=None, seed=42):
     rng = np.random.RandomState(seed)
     sm = SampleMeta(iid=np.arange(n))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     if keys:
         for k in keys:
             pheno[k] = rng.normal(0, 1, n)
@@ -90,6 +90,6 @@ class TestPhenotypeValues:
 
     def test_empty_phenotype(self):
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         assert len(pheno.keys) == 0
         assert pheno.samples.n == 5

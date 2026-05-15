@@ -12,7 +12,7 @@ from tests.testdata import TestSimulation
 from xftsim.struct import DenseHaplotypeArray, SampleMeta, VariantMeta
 from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -27,7 +27,7 @@ def _run_drift_sim(n=500, m=50, n_gen=10, seed=42):
     arch.add('Y', AggregationComponent('Y.G + Y.E'))
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
     mate = RandomMating(offspring_per_pair=2)
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mate, recombination_map=rmap,
         retain_haplotypes=n_gen + 1,

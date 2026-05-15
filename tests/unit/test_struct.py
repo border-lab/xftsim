@@ -1,10 +1,10 @@
 """
-Unit tests for SampleMeta, VariantMeta, NPhenotypeArray, PedigreeArray.
+Unit tests for SampleMeta, VariantMeta, PhenotypeArray, PedigreeArray.
 """
 import numpy as np
 import pytest
 import warnings
-from xftsim.struct import SampleMeta, VariantMeta, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, VariantMeta, PhenotypeArray, PedigreeArray
 
 
 # ── SampleMeta ──────────────────────────────────────────────────────────────
@@ -113,25 +113,25 @@ class TestVariantMeta:
         np.testing.assert_array_almost_equal(sub.extra['ld_score'], [0.2, 0.4])
 
 
-# ── NPhenotypeArray ────────────────────────────────────────────────────────
+# ── PhenotypeArray ────────────────────────────────────────────────────────
 
 class TestNPhenotypeArray:
     def test_get_set(self):
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         pa['height.G'] = np.ones(5) * 3.0
         np.testing.assert_array_equal(pa['height.G'], np.ones(5) * 3.0)
 
     def test_contains(self):
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         pa['x'] = np.zeros(5)
         assert 'x' in pa
         assert 'y' not in pa
 
     def test_keys(self):
         sm = SampleMeta(iid=np.arange(3))
-        pa = NPhenotypeArray(samples=sm, values={
+        pa = PhenotypeArray(samples=sm, values={
             'a': np.zeros(3),
             'b': np.ones(3),
         })
@@ -139,13 +139,13 @@ class TestNPhenotypeArray:
 
     def test_shape_validation(self):
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         with pytest.raises(ValueError, match="shape"):
             pa['bad'] = np.zeros(3)
 
     def test_overwrite_warning(self):
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         pa['x'] = np.zeros(5)
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -155,7 +155,7 @@ class TestNPhenotypeArray:
 
     def test_subset(self):
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm, values={
+        pa = PhenotypeArray(samples=sm, values={
             'x': np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
         })
         sub = pa.subset(np.array([0, 2, 4]))
@@ -164,7 +164,7 @@ class TestNPhenotypeArray:
 
     def test_samples_travel_with_data(self):
         sm = SampleMeta(iid=np.array([10, 20, 30]))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         pa['x'] = np.zeros(3)
         sub = pa.subset(np.array([1, 2]))
         np.testing.assert_array_equal(sub.samples.iid, [20, 30])
@@ -314,40 +314,40 @@ class TestVariantMetaEdgeCases:
 
 
 class TestNPhenotypeArrayEdgeCases:
-    """Edge case tests for NPhenotypeArray."""
+    """Edge case tests for PhenotypeArray."""
 
     def test_initial_values(self):
         """Passing values dict at construction should populate immediately."""
         sm = SampleMeta(iid=np.arange(3))
         vals = {'x': np.array([1.0, 2.0, 3.0]), 'y': np.array([4.0, 5.0, 6.0])}
-        pa = NPhenotypeArray(samples=sm, values=vals)
+        pa = PhenotypeArray(samples=sm, values=vals)
         assert 'x' in pa
         assert 'y' in pa
         np.testing.assert_array_equal(pa['x'], [1.0, 2.0, 3.0])
 
     def test_missing_key_raises(self):
         sm = SampleMeta(iid=np.arange(3))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         with pytest.raises(KeyError):
             pa['nonexistent']
 
     def test_wrong_dtype_coerced(self):
         """Integer values should be coerced to float64."""
         sm = SampleMeta(iid=np.arange(3))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         pa['x'] = np.array([1, 2, 3])  # int
         assert pa['x'].dtype == np.float64
 
     def test_repr(self):
         sm = SampleMeta(iid=np.arange(3))
-        pa = NPhenotypeArray(samples=sm, values={'a': np.zeros(3)})
+        pa = PhenotypeArray(samples=sm, values={'a': np.zeros(3)})
         r = repr(pa)
-        assert 'NPhenotypeArray' in r
+        assert 'PhenotypeArray' in r
         assert 'n=3' in r
 
     def test_empty_keys(self):
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         assert len(list(pa.keys)) == 0
 
 

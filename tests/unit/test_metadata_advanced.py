@@ -5,12 +5,12 @@ Tests:
 1. SampleMeta: unique_identifier, with_generation, n_fam/n_female/n_male, extra fields subset
 2. VariantMeta: subset with all optional fields, __getitem__ on extras, extra validation
 3. VariantMeta: repr with chrom/af, __getitem__ on None core field
-4. NPhenotypeArray: __contains__, repr, keys
+4. PhenotypeArray: __contains__, repr, keys
 """
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, PhenotypeArray
 
 
 class TestSampleMetaUniqueIdentifier:
@@ -201,14 +201,14 @@ class TestNPhenotypeArrayMethods:
     def test_contains(self):
         """__contains__ should check key existence."""
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm, values={'x': np.zeros(5)})
+        pa = PhenotypeArray(samples=sm, values={'x': np.zeros(5)})
         assert 'x' in pa
         assert 'y' not in pa
 
     def test_repr(self):
         """repr should show n and keys."""
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm, values={'x': np.zeros(5), 'y': np.ones(5)})
+        pa = PhenotypeArray(samples=sm, values={'x': np.zeros(5), 'y': np.ones(5)})
         r = repr(pa)
         assert 'n=5' in r
         assert 'x' in r
@@ -217,13 +217,13 @@ class TestNPhenotypeArrayMethods:
     def test_keys(self):
         """keys should return dict_keys."""
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm, values={'a': np.zeros(5), 'b': np.ones(5)})
+        pa = PhenotypeArray(samples=sm, values={'a': np.zeros(5), 'b': np.ones(5)})
         assert set(pa.keys) == {'a', 'b'}
 
     def test_subset_multiple_keys(self):
         """subset should preserve all keys."""
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm, values={
+        pa = PhenotypeArray(samples=sm, values={
             'x': np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
             'y': np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
         })
@@ -233,7 +233,7 @@ class TestNPhenotypeArrayMethods:
         np.testing.assert_array_equal(sub['y'], [20.0, 40.0])
 
     def test_empty_init(self):
-        """NPhenotypeArray with no values should have 0 keys."""
+        """PhenotypeArray with no values should have 0 keys."""
         sm = SampleMeta(iid=np.arange(5))
-        pa = NPhenotypeArray(samples=sm)
+        pa = PhenotypeArray(samples=sm)
         assert len(pa.keys) == 0

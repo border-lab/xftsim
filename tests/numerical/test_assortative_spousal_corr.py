@@ -14,7 +14,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -35,7 +35,7 @@ def _run_and_get_spousal_corr(r, n=500, m=50, seed=42):
     else:
         mate = LinearAssortativeMating(component_names=['Y'], r=r, offspring_per_pair=2)
 
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mate,
         recombination_map=RecombinationMap.constant_map(m=m),

@@ -4,15 +4,15 @@ Unit tests for RandomMating and LinearAssortativeMating edge cases.
 Tests:
 1. RandomMating: invalid offspring_per_pair, minimal population, sex alternation,
    unequal sex counts, large families, repr
-2. NMateAssignment: validation, repr, n_offspring property
+2. MateAssignment: validation, repr, n_offspring property
 3. LinearAssortativeMating: invalid r, r=0 fallback, missing phenotypes fallback,
    disassortative mating (r<0), zero-variance component, repr
 """
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.mate import RandomMating, LinearAssortativeMating, NMateAssignment
+from xftsim.struct import SampleMeta, PhenotypeArray
+from xftsim.mate import RandomMating, LinearAssortativeMating, MateAssignment
 
 
 class TestRandomMatingEdgeCases:
@@ -94,7 +94,7 @@ class TestNMateAssignmentValidation:
         """maternal_idx length != n should raise."""
         sm = SampleMeta(iid=np.arange(3))
         with pytest.raises(ValueError, match="maternal_idx length"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 1], dtype=np.int64),
                 paternal_idx=np.array([0, 1, 2], dtype=np.int64),
@@ -104,7 +104,7 @@ class TestNMateAssignmentValidation:
         """paternal_idx length != n should raise."""
         sm = SampleMeta(iid=np.arange(3))
         with pytest.raises(ValueError, match="paternal_idx length"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 1, 2], dtype=np.int64),
                 paternal_idx=np.array([0, 1], dtype=np.int64),
@@ -114,7 +114,7 @@ class TestNMateAssignmentValidation:
         """Negative maternal_idx should raise."""
         sm = SampleMeta(iid=np.arange(2))
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([-1, 0], dtype=np.int64),
                 paternal_idx=np.array([0, 1], dtype=np.int64),
@@ -124,16 +124,16 @@ class TestNMateAssignmentValidation:
         """Negative paternal_idx should raise."""
         sm = SampleMeta(iid=np.arange(2))
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 1], dtype=np.int64),
                 paternal_idx=np.array([0, -1], dtype=np.int64),
             )
 
     def test_repr(self):
-        """NMateAssignment repr should show n_offspring and generation."""
+        """MateAssignment repr should show n_offspring and generation."""
         sm = SampleMeta(iid=np.arange(4), generation=3)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.array([0, 0, 1, 1], dtype=np.int64),
             paternal_idx=np.array([2, 2, 3, 3], dtype=np.int64),
@@ -145,7 +145,7 @@ class TestNMateAssignmentValidation:
     def test_n_offspring_property(self):
         """n_offspring should equal n."""
         sm = SampleMeta(iid=np.arange(6))
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.zeros(6, dtype=np.int64),
             paternal_idx=np.zeros(6, dtype=np.int64),
@@ -164,7 +164,7 @@ class TestLinearAssortativeMatingEdgeCases:
     def test_r_zero_fallback_to_random(self):
         """r=0 should behave like random mating."""
         sm = SampleMeta(iid=np.arange(10), sex=np.tile([0, 1], 5))
-        pheno = NPhenotypeArray(samples=sm, values={'Y': np.random.randn(10)})
+        pheno = PhenotypeArray(samples=sm, values={'Y': np.random.randn(10)})
         mate = LinearAssortativeMating(component_names=['Y'], r=0.0, offspring_per_pair=2)
         result = mate.mate(sm, rng=np.random.RandomState(42), phenotypes=pheno)
         assert result.n_offspring == 10  # 5 pairs * 2
@@ -179,7 +179,7 @@ class TestLinearAssortativeMatingEdgeCases:
     def test_missing_component_names_still_works(self):
         """If none of the component_names exist in phenotypes, composite is zero."""
         sm = SampleMeta(iid=np.arange(10), sex=np.tile([0, 1], 5))
-        pheno = NPhenotypeArray(samples=sm, values={'X': np.random.randn(10)})
+        pheno = PhenotypeArray(samples=sm, values={'X': np.random.randn(10)})
         mate = LinearAssortativeMating(component_names=['Y', 'Z'], r=0.5)
         # Should still run (composite is all zeros, so it's essentially random)
         result = mate.mate(sm, rng=np.random.RandomState(42), phenotypes=pheno)
@@ -189,7 +189,7 @@ class TestLinearAssortativeMatingEdgeCases:
         """r < 0 should negate scores for males."""
         sm = SampleMeta(iid=np.arange(20), sex=np.tile([0, 1], 10))
         vals = np.random.RandomState(42).randn(20)
-        pheno = NPhenotypeArray(samples=sm, values={'Y': vals})
+        pheno = PhenotypeArray(samples=sm, values={'Y': vals})
         mate = LinearAssortativeMating(component_names=['Y'], r=-0.5, offspring_per_pair=2)
         result = mate.mate(sm, rng=np.random.RandomState(42), phenotypes=pheno)
         assert result.n_offspring == 20
@@ -205,7 +205,7 @@ class TestLinearAssortativeMatingEdgeCases:
     def test_zero_variance_component(self):
         """Constant phenotype (zero variance) should not crash."""
         sm = SampleMeta(iid=np.arange(10), sex=np.tile([0, 1], 5))
-        pheno = NPhenotypeArray(samples=sm, values={'Y': np.ones(10)})
+        pheno = PhenotypeArray(samples=sm, values={'Y': np.ones(10)})
         mate = LinearAssortativeMating(component_names=['Y'], r=0.5)
         result = mate.mate(sm, rng=np.random.RandomState(42), phenotypes=pheno)
         assert result.n_offspring == 10

@@ -14,13 +14,13 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray
 from xftsim.filters import TrioFilter, SibPairFilter, TrioView, SibPairView
 
 
 def _make_pheno(n, keys_values, generation=0):
     sm = SampleMeta(iid=np.arange(n), generation=generation)
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     for k, v in keys_values.items():
         pheno._values[k] = np.asarray(v, dtype=np.float64)
     return pheno
@@ -113,7 +113,7 @@ class TestSibPairFilterEdgeCases:
             fid=np.arange(5),
             generation=1,
         )
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['Y'] = np.arange(5, dtype=float)
         result = filt.apply(1, {1: pheno}, {})
         assert result.n_pairs == 0
@@ -124,7 +124,7 @@ class TestSibPairFilterEdgeCases:
         filt = SibPairFilter()
         fids = np.array([0, 1, 1, 2, 2, 2])
         sm = SampleMeta(iid=np.arange(6), fid=fids, generation=1)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['Y'] = np.arange(6, dtype=float)
         result = filt.apply(1, {1: pheno}, {})
         # Family 0: 0 pairs, Family 1: 1 pair, Family 2: C(3,2)=3 pairs
@@ -135,7 +135,7 @@ class TestSibPairFilterEdgeCases:
         filt = SibPairFilter()
         fids = np.array([0, 0, 1, 1])
         sm = SampleMeta(iid=np.arange(4), fid=fids, generation=1)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['A'] = np.array([1.0, 2.0, 3.0, 4.0])
         pheno._values['B'] = np.array([10.0, 20.0, 30.0, 40.0])
         result = filt.apply(1, {1: pheno}, {})
@@ -153,7 +153,7 @@ class TestSibPairFilterEdgeCases:
         filt = SibPairFilter()
         fids = np.array([0, 0, 0])
         sm = SampleMeta(iid=np.arange(3), fid=fids, generation=1)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['Y'] = np.array([10.0, 20.0, 30.0])
         result = filt.apply(1, {1: pheno}, {})
         assert result.n_pairs == 3
@@ -167,7 +167,7 @@ class TestSibPairFilterEdgeCases:
         filt = SibPairFilter()
         fids = np.zeros(10, dtype=int)
         sm = SampleMeta(iid=np.arange(10), fid=fids, generation=1)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['Y'] = np.arange(10, dtype=float)
         result = filt.apply(1, {1: pheno}, {})
         assert result.n_pairs == 45  # C(10,2)

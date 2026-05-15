@@ -9,7 +9,7 @@ Public API
 save_haplotypes_npz / load_haplotypes_npz
     Round-trip DenseHaplotypeArray to/from compressed .npz.
 save_phenotypes_npz / load_phenotypes_npz
-    Round-trip NPhenotypeArray to/from compressed .npz.
+    Round-trip PhenotypeArray to/from compressed .npz.
 save_effects_npz / load_effects_npz
     Round-trip any EffectSpec subclass to/from compressed .npz.
 save_architecture / load_architecture
@@ -370,14 +370,14 @@ def load_grg(path: str, generation: int = 0,
     )
 
 
-def save_phenotypes_npz(phenotypes: xft.struct.NPhenotypeArray,
+def save_phenotypes_npz(phenotypes: xft.struct.PhenotypeArray,
                          path: str) -> None:
     """
-    Save NPhenotypeArray to compressed numpy format.
+    Save PhenotypeArray to compressed numpy format.
 
     Parameters
     ----------
-    phenotypes : xft.struct.NPhenotypeArray
+    phenotypes : xft.struct.PhenotypeArray
         The phenotype data to save.
     path : str
         The path to save to (will add .npz extension if not present).
@@ -393,9 +393,9 @@ def save_phenotypes_npz(phenotypes: xft.struct.NPhenotypeArray,
     np.savez_compressed(path, **save_dict)
 
 
-def load_phenotypes_npz(path: str) -> xft.struct.NPhenotypeArray:
+def load_phenotypes_npz(path: str) -> xft.struct.PhenotypeArray:
     """
-    Load NPhenotypeArray from compressed numpy format.
+    Load PhenotypeArray from compressed numpy format.
 
     Parameters
     ----------
@@ -404,7 +404,7 @@ def load_phenotypes_npz(path: str) -> xft.struct.NPhenotypeArray:
 
     Returns
     -------
-    xft.struct.NPhenotypeArray
+    xft.struct.PhenotypeArray
     """
     data = np.load(path, allow_pickle=True)
     samples = xft.struct.SampleMeta(
@@ -415,7 +415,7 @@ def load_phenotypes_npz(path: str) -> xft.struct.NPhenotypeArray:
     values = {}
     for key in data['pheno_keys']:
         values[str(key)] = data[f'pheno_{key}']
-    return xft.struct.NPhenotypeArray(samples=samples, values=values)
+    return xft.struct.PhenotypeArray(samples=samples, values=values)
 
 
 def save_effects_npz(effects: "xft.effect.EffectSpec", path: str) -> None:
@@ -629,7 +629,7 @@ def _deserialize_mating_regime(config: dict[str, object]) -> object:
         raise ValueError(f"Unknown mating regime type: {mtype}")
 
 
-def save_simulation_checkpoint(sim: "xft.sim.NSimulation",
+def save_simulation_checkpoint(sim: "xft.sim.Simulation",
                                dir_path: str) -> None:
     """
     Save a simulation checkpoint to a directory.
@@ -639,7 +639,7 @@ def save_simulation_checkpoint(sim: "xft.sim.NSimulation",
 
     Parameters
     ----------
-    sim : xft.sim.NSimulation
+    sim : xft.sim.Simulation
         The simulation to checkpoint.
     dir_path : str
         Directory path (created if it doesn't exist).

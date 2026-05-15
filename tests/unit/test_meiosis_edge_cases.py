@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.mate import NMateAssignment, RandomMating
+from xftsim.mate import MateAssignment, RandomMating
 from xftsim.reproduce import RecombinationMap
 
 
@@ -29,7 +29,7 @@ def _make_hap(n, m, seed=42):
 
 def _make_assignment(n_offspring, maternal_idx, paternal_idx, generation=1):
     sm = SampleMeta(iid=np.arange(n_offspring), generation=generation)
-    return NMateAssignment(
+    return MateAssignment(
         offspring_samples=sm,
         maternal_idx=np.array(maternal_idx, dtype=np.int64),
         paternal_idx=np.array(paternal_idx, dtype=np.int64),

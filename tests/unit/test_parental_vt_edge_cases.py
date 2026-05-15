@@ -19,7 +19,7 @@ from xftsim.arch import (
     MotherComponent, FatherComponent, ParentComponent,
     NoiseComponent, ArchNode,
 )
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray, PedigreeArray
 
 
 def _make_hap(n=4, m=1):
@@ -34,7 +34,7 @@ class TestMotherComponentEdgeCases:
         """At generation 0 with no founder component, warns and returns zeros."""
         comp = MotherComponent('Y')
         hap = _make_hap(n=4)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         node = ArchNode(outputs=['Y.VT'], component=comp, inputs=[])
 
         with warnings.catch_warnings(record=True) as w:
@@ -50,7 +50,7 @@ class TestMotherComponentEdgeCases:
         noise_comp = NoiseComponent(variance=1.0)
         comp = MotherComponent('Y', founder_component=noise_comp)
         hap = _make_hap(n=4)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         node = ArchNode(outputs=['Y.VT'], component=comp, inputs=[])
 
         rng = np.random.RandomState(42)
@@ -63,12 +63,12 @@ class TestMotherComponentEdgeCases:
         """At gen > 0 with pedigree, returns mother's phenotype values."""
         comp = MotherComponent('Y')
         hap = _make_hap(n=4)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         node = ArchNode(outputs=['Y.VT'], component=comp, inputs=[])
 
         # Create parent phenotypes
         parent_sm = SampleMeta(iid=np.arange(6))
-        parent_pheno = NPhenotypeArray(samples=parent_sm)
+        parent_pheno = PhenotypeArray(samples=parent_sm)
         parent_pheno._values['Y'] = np.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0])
 
         # Create pedigree
@@ -94,7 +94,7 @@ class TestFatherComponentEdgeCases:
         """Previous generation phenotypes pruned → warns and returns zeros."""
         comp = FatherComponent('Y')
         hap = _make_hap(n=4)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         node = ArchNode(outputs=['Y.VT'], component=comp, inputs=[])
 
         offspring_sm = SampleMeta(iid=np.arange(4), generation=2)
@@ -123,11 +123,11 @@ class TestFatherComponentEdgeCases:
         """Returns father's phenotype values."""
         comp = FatherComponent('Y')
         hap = _make_hap(n=4)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         node = ArchNode(outputs=['Y.VT'], component=comp, inputs=[])
 
         parent_sm = SampleMeta(iid=np.arange(6))
-        parent_pheno = NPhenotypeArray(samples=parent_sm)
+        parent_pheno = PhenotypeArray(samples=parent_sm)
         parent_pheno._values['Y'] = np.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0])
 
         offspring_sm = SampleMeta(iid=np.arange(4), generation=1)
@@ -152,11 +152,11 @@ class TestParentComponentEdgeCases:
         """ParentComponent returns 0.5*(mother + father)."""
         comp = ParentComponent('Y')
         hap = _make_hap(n=4)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         node = ArchNode(outputs=['Y.VT'], component=comp, inputs=[])
 
         parent_sm = SampleMeta(iid=np.arange(6))
-        parent_pheno = NPhenotypeArray(samples=parent_sm)
+        parent_pheno = PhenotypeArray(samples=parent_sm)
         parent_pheno._values['Y'] = np.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0])
 
         offspring_sm = SampleMeta(iid=np.arange(4), generation=1)
@@ -180,11 +180,11 @@ class TestParentComponentEdgeCases:
         """Phenotype not found in previous gen → ValueError."""
         comp = ParentComponent('NONEXISTENT')
         hap = _make_hap(n=2)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         node = ArchNode(outputs=['X'], component=comp, inputs=[])
 
         parent_sm = SampleMeta(iid=np.arange(4))
-        parent_pheno = NPhenotypeArray(samples=parent_sm)
+        parent_pheno = PhenotypeArray(samples=parent_sm)
         parent_pheno._values['Y'] = np.array([1.0, 2.0, 3.0, 4.0])
 
         offspring_sm = SampleMeta(iid=np.arange(2), generation=1)

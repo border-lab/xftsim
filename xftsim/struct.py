@@ -505,7 +505,7 @@ class HaplotypeOperator(ABC):
 
         Parameters
         ----------
-        assignment : NMateAssignment
+        assignment : MateAssignment
             Mate assignment with maternal/paternal indices and offspring metadata.
         recombination_map : RecombinationMap
             Recombination probabilities between loci.
@@ -693,6 +693,11 @@ class DenseHaplotypeArray(HaplotypeOperator):
         """Per-SNP standardized matvec: ((G - 2p) / sqrt(2p(1-p))) @ v."""
         G_std = self.to_diploid_standardized(af=af, scale=True)
         return G_std @ v
+
+    def standardized_rmatvec(self, v: np.ndarray, af: np.ndarray = None) -> np.ndarray:
+        """Per-SNP standardized rmatvec: ((G - 2p) / sqrt(2p(1-p))).T @ v."""
+        G_std = self.to_diploid_standardized(af=af, scale=True)
+        return G_std.T @ v
 
     def diploid_matvec(self, u: np.ndarray) -> np.ndarray:
         """(G[:, :, 0] + G[:, :, 1]) @ u."""
@@ -955,7 +960,7 @@ class DenseHaplotypeArray(HaplotypeOperator):
 
         Parameters
         ----------
-        assignment : NMateAssignment
+        assignment : MateAssignment
             Mate assignment with maternal/paternal indices and offspring metadata.
         recombination_map : RecombinationMap
             Recombination probabilities between loci.
@@ -982,9 +987,9 @@ class DenseHaplotypeArray(HaplotypeOperator):
         )
 
     @property
-    def xft(self) -> "NHaplotypeArrayAccessor":
+    def xft(self) -> "HaplotypeArrayAccessor":
         """Return accessor object for compatibility with xarray .xft interface."""
-        return NHaplotypeArrayAccessor(self)
+        return HaplotypeArrayAccessor(self)
 
     def __repr__(self) -> str:
         parts = [f"n={self.n}", f"m={self.m}", f"generation={self.generation}"]
@@ -1350,7 +1355,7 @@ class StandardizedHaplotypeOperator(HaplotypeOperator):
                 f"n={self.n}, m={self.m})")
 
 
-class NHaplotypeArrayAccessor:
+class HaplotypeArrayAccessor:
     """
     Accessor class that mimics the xarray .xft interface for DenseHaplotypeArray.
     Provides compatibility with code expecting xarray-style access.
@@ -1407,10 +1412,10 @@ class NHaplotypeArrayAccessor:
 
 
 # ---------------------------------------------------------------------------
-# NPhenotypeArray — new numpy-backed phenotype container
+# PhenotypeArray — new numpy-backed phenotype container
 # ---------------------------------------------------------------------------
 
-class NPhenotypeArray:
+class PhenotypeArray:
     """
     Thin wrapper around a flat dict of named 1-D arrays.
 
@@ -1442,7 +1447,7 @@ class NPhenotypeArray:
                 f"Value for '{key}' has shape {val.shape}, expected ({self.samples.n},)"
             )
         if key in self._values:
-            warnings.warn(f"Overwriting existing key '{key}' in NPhenotypeArray")
+            warnings.warn(f"Overwriting existing key '{key}' in PhenotypeArray")
         self._values[key] = val
 
     def __contains__(self, key: str) -> bool:
@@ -1453,14 +1458,14 @@ class NPhenotypeArray:
         """Return the names of all stored components."""
         return self._values.keys()
 
-    def subset(self, idx) -> "NPhenotypeArray":
-        """Return a new NPhenotypeArray with a subset of samples."""
+    def subset(self, idx) -> "PhenotypeArray":
+        """Return a new PhenotypeArray with a subset of samples."""
         new_samples = self.samples.subset(idx)
         new_values = {k: v[idx].copy() for k, v in self._values.items()}
-        return NPhenotypeArray(samples=new_samples, values=new_values)
+        return PhenotypeArray(samples=new_samples, values=new_values)
 
     def __repr__(self) -> str:
-        return (f"NPhenotypeArray(n={self.samples.n}, "
+        return (f"PhenotypeArray(n={self.samples.n}, "
                 f"keys={list(self._values.keys())})")
 
 

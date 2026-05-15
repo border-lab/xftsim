@@ -10,7 +10,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.filters import SibPairFilter
 
 
@@ -18,7 +18,7 @@ def _make_pheno(n, fids, seed=42):
     """Create a phenotype array with given family IDs."""
     rng = np.random.RandomState(seed)
     sm = SampleMeta(iid=np.arange(n), fid=fids)
-    pheno = NPhenotypeArray(sm)
+    pheno = PhenotypeArray(sm)
     pheno['Y'] = rng.normal(0, 1, n)
     return pheno
 

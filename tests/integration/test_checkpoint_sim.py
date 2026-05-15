@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
@@ -22,7 +22,7 @@ def _make_sim(m=20, n=100, seed=42, mating_regime=None):
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
     if mating_regime is None:
         mating_regime = RandomMating(offspring_per_pair=2)
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mating_regime, recombination_map=rmap,
         retain_haplotypes=10, retain_phenotypes=10, seed=seed,
@@ -36,7 +36,7 @@ class TestCheckpointResume:
         sim.run(3)
         save_simulation_checkpoint(sim, str(tmp_path / "ckpt"))
 
-        resumed = NSimulation.from_checkpoint(str(tmp_path / "ckpt"))
+        resumed = Simulation.from_checkpoint(str(tmp_path / "ckpt"))
         resumed.continue_run(3)
 
         for gen in range(3, 6):
@@ -50,7 +50,7 @@ class TestCheckpointResume:
         assert sim.generation == 4
         save_simulation_checkpoint(sim, str(tmp_path / "ckpt"))
 
-        resumed = NSimulation.from_checkpoint(str(tmp_path / "ckpt"))
+        resumed = Simulation.from_checkpoint(str(tmp_path / "ckpt"))
         assert resumed.generation == 4
         resumed.continue_run(3)
         assert resumed.generation == 7
@@ -61,7 +61,7 @@ class TestCheckpointResume:
         sim.run(3)
         save_simulation_checkpoint(sim, str(tmp_path / "ckpt"))
 
-        resumed = NSimulation.from_checkpoint(str(tmp_path / "ckpt"))
+        resumed = Simulation.from_checkpoint(str(tmp_path / "ckpt"))
         resumed.continue_run(2)
 
         for gen in [3, 4]:
@@ -83,7 +83,7 @@ class TestAssortativeCheckpoint:
         sim.run(3)
         save_simulation_checkpoint(sim, str(tmp_path / "ckpt"))
 
-        resumed = NSimulation.from_checkpoint(str(tmp_path / "ckpt"))
+        resumed = Simulation.from_checkpoint(str(tmp_path / "ckpt"))
         assert isinstance(resumed.mating_regime, LinearAssortativeMating)
         assert resumed.mating_regime.r == 0.5
         assert resumed.mating_regime.component_names == ['Y']
@@ -97,7 +97,7 @@ class TestAssortativeCheckpoint:
         sim.run(2)
         save_simulation_checkpoint(sim, str(tmp_path / "ckpt"))
 
-        resumed = NSimulation.from_checkpoint(str(tmp_path / "ckpt"))
+        resumed = Simulation.from_checkpoint(str(tmp_path / "ckpt"))
         resumed.continue_run(2)
         assert resumed.generation == 3
         assert np.all(np.isfinite(resumed.phenotype_history[3]['Y']))
@@ -110,7 +110,7 @@ class TestCheckpointEdgeCases:
         sim.run(1)
         save_simulation_checkpoint(sim, str(tmp_path / "ckpt"))
 
-        resumed = NSimulation.from_checkpoint(str(tmp_path / "ckpt"))
+        resumed = Simulation.from_checkpoint(str(tmp_path / "ckpt"))
         assert resumed.generation == 0
         resumed.continue_run(2)
         assert resumed.generation == 2
@@ -121,7 +121,7 @@ class TestCheckpointEdgeCases:
         sim.run(3)
         save_simulation_checkpoint(sim, str(tmp_path / "ckpt"))
 
-        resumed = NSimulation.from_checkpoint(str(tmp_path / "ckpt"))
+        resumed = Simulation.from_checkpoint(str(tmp_path / "ckpt"))
         resumed.continue_run(0)
         assert resumed.generation == 2
 
@@ -131,7 +131,7 @@ class TestCheckpointEdgeCases:
         sim.run(3)
         save_simulation_checkpoint(sim, str(tmp_path / "ckpt"))
 
-        resumed = NSimulation.from_checkpoint(str(tmp_path / "ckpt"))
+        resumed = Simulation.from_checkpoint(str(tmp_path / "ckpt"))
         resumed.retain_phenotypes = 2
         resumed.retain_haplotypes = 2
         resumed.continue_run(5)

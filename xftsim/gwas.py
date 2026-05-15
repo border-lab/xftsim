@@ -12,7 +12,7 @@ from scipy import stats
 from typing import Dict, List, Optional, Union
 from dataclasses import dataclass, field
 
-from xftsim.struct import HaplotypeOperator, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import HaplotypeOperator, DenseHaplotypeArray, PhenotypeArray
 
 
 @dataclass
@@ -55,7 +55,7 @@ class GWAS:
     ----------
     haplotypes : HaplotypeOperator
         Genotype data (DenseHaplotypeArray or GraphHaplotypeOperator).
-    phenotypes : NPhenotypeArray
+    phenotypes : PhenotypeArray
         Phenotype data (dict-like, keyed by phenotype name).
     sample_indices : np.ndarray, optional
         Indices of samples to include (e.g. from an UnrelatedView).
@@ -71,10 +71,10 @@ class GWAS:
     """
 
     def __init__(self, haplotypes: HaplotypeOperator,
-                 phenotypes: NPhenotypeArray,
+                 phenotypes: PhenotypeArray,
                  sample_indices: np.ndarray | None = None) -> None:
         self.haplotypes: HaplotypeOperator = haplotypes
-        self.phenotypes: NPhenotypeArray = phenotypes
+        self.phenotypes: PhenotypeArray = phenotypes
         self.sample_indices: np.ndarray | None = sample_indices
 
     def run(self, keys: list[str] | None = None) -> dict[str, GWASResult]:

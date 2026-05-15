@@ -13,7 +13,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent,

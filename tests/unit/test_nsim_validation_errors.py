@@ -1,5 +1,5 @@
 """
-Unit tests for NSimulation validation error paths.
+Unit tests for Simulation validation error paths.
 
 Tests:
 1. Effect dimension mismatch (m) detected at run() time
@@ -14,7 +14,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -33,7 +33,7 @@ class TestNSimValidation:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -52,7 +52,7 @@ class TestNSimValidation:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -71,7 +71,7 @@ class TestNSimValidation:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),

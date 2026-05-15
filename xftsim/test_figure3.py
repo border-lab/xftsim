@@ -25,7 +25,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics, HasemanElstonEstimator
 
 # ── Parameters ──────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ trait_names = [f't{i+1}' for i in range(K)]
 
 
 def build_sim(scenario, seed=42):
-    """Build an NSimulation for a given scenario.
+    """Build an Simulation for a given scenario.
 
     Parameters
     ----------
@@ -127,7 +127,7 @@ def build_sim(scenario, seed=42):
     else:
         mating = RandomMating(offspring_per_pair=2)
 
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=founder_haplotypes,
         architecture=arch,
         mating_regime=mating,

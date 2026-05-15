@@ -6,7 +6,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent,
@@ -26,7 +26,7 @@ class TestLongRunStability:
         arch = TestSimulation.simple_architecture(m=m, h2=0.5)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -45,7 +45,7 @@ class TestLongRunStability:
         arch = TestSimulation.simple_architecture(m=m, h2=0.5)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=1, retain_phenotypes=2,
         )
@@ -64,7 +64,7 @@ class TestLongRunStability:
         arch = TestSimulation.bivariate_architecture(m=m, h2=[0.5, 0.3], rg=0.3)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -82,7 +82,7 @@ class TestLongRunStability:
         arch = TestSimulation.vt_architecture(m=m, h2=0.5, vt_weight=0.3)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -100,7 +100,7 @@ class TestLongRunStability:
         mate = LinearAssortativeMating(
             component_names=['Y'], r=0.5, offspring_per_pair=2,
         )
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -119,7 +119,7 @@ class TestLongRunStability:
         mate = LinearAssortativeMating(
             component_names=['Y'], r=-0.5, offspring_per_pair=2,
         )
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -135,7 +135,7 @@ class TestLongRunStability:
         arch = TestSimulation.simple_architecture(m=m, h2=0.5)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=10,
         )
@@ -158,7 +158,7 @@ class TestLongRunStability:
             if sim.generation >= stop_gen:
                 sim.stop = True
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=10,
             callbacks=[stopper],
@@ -184,7 +184,7 @@ class TestComplexArchitectureStability:
         arch.add('Z', AggregationComponent('Y.E2'))
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -202,7 +202,7 @@ class TestComplexArchitectureStability:
         mate = LinearAssortativeMating(
             component_names=['Y'], r=0.3, offspring_per_pair=2,
         )
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )

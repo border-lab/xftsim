@@ -33,7 +33,7 @@ environmental noise:
    from xftsim.arch import Architecture
    from xftsim.mate import RandomMating
    from xftsim.reproduce import RecombinationMap
-   from xftsim.sim import NSimulation
+   from xftsim.sim import Simulation
 
    # --- Founder haplotypes ---
    n_samples = 200
@@ -75,7 +75,7 @@ environmental noise:
    arch = Architecture.from_formula(formula, effects=effects)
 
    # --- Run simulation ---
-   sim = NSimulation(
+   sim = Simulation(
        founder_haplotypes=haplotypes,
        architecture=arch,
        mating_regime=RandomMating(n_offspring=200),

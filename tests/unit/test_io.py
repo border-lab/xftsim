@@ -6,7 +6,7 @@ import pytest
 import tempfile
 import os
 
-from xftsim.struct import DenseHaplotypeArray, SampleMeta, VariantMeta, NPhenotypeArray
+from xftsim.struct import DenseHaplotypeArray, SampleMeta, VariantMeta, PhenotypeArray
 from xftsim.io import (
     save_haplotypes_npz, load_haplotypes_npz,
     save_phenotypes_npz, load_phenotypes_npz,
@@ -52,7 +52,7 @@ class TestHaplotypeIO:
 class TestPhenotypeIO:
     def _make_pheno(self, n=50):
         samples = SampleMeta(iid=np.arange(n))
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         rng = np.random.RandomState(42)
         pheno['Y.G'] = rng.randn(n)
         pheno['Y.E'] = rng.randn(n)
@@ -86,7 +86,7 @@ class TestPhenotypeIO:
 
     def test_roundtrip_from_simulation(self, tmp_path):
         """Phenotypes from a real simulation should round-trip."""
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
@@ -94,7 +94,7 @@ class TestPhenotypeIO:
         arch = TestSimulation.simple_architecture(m=20, h2=0.5, seed=123)
         rmap = RecombinationMap.constant_map(m=20, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mate, recombination_map=rmap, seed=42,
         )
@@ -276,7 +276,7 @@ class TestArchitectureIO:
 class TestSimulationCheckpoint:
     def _make_sim(self, m=20, n=100, seed=42):
         from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
@@ -289,7 +289,7 @@ class TestSimulationCheckpoint:
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=seed)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        return NSimulation(
+        return Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mate, recombination_map=rmap,
             retain_haplotypes=5, retain_phenotypes=5, seed=seed,
@@ -412,7 +412,7 @@ class TestSimulationCheckpoint:
     def test_checkpoint_resume(self, tmp_path):
         """Simulation should be resumable from checkpoint via from_checkpoint."""
         from xftsim.io import save_simulation_checkpoint
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
 
         sim = self._make_sim()
         sim.run(3)
@@ -420,7 +420,7 @@ class TestSimulationCheckpoint:
         save_simulation_checkpoint(sim, dir_path)
 
         # Resume and run 2 more generations
-        resumed = NSimulation.from_checkpoint(dir_path)
+        resumed = Simulation.from_checkpoint(dir_path)
         assert resumed.generation == 2
         resumed.continue_run(2)
         assert resumed.generation == 4
@@ -429,7 +429,7 @@ class TestSimulationCheckpoint:
     def test_checkpoint_resume_preserves_gen0_yg(self, tmp_path):
         """Resumed simulation should have the same gen-0 Y.G (if still in history)."""
         from xftsim.io import save_simulation_checkpoint
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
 
         sim = self._make_sim()
         sim.run(2)
@@ -438,7 +438,7 @@ class TestSimulationCheckpoint:
         dir_path = str(tmp_path / "checkpoint_yg")
         save_simulation_checkpoint(sim, dir_path)
 
-        resumed = NSimulation.from_checkpoint(dir_path)
+        resumed = Simulation.from_checkpoint(dir_path)
         np.testing.assert_array_almost_equal(
             resumed.phenotype_history[0]['Y.G'], gen0_yg
         )
@@ -490,7 +490,7 @@ class TestIOEdgeCases:
     def test_phenotype_empty_keys(self, tmp_path):
         """Phenotype with no keys should roundtrip."""
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         path = str(tmp_path / "empty_pheno.npz")
         save_phenotypes_npz(pheno, path)
         loaded = load_phenotypes_npz(path)
@@ -500,7 +500,7 @@ class TestIOEdgeCases:
     def test_phenotype_many_keys(self, tmp_path):
         """Phenotype with many keys should roundtrip."""
         sm = SampleMeta(iid=np.arange(10))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         rng = np.random.RandomState(42)
         for i in range(20):
             pheno._values[f'trait_{i}'] = rng.randn(10)
@@ -524,7 +524,7 @@ class TestIOEdgeCases:
     def test_checkpoint_retention_values_preserved(self, tmp_path):
         """Retention settings should be preserved in checkpoint."""
         from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
@@ -532,7 +532,7 @@ class TestIOEdgeCases:
         arch = TestSimulation.simple_architecture(m=20, h2=0.5)
         rmap = RecombinationMap.constant_map(m=20, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=3, retain_phenotypes=7,
         )

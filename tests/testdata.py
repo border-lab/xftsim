@@ -6,7 +6,7 @@ Usable both inside pytest (via conftest fixtures) and standalone.
 """
 import os
 import numpy as np
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent,

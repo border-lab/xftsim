@@ -13,16 +13,16 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray
 from xftsim.filters import TrioFilter, SibPairFilter, TrioView, SibPairView
 
 
 def _make_pheno_with_fid(n, fid, keys=None):
-    """Create NPhenotypeArray with specified FIDs."""
+    """Create PhenotypeArray with specified FIDs."""
     sm = SampleMeta(iid=np.arange(n), fid=np.asarray(fid))
     if keys is None:
         keys = {'Y': np.random.randn(n)}
-    return NPhenotypeArray(samples=sm, values=keys)
+    return PhenotypeArray(samples=sm, values=keys)
 
 
 class TestSibPairFilterPairCount:
@@ -153,12 +153,12 @@ class TestTrioFilterEdgeCases:
         n_parent = 4
         n_offspring = 4
         parent_sm = SampleMeta(iid=np.arange(n_parent))
-        parent_pheno = NPhenotypeArray(
+        parent_pheno = PhenotypeArray(
             samples=parent_sm,
             values={'Y': np.array([1.0, 2.0, 3.0, 4.0])},
         )
         offspring_sm = SampleMeta(iid=np.arange(n_offspring), generation=1)
-        offspring_pheno = NPhenotypeArray(
+        offspring_pheno = PhenotypeArray(
             samples=offspring_sm,
             values={'Y': np.array([10.0, 20.0, 30.0, 40.0])},
         )
@@ -183,12 +183,12 @@ class TestTrioFilterEdgeCases:
         filt = TrioFilter()
         n = 2
         parent_sm = SampleMeta(iid=np.arange(n))
-        parent_pheno = NPhenotypeArray(
+        parent_pheno = PhenotypeArray(
             samples=parent_sm,
             values={'Y': np.array([1.0, 2.0])},
         )
         offspring_sm = SampleMeta(iid=np.arange(n), generation=1)
-        offspring_pheno = NPhenotypeArray(
+        offspring_pheno = PhenotypeArray(
             samples=offspring_sm,
             values={'Y': np.array([3.0, 4.0]), 'Z': np.array([5.0, 6.0])},
         )

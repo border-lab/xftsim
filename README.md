@@ -88,7 +88,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics
 from xftsim.founders import founder_haplotypes_uniform_AFs
 
@@ -113,7 +113,7 @@ mating = RandomMating(offspring_per_pair=2)
 recomb = RecombinationMap.constant_map(m=200, p=0.5)
 
 # 5. Run simulation
-sim = NSimulation(
+sim = Simulation(
     founder_haplotypes=hap,
     architecture=arch,
     mating_regime=mating,
@@ -238,7 +238,7 @@ xftsim demo UGRM                # run a built-in demo simulation
 
 | Module | Description |
 |--------|-------------|
-| `nsim` | `NSimulation` -- forward-time simulation loop |
+| `nsim` | `Simulation` -- forward-time simulation loop |
 | `narch` | `Architecture`, `ArchNode`, component classes |
 | `neffect` | `EffectSpec` hierarchy (additive, multivariate, sparse) |
 | `parser` | Formula DSL parser |
@@ -246,7 +246,7 @@ xftsim demo UGRM                # run a built-in demo simulation
 | `nfilter` | Filters (`TrioFilter`, `SibPairFilter`) for structured views |
 | `nstats` | Per-generation statistics (`SampleStatistics`) |
 | `ngwas` | GWAS and PGS computation |
-| `struct` | Core data structures (`DenseHaplotypeArray`, `NPhenotypeArray`, `SampleMeta`, `PedigreeArray`) |
+| `struct` | Core data structures (`DenseHaplotypeArray`, `PhenotypeArray`, `SampleMeta`, `PedigreeArray`) |
 | `founders` | Founder haplotype generation |
 | `reproduce` | Meiosis and `RecombinationMap` |
 | `io` | Save/load haplotypes, phenotypes, effects, architectures, checkpoints, GRG |
@@ -255,7 +255,7 @@ xftsim demo UGRM                # run a built-in demo simulation
 ## Gotchas
 
 - **Formula parser**: one component per line. Do NOT write `genetic(eff) + noise(0.5)` on a single line.
-- **`filters` parameter**: `NSimulation(filters=...)` takes a `dict[str, Filter]`, not a list. Example: `filters={'trio': TrioFilter()}`.
+- **`filters` parameter**: `Simulation(filters=...)` takes a `dict[str, Filter]`, not a list. Example: `filters={'trio': TrioFilter()}`.
 - **`TrioFilter()` and `SampleStatistics()`**: take no constructor arguments.
 - **`pheno.keys`**: this is a property, not a method -- use `pheno.keys` not `pheno.keys()`.
 - **Integer indexing**: `hap[0]` produces a 2D array that breaks `subset()` -- use `hap[[0]]` for a single individual.

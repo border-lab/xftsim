@@ -12,7 +12,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent, ArchNode,
@@ -36,7 +36,7 @@ class TestGeneticComponentCompute:
         eff = AdditiveEffects.from_h2(h2=0.5, m=20, standardized=True, seed=42)
         comp = GeneticComponent(eff)
         node = ArchNode(outputs=['Y.G'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         assert abs(np.mean(result)) < 0.5  # Approximately centered
 
@@ -46,7 +46,7 @@ class TestGeneticComponentCompute:
         eff = AdditiveEffects.from_h2(h2=0.5, m=5, standardized=False, seed=42)
         comp = GeneticComponent(eff)
         node = ArchNode(outputs=['Y.G'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         expected = hap.matvec(eff.effects)
         np.testing.assert_allclose(result, expected)
@@ -57,7 +57,7 @@ class TestGeneticComponentCompute:
         eff = AdditiveEffects.from_h2(h2=0.5, m=10, seed=42)
         comp = GeneticComponent(eff)
         node = ArchNode(outputs=['Y.G'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         assert result.shape == (20,)
 
@@ -69,7 +69,7 @@ class TestMVGeneticComponentCompute:
         eff = MultivariateEffects.from_h2_rg(h2=[0.5, 0.3], rg=0.4, m=10, seed=42)
         comp = MVGeneticComponent(eff)
         node = ArchNode(outputs=['Y1.G', 'Y2.G'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         assert result.shape == (20, 2)
 
@@ -83,7 +83,7 @@ class TestHaplotypeGeneticComponentCompute:
         pat = HaplotypeGeneticComponent(eff, haplotype='paternal')
         node_m = ArchNode(outputs=['Y.Gmat'], component=mat, inputs=[])
         node_p = ArchNode(outputs=['Y.Gpat'], component=pat, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result_m = mat.compute(node_m, hap, pheno, rng=rng)
         result_p = pat.compute(node_p, hap, pheno, rng=rng)
@@ -96,7 +96,7 @@ class TestHaplotypeGeneticComponentCompute:
         eff = AdditiveEffects.from_h2(h2=0.5, m=10, seed=42)
         comp = HaplotypeGeneticComponent(eff, haplotype='maternal')
         node = ArchNode(outputs=['Y.Gmat'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         assert result.shape == (20,)
 
@@ -107,7 +107,7 @@ class TestNoiseComponentCompute:
         hap = _make_hap(n=20, m=10)
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['Y.E'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         assert result.shape == (20,)
 
@@ -116,7 +116,7 @@ class TestNoiseComponentCompute:
         hap = _make_hap(n=20, m=10)
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['Y.E'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         r1 = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         r2 = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         np.testing.assert_array_equal(r1, r2)
@@ -134,7 +134,7 @@ class TestCNoiseComponentCompute:
         cov = np.eye(3)
         comp = CNoiseComponent(cov=cov)
         node = ArchNode(outputs=['A', 'B', 'C'], component=comp, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno, rng=np.random.RandomState(42))
         assert result.shape == (20, 3)
 

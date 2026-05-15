@@ -11,7 +11,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import NoiseComponent, CNoiseComponent, ArchNode
 
 
@@ -30,7 +30,7 @@ class TestNoiseGrouped:
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['Y.E'], component=comp, inputs=[], grouping=None)
         hap = _make_hap()
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng, generation=0, pedigree_history={})
         assert result.shape == (12,)
@@ -43,7 +43,7 @@ class TestNoiseGrouped:
         node = ArchNode(outputs=['Y.E'], component=comp, inputs=[], grouping='FID')
         fids = np.array([0, 0, 1, 1, 2, 2])
         hap = _make_hap(n=6, fids=fids)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng, generation=0, pedigree_history={})
         # Siblings should have the same noise value
@@ -60,7 +60,7 @@ class TestNoiseGrouped:
         n = 200
         fids = np.repeat(np.arange(100), 2)
         hap = _make_hap(n=n, fids=fids)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng, generation=0, pedigree_history={})
         # Extract one value per family
@@ -76,7 +76,7 @@ class TestCNoiseGrouped:
         comp = CNoiseComponent(cov=cov)
         node = ArchNode(outputs=['A', 'B'], component=comp, inputs=[], grouping=None)
         hap = _make_hap(n=10)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng, generation=0, pedigree_history={})
         assert result.shape == (10, 2)
@@ -88,7 +88,7 @@ class TestCNoiseGrouped:
         node = ArchNode(outputs=['A', 'B'], component=comp, inputs=[], grouping='FID')
         fids = np.array([0, 0, 1, 1, 2, 2])
         hap = _make_hap(n=6, fids=fids)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng, generation=0, pedigree_history={})
         assert result.shape == (6, 2)

@@ -7,7 +7,7 @@ Seeds are logged on failure for reproducibility.
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent,
     CNoiseComponent, AggregationComponent,

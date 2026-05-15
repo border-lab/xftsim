@@ -148,7 +148,7 @@ class TestSiblingRepr:
 class TestSiblingMissingSource:
     def test_missing_source_raises(self):
         """Source not in phenotypes should raise ValueError."""
-        from xftsim.struct import SampleMeta, NPhenotypeArray
+        from xftsim.struct import SampleMeta, PhenotypeArray
         from xftsim.arch import ArchNode
         import sys, os
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -158,6 +158,6 @@ class TestSiblingMissingSource:
         comp = SiblingMeanComponent('NONEXISTENT')
         node = ArchNode(outputs=['Y.sib'], component=comp, inputs=['NONEXISTENT'],
                         grouping='FID')
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         with pytest.raises(ValueError, match="not found"):
             comp.compute(node, hap, pheno)

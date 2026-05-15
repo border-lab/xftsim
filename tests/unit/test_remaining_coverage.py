@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.parser import parse_formula
 
 
@@ -60,7 +60,7 @@ class TestMatingStatisticsEdgeCases:
         from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
         from xftsim.mate import RandomMating, LinearAssortativeMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.stats import SampleStatistics, MatingStatistics
         from xftsim.filters import TrioFilter
 
@@ -79,7 +79,7 @@ class TestMatingStatisticsEdgeCases:
         else:
             mating = RandomMating(offspring_per_pair=2)
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rm,
             statistics=[SampleStatistics(), MatingStatistics()],
@@ -135,7 +135,7 @@ class TestNmateRngDefault:
         """LinearAssortativeMating.mate with rng=None creates default RNG."""
         from xftsim.mate import LinearAssortativeMating
         samples = SampleMeta(iid=np.arange(10))
-        phenotypes = NPhenotypeArray(
+        phenotypes = PhenotypeArray(
             samples=samples,
             values={"Y": np.random.randn(10)},
         )
@@ -185,7 +185,7 @@ class TestNGWASNonDensePath:
                 return self._dense
 
         mock = MockOperator(hap)
-        phenotypes = NPhenotypeArray(
+        phenotypes = PhenotypeArray(
             samples=samples,
             values={"Y": np.random.RandomState(42).randn(20)},
         )
@@ -215,7 +215,7 @@ class TestSiblingMeanDirect:
             fid=np.array([0, 0, 0, 1, 1, 1, 2, 2, 3, 3]),
         )
         hap = DenseHaplotypeArray(genotypes=geno, samples=samples)
-        pheno = NPhenotypeArray(
+        pheno = PhenotypeArray(
             samples=samples,
             values={"Y": np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])},
         )

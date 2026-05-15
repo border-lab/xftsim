@@ -14,7 +14,7 @@ import os
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.stats import SampleStatistics
@@ -38,7 +38,7 @@ class TestCheckpointCycle:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        return NSimulation(hap, arch, mate, rmap, seed=seed)
+        return Simulation(hap, arch, mate, rmap, seed=seed)
 
     def test_save_load_continue(self, tmp_path):
         """Full cycle: run → save → load → continue → verify."""
@@ -52,7 +52,7 @@ class TestCheckpointCycle:
         save_simulation_checkpoint(sim, ckpt_dir)
 
         # Load and continue
-        sim2 = NSimulation.from_checkpoint(
+        sim2 = Simulation.from_checkpoint(
             ckpt_dir,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=5, p=0.5),
@@ -72,7 +72,7 @@ class TestCheckpointCycle:
         ckpt_dir = str(tmp_path / 'ckpt2')
         save_simulation_checkpoint(sim, ckpt_dir)
 
-        sim2 = NSimulation.from_checkpoint(
+        sim2 = Simulation.from_checkpoint(
             ckpt_dir,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=5, p=0.5),
@@ -88,7 +88,7 @@ class TestCheckpointCycle:
         ckpt_dir = str(tmp_path / 'ckpt_stats')
         save_simulation_checkpoint(sim, ckpt_dir)
 
-        sim2 = NSimulation.from_checkpoint(
+        sim2 = Simulation.from_checkpoint(
             ckpt_dir,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=5, p=0.5),
@@ -106,7 +106,7 @@ class TestCheckpointCycle:
         for i in range(3):
             ckpt_dir = str(tmp_path / f'ckpt_{i}')
             save_simulation_checkpoint(sim, ckpt_dir)
-            sim = NSimulation.from_checkpoint(
+            sim = Simulation.from_checkpoint(
                 ckpt_dir,
                 mating_regime=RandomMating(offspring_per_pair=2),
                 recombination_map=RecombinationMap.constant_map(m=5, p=0.5),

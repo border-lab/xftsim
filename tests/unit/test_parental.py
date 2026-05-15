@@ -9,14 +9,14 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, DenseHaplotypeArray, PhenotypeArray, PedigreeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MotherComponent, FatherComponent, ParentComponent, ArchNode,
 )
 from xftsim.effect import AdditiveEffects
 from xftsim.parser import parse_formula
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 class TestMotherComponent:
@@ -26,7 +26,7 @@ class TestMotherComponent:
         founder = NoiseComponent(variance=0.5)
         comp = MotherComponent('Y', founder_component=founder)
         node = ArchNode(outputs=['Y.VT'], component=comp)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
 
         result = comp.compute(node, hap, pheno,
                              rng=np.random.RandomState(42),
@@ -41,7 +41,7 @@ class TestMotherComponent:
         hap = TestSimulation.founder_haplotypes(n=100, m=10)
         comp = MotherComponent('Y', founder_component=None)
         node = ArchNode(outputs=['Y.VT'], component=comp)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -66,7 +66,7 @@ class TestMotherComponent:
         hap = DenseHaplotypeArray(genotypes=geno, samples=samples_gen1, generation=1)
 
         # Parent phenotypes
-        parent_pheno = NPhenotypeArray(samples=samples_gen0)
+        parent_pheno = PhenotypeArray(samples=samples_gen0)
         parent_pheno._values['Y'] = np.arange(n, dtype=np.float64)
 
         # Pedigree: each offspring i gets mother i%10
@@ -79,7 +79,7 @@ class TestMotherComponent:
 
         comp = MotherComponent('Y')
         node = ArchNode(outputs=['Y.M'], component=comp)
-        pheno = NPhenotypeArray(samples=samples_gen1)
+        pheno = PhenotypeArray(samples=samples_gen1)
 
         result = comp.compute(node, hap, pheno,
                              generation=1,
@@ -97,7 +97,7 @@ class TestFatherComponent:
         founder = NoiseComponent(variance=1.0)
         comp = FatherComponent('Y', founder_component=founder)
         node = ArchNode(outputs=['Y.VT'], component=comp)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
 
         result = comp.compute(node, hap, pheno,
                              rng=np.random.RandomState(42),
@@ -118,7 +118,7 @@ class TestFatherComponent:
         samples_gen1 = SampleMeta(iid=np.arange(n), sex=sex, generation=1)
         hap = DenseHaplotypeArray(genotypes=geno, samples=samples_gen1, generation=1)
 
-        parent_pheno = NPhenotypeArray(samples=samples_gen0)
+        parent_pheno = PhenotypeArray(samples=samples_gen0)
         parent_pheno._values['Y'] = np.arange(n, dtype=np.float64) * 2.0
 
         maternal_idx = np.arange(n) % 10
@@ -130,7 +130,7 @@ class TestFatherComponent:
 
         comp = FatherComponent('Y')
         node = ArchNode(outputs=['Y.F'], component=comp)
-        pheno = NPhenotypeArray(samples=samples_gen1)
+        pheno = PhenotypeArray(samples=samples_gen1)
 
         result = comp.compute(node, hap, pheno,
                              generation=1,
@@ -153,7 +153,7 @@ class TestParentComponent:
         samples_gen1 = SampleMeta(iid=np.arange(n), sex=sex, generation=1)
         hap = DenseHaplotypeArray(genotypes=geno, samples=samples_gen1, generation=1)
 
-        parent_pheno = NPhenotypeArray(samples=samples_gen0)
+        parent_pheno = PhenotypeArray(samples=samples_gen0)
         parent_pheno._values['Y'] = np.arange(n, dtype=np.float64)
 
         maternal_idx = np.arange(n) % 10
@@ -165,7 +165,7 @@ class TestParentComponent:
 
         comp = ParentComponent('Y')
         node = ArchNode(outputs=['Y.P'], component=comp)
-        pheno = NPhenotypeArray(samples=samples_gen1)
+        pheno = PhenotypeArray(samples=samples_gen1)
 
         result = comp.compute(node, hap, pheno,
                              generation=1,
@@ -183,7 +183,7 @@ class TestParentComponent:
         founder = NoiseComponent(variance=0.5)
         comp = ParentComponent('Y', founder_component=founder)
         node = ArchNode(outputs=['Y.VT'], component=comp)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
 
         result = comp.compute(node, hap, pheno,
                              rng=np.random.RandomState(42),
@@ -231,7 +231,7 @@ class TestVTSimulation:
         arch = TestSimulation.vt_architecture(m=50, h2=0.5, vt_weight=0.3)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_phenotypes=10)
         sim.run(4)
 
@@ -247,7 +247,7 @@ class TestVTSimulation:
         arch = TestSimulation.vt_architecture(m=50, h2=0.5, vt_weight=0.3)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_phenotypes=0)
 
         with warnings.catch_warnings(record=True) as w:
@@ -268,7 +268,7 @@ class TestVTSimulation:
         arch = TestSimulation.vt_architecture(m=50, h2=0.5, vt_weight=0.3)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_phenotypes=10)
         sim.run(3)
 

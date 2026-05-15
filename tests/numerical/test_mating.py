@@ -6,7 +6,7 @@ Stochastic protocol: tolerance ~ 4/sqrt(N), N=10000.
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.effect import AdditiveEffects
 
@@ -22,7 +22,7 @@ def _make_pop(n=N, m=M, seed=42):
     samples = SampleMeta(iid=np.arange(n), sex=sex)
     variants = VariantMeta(vid=np.arange(m), af=np.full(m, 0.5))
     hap = DenseHaplotypeArray(genotypes=geno, samples=samples, variants=variants)
-    pheno = NPhenotypeArray(samples=samples)
+    pheno = PhenotypeArray(samples=samples)
     eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=123, standardized=False)
     pheno._values['Y'] = (geno[:, :, 0] + geno[:, :, 1]).astype(np.float64) @ eff.effects
     pheno._values['Y'] += rng.normal(0, 0.5, size=n)
@@ -96,7 +96,7 @@ class TestAssortativeMatingNumerical:
         (Deterministic test with fixed seed.)
         """
         from tests.testdata import TestSimulation
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.stats import SampleStatistics
 
         hap = TestSimulation.founder_haplotypes(n=1000, m=50, seed=42)
@@ -104,7 +104,7 @@ class TestAssortativeMatingNumerical:
         rmap = TestSimulation.recombination_map(m=50)
 
         # Random mating sim
-        sim_rand = NSimulation(
+        sim_rand = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(), recombination_map=rmap,
             statistics=[SampleStatistics()], seed=42,
@@ -113,7 +113,7 @@ class TestAssortativeMatingNumerical:
 
         # Assortative mating sim
         hap2 = TestSimulation.founder_haplotypes(n=1000, m=50, seed=42)
-        sim_assort = NSimulation(
+        sim_assort = Simulation(
             founder_haplotypes=hap2, architecture=arch,
             mating_regime=LinearAssortativeMating(['Y'], r=0.7),
             recombination_map=rmap,
@@ -141,7 +141,7 @@ class TestMultivariateAssortativeMating:
         samples = SampleMeta(iid=np.arange(n), sex=sex)
         variants = VariantMeta(vid=np.arange(m), af=np.full(m, 0.5))
         hap = DenseHaplotypeArray(genotypes=geno, samples=samples, variants=variants)
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         eff1 = AdditiveEffects.from_h2(h2=0.5, m=m, seed=123, standardized=False)
         eff2 = AdditiveEffects.from_h2(h2=0.3, m=m, seed=456, standardized=False)
         G = (geno[:, :, 0] + geno[:, :, 1]).astype(np.float64)

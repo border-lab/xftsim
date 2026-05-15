@@ -16,7 +16,7 @@ mean and standard deviation.
 | `matvec` | Diploid haplotype-by-weight matrix-vector product |
 | `std_matvec` | Standardized (mean-centered, variance-scaled) matvec |
 | `arch_compute` | Single call to `Architecture.compute()` for a Y = G + E model |
-| `full_simulation` | End-to-end `NSimulation.run()` over multiple generations |
+| `full_simulation` | End-to-end `Simulation.run()` over multiple generations |
 | `io_checkpoint` | Save and load a simulation checkpoint (directory with npz + JSON files) |
 
 ## Data Scales

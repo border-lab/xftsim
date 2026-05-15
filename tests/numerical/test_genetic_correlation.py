@@ -13,7 +13,7 @@ from xftsim.effect import MultivariateEffects
 from xftsim.arch import Architecture, MVGeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -31,7 +31,7 @@ def _run_bivariate(rg, n=1000, m=100, seed=42):
     arch.add('T1', AggregationComponent('T1.G + T1.E'), inputs=['T1.G', 'T1.E'])
     arch.add('T2', AggregationComponent('T2.G + T2.E'), inputs=['T2.G', 'T2.E'])
 
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
         recombination_map=RecombinationMap.constant_map(m=m),

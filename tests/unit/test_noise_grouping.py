@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from xftsim.arch import NoiseComponent, CNoiseComponent, ArchNode
-from xftsim.struct import SampleMeta, NPhenotypeArray, DenseHaplotypeArray, VariantMeta
+from xftsim.struct import SampleMeta, PhenotypeArray, DenseHaplotypeArray, VariantMeta
 
 
 def _make_grouped_hap(fids, m=3):
@@ -25,7 +25,7 @@ class TestGroupedNoise:
     def test_same_value_within_group(self):
         """Members of same FID get the same noise."""
         hap = _make_grouped_hap([0, 0, 0, 1, 1])
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['E'], component=comp, inputs=[], grouping='FID')
         rng = np.random.RandomState(42)
@@ -39,7 +39,7 @@ class TestGroupedNoise:
     def test_different_across_groups(self):
         """Different groups get different noise (with high probability)."""
         hap = _make_grouped_hap([0, 0, 1, 1])
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['E'], component=comp, inputs=[], grouping='FID')
         rng = np.random.RandomState(42)
@@ -50,7 +50,7 @@ class TestGroupedNoise:
     def test_grouped_cnoise_same_within_group(self):
         """CNoiseComponent grouped: same vector within family."""
         hap = _make_grouped_hap([0, 0, 1, 1])
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         cov = np.array([[1.0, 0.5], [0.5, 1.0]])
         comp = CNoiseComponent(cov=cov)
         node = ArchNode(outputs=['E1', 'E2'], component=comp, inputs=[], grouping='FID')
@@ -65,7 +65,7 @@ class TestGroupedNoise:
     def test_ungrouped_noise_all_different(self):
         """Without grouping, each individual gets different noise."""
         hap = _make_grouped_hap([0, 0, 1, 1])
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['E'], component=comp, inputs=[], grouping=None)
         rng = np.random.RandomState(42)

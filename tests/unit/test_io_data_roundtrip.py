@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 import os
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.io import (
     save_haplotypes_npz, load_haplotypes_npz,
     save_phenotypes_npz, load_phenotypes_npz,
@@ -94,7 +94,7 @@ class TestPhenotypesRoundtrip:
         """Single phenotype key roundtrip."""
         sm = SampleMeta(iid=np.arange(5))
         vals = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        pheno = NPhenotypeArray(samples=sm, values={'Y': vals})
+        pheno = PhenotypeArray(samples=sm, values={'Y': vals})
         path = str(tmp_path / 'pheno.npz')
         save_phenotypes_npz(pheno, path)
         loaded = load_phenotypes_npz(path)
@@ -111,7 +111,7 @@ class TestPhenotypesRoundtrip:
             'Y.E': np.random.randn(10),
             'Y': np.random.randn(10),
         }
-        pheno = NPhenotypeArray(samples=sm, values=vals)
+        pheno = PhenotypeArray(samples=sm, values=vals)
         path = str(tmp_path / 'pheno_multi.npz')
         save_phenotypes_npz(pheno, path)
         loaded = load_phenotypes_npz(path)
@@ -123,7 +123,7 @@ class TestPhenotypesRoundtrip:
     def test_empty_phenotype(self, tmp_path):
         """Empty phenotype (no keys) roundtrip."""
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         path = str(tmp_path / 'pheno_empty.npz')
         save_phenotypes_npz(pheno, path)
         loaded = load_phenotypes_npz(path)

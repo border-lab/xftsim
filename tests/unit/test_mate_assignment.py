@@ -1,5 +1,5 @@
 """
-Unit tests for NMateAssignment validation and properties.
+Unit tests for MateAssignment validation and properties.
 
 Tests:
 1. Valid construction and n_offspring
@@ -16,13 +16,13 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta
-from xftsim.mate import NMateAssignment, RandomMating
+from xftsim.mate import MateAssignment, RandomMating
 
 
 class TestNMateAssignmentValidation:
     def test_valid_construction(self):
         sm = SampleMeta(iid=np.arange(4), generation=1)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.array([0, 0, 1, 1]),
             paternal_idx=np.array([2, 2, 3, 3]),
@@ -32,7 +32,7 @@ class TestNMateAssignmentValidation:
     def test_maternal_length_mismatch(self):
         sm = SampleMeta(iid=np.arange(4), generation=1)
         with pytest.raises(ValueError, match="maternal_idx"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 0]),
                 paternal_idx=np.array([2, 2, 3, 3]),
@@ -41,7 +41,7 @@ class TestNMateAssignmentValidation:
     def test_paternal_length_mismatch(self):
         sm = SampleMeta(iid=np.arange(4), generation=1)
         with pytest.raises(ValueError, match="paternal_idx"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 0, 1, 1]),
                 paternal_idx=np.array([2, 2]),
@@ -50,7 +50,7 @@ class TestNMateAssignmentValidation:
     def test_negative_maternal_raises(self):
         sm = SampleMeta(iid=np.arange(2), generation=1)
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([-1, 0]),
                 paternal_idx=np.array([0, 1]),
@@ -59,7 +59,7 @@ class TestNMateAssignmentValidation:
     def test_negative_paternal_raises(self):
         sm = SampleMeta(iid=np.arange(2), generation=1)
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 0]),
                 paternal_idx=np.array([1, -1]),
@@ -67,7 +67,7 @@ class TestNMateAssignmentValidation:
 
     def test_dtype_coercion(self):
         sm = SampleMeta(iid=np.arange(2), generation=1)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.array([0, 0], dtype=np.int32),
             paternal_idx=np.array([1, 1], dtype=np.float64),
@@ -77,7 +77,7 @@ class TestNMateAssignmentValidation:
 
     def test_empty_offspring(self):
         sm = SampleMeta(iid=np.array([]), generation=1)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.array([], dtype=np.int64),
             paternal_idx=np.array([], dtype=np.int64),
@@ -86,13 +86,13 @@ class TestNMateAssignmentValidation:
 
     def test_repr(self):
         sm = SampleMeta(iid=np.arange(4), generation=2)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.array([0, 0, 1, 1]),
             paternal_idx=np.array([2, 2, 3, 3]),
         )
         r = repr(ma)
-        assert 'NMateAssignment' in r
+        assert 'MateAssignment' in r
         assert 'n_offspring=4' in r
         assert 'generation=2' in r
 

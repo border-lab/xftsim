@@ -1,5 +1,5 @@
 """
-Unit tests for NSimulation.from_checkpoint error paths.
+Unit tests for Simulation.from_checkpoint error paths.
 
 Tests:
 1. Nonexistent directory raises
@@ -15,7 +15,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.io import save_simulation_checkpoint
 
 import sys, os
@@ -31,7 +31,7 @@ def _make_sim(seed=42):
     arch.add('Y.G', GeneticComponent(eff))
     arch.add('Y.E', NoiseComponent(variance=0.5))
     arch.add('Y', AggregationComponent('Y.G + Y.E'))
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
         recombination_map=RecombinationMap.constant_map(m=m),
@@ -43,7 +43,7 @@ class TestFromCheckpointErrors:
     def test_nonexistent_dir_raises(self):
         """from_checkpoint with nonexistent directory should raise."""
         with pytest.raises((FileNotFoundError, OSError)):
-            NSimulation.from_checkpoint('/tmp/nonexistent_xftsim_checkpoint_xyz')
+            Simulation.from_checkpoint('/tmp/nonexistent_xftsim_checkpoint_xyz')
 
     def test_checkpoint_roundtrip_restores_generation(self):
         """Save and reload should preserve generation counter."""
@@ -54,7 +54,7 @@ class TestFromCheckpointErrors:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            loaded = NSimulation.from_checkpoint(tmpdir)
+            loaded = Simulation.from_checkpoint(tmpdir)
             assert loaded.generation == 2
         finally:
             shutil.rmtree(tmpdir)
@@ -68,7 +68,7 @@ class TestFromCheckpointErrors:
         try:
             save_simulation_checkpoint(sim, tmpdir)
             new_rm = RandomMating(offspring_per_pair=4)
-            loaded = NSimulation.from_checkpoint(tmpdir, mating_regime=new_rm)
+            loaded = Simulation.from_checkpoint(tmpdir, mating_regime=new_rm)
             assert loaded.mating_regime.offspring_per_pair == 4
         finally:
             shutil.rmtree(tmpdir)
@@ -81,7 +81,7 @@ class TestFromCheckpointErrors:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            loaded = NSimulation.from_checkpoint(tmpdir)
+            loaded = Simulation.from_checkpoint(tmpdir)
             loaded.continue_run(2)
             assert loaded.generation == 3
             assert np.all(np.isfinite(loaded.phenotypes['Y']))

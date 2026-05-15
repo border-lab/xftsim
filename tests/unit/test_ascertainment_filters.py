@@ -10,7 +10,7 @@ from xftsim.filters import (
     AscertainmentFilter, AscertainedView,
     SubsampleFilter, SubsampleView,
 )
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 
 # ---------------------------------------------------------------------------
@@ -18,7 +18,7 @@ from xftsim.struct import SampleMeta, NPhenotypeArray
 # ---------------------------------------------------------------------------
 
 def _make_pheno(n, fids=None, seed=42, keys=('Y',)):
-    """Build an NPhenotypeArray with given FIDs and random phenotypes."""
+    """Build an PhenotypeArray with given FIDs and random phenotypes."""
     rng = np.random.RandomState(seed)
     iid = np.arange(n)
     if fids is None:
@@ -28,7 +28,7 @@ def _make_pheno(n, fids=None, seed=42, keys=('Y',)):
         fid=np.asarray(fids),
         sex=np.tile([0, 1], (n + 1) // 2)[:n],
     )
-    pheno = NPhenotypeArray(samples=samples)
+    pheno = PhenotypeArray(samples=samples)
     for key in keys:
         pheno[key] = rng.randn(n)
     return pheno
@@ -583,7 +583,7 @@ class TestEdgeCases:
             fid=fids,
             sex=np.tile([0, 1], 6),
         )
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         pheno['Y'] = np.random.RandomState(42).randn(n)
 
         view = UnrelatedFilter().apply(0, {0: pheno}, {})

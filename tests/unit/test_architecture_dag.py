@@ -157,8 +157,8 @@ class TestArchitectureCompute:
     def test_compute_writes_to_existing_phenotypes(self):
         """Passing existing phenotype array adds keys to it."""
         hap = _make_hap(n=10, m=5)
-        from xftsim.struct import NPhenotypeArray
-        pheno = NPhenotypeArray(samples=hap.samples)
+        from xftsim.struct import PhenotypeArray
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno._values['EXISTING'] = np.ones(10)
 
         arch = Architecture()

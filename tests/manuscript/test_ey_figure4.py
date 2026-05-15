@@ -34,7 +34,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture
 from xftsim.mate import LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics, HasemanElstonEstimator
 from xftsim.gwas import GWAS
 
@@ -121,7 +121,7 @@ wealth ~ wealth.E + wealth.VT
         offspring_per_pair=2,
     )
 
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=founder_haplotypes,
         architecture=arch,
         mating_regime=mating,

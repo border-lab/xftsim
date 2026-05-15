@@ -2,12 +2,12 @@
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
-from xftsim.mate import RandomMating, LinearAssortativeMating, NMateAssignment
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
+from xftsim.mate import RandomMating, LinearAssortativeMating, MateAssignment
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 def _make_pop(n=2000, m=50, seed=42):
@@ -20,7 +20,7 @@ def _make_pop(n=2000, m=50, seed=42):
     hap = DenseHaplotypeArray(genotypes=geno, samples=samples, variants=variants)
     # Compute phenotypes
     eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=123, standardized=False)
-    pheno = NPhenotypeArray(samples=samples)
+    pheno = PhenotypeArray(samples=samples)
     pheno._values['Y'] = (geno[:, :, 0] + geno[:, :, 1]).astype(np.float64) @ eff.effects
     pheno._values['Y'] += rng.normal(0, 0.5, size=n)
     return hap, pheno
@@ -33,7 +33,7 @@ class TestLinearAssortativeMating:
         mate = LinearAssortativeMating(['Y'], r=0.0)
         rng = np.random.RandomState(99)
         assignment = mate.mate(hap.samples, rng=rng, phenotypes=pheno)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
         assert assignment.n_offspring > 0
 
     def test_positive_r_produces_offspring(self):
@@ -116,14 +116,14 @@ class TestLinearAssortativeMating:
         hap, pheno = _make_pop(n=200)
         mate = RandomMating()
         assignment = mate.mate(hap.samples, rng=np.random.RandomState(0), phenotypes=pheno)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
 
     def test_fallback_when_no_phenotypes(self):
         """With phenotypes=None, assortative should fall back to random."""
         hap, _ = _make_pop(n=200)
         mate = LinearAssortativeMating(['Y'], r=0.5)
         assignment = mate.mate(hap.samples, rng=np.random.RandomState(0), phenotypes=None)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
         assert assignment.n_offspring > 0
 
 
@@ -157,7 +157,7 @@ class TestAssortativeEdgeCases:
         geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
         sex = np.tile([0, 1], (n + 1) // 2)[:n]
         samples = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         pheno._values['Y1'] = rng.normal(0, 1, size=n)
         pheno._values['Y2'] = rng.normal(0, 1, size=n)
         mate = LinearAssortativeMating(['Y1', 'Y2'], r=0.5)
@@ -175,7 +175,7 @@ class TestAssortativeEdgeCases:
         mate = LinearAssortativeMating(['Y', 'MISSING_KEY'], r=0.5)
         # Should not raise — MISSING_KEY is simply skipped
         assignment = mate.mate(hap.samples, rng=np.random.RandomState(0), phenotypes=pheno)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
         assert assignment.n_offspring > 0
 
     def test_all_components_missing_falls_back(self):
@@ -183,7 +183,7 @@ class TestAssortativeEdgeCases:
         hap, pheno = _make_pop(n=200)
         mate = LinearAssortativeMating(['NONEXISTENT'], r=0.5)
         assignment = mate.mate(hap.samples, rng=np.random.RandomState(0), phenotypes=pheno)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
         assert assignment.n_offspring > 0
 
     def test_zero_variance_phenotype(self):
@@ -193,7 +193,7 @@ class TestAssortativeEdgeCases:
         geno = rng.randint(0, 2, size=(n, m, 2)).astype(np.int8)
         sex = np.tile([0, 1], (n + 1) // 2)[:n]
         samples = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         pheno._values['Y'] = np.ones(n)  # zero variance
         mate = LinearAssortativeMating(['Y'], r=0.5)
         assignment = mate.mate(samples, rng=np.random.RandomState(0), phenotypes=pheno)

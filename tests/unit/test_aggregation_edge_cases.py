@@ -20,13 +20,13 @@ from xftsim.arch import (
     AggregationComponent, ArchNode,
     _tokenize, _shunting_yard, _evaluate_expression,
 )
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 
 def _make_pheno(n, values_dict):
-    """Create NPhenotypeArray with given values."""
+    """Create PhenotypeArray with given values."""
     sm = SampleMeta(iid=np.arange(n))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     for k, v in values_dict.items():
         pheno._values[k] = np.asarray(v, dtype=np.float64)
     return pheno
@@ -170,7 +170,7 @@ class TestAggregationComponent:
         vm = VariantMeta(vid=np.array(['v0']))
         geno = np.ones((3, 1, 2), dtype=np.int8)
         hap = DenseHaplotypeArray(genotypes=geno, samples=sm, variants=vm)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['A'] = np.array([1.0, 2.0, 3.0])
         pheno._values['B'] = np.array([4.0, 5.0, 6.0])
 

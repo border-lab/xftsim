@@ -16,7 +16,7 @@ import pytest
 import tempfile
 import os
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.io import (
     save_haplotypes_npz, load_haplotypes_npz,
@@ -112,7 +112,7 @@ class TestPhenotypeRoundtrip:
     def test_values_preserved(self):
         """Phenotype values match after save/load."""
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['Y'] = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -124,7 +124,7 @@ class TestPhenotypeRoundtrip:
     def test_multiple_keys_preserved(self):
         """Multiple phenotype keys preserved."""
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['A'] = np.ones(5)
         pheno._values['B'] = np.zeros(5)
         pheno._values['C'] = np.arange(5, dtype=float)

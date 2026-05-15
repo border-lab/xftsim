@@ -434,7 +434,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.io import load_grg
 
 hap = founder_haplotypes_uniform_AFs(n=1000, m=500)
@@ -444,6 +444,6 @@ arch.add("Y.G", GeneticComponent(eff))
 arch.add("Y.E", NoiseComponent(0.5))
 arch.add("Y", AggregationComponent("Y.G + Y.E"))
 rmap = RecombinationMap.constant_map(m=500, p=0.01)
-sim = NSimulation(hap, arch, RandomMating(), rmap, seed=1)
+sim = Simulation(hap, arch, RandomMating(), rmap, seed=1)
 sim.run(10)
 ```

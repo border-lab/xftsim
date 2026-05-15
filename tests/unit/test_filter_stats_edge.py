@@ -10,7 +10,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray
 from xftsim.filters import TrioFilter, SibPairFilter, TrioView, SibPairView
 from xftsim.stats import SampleStatistics, GenerationResult
 
@@ -24,7 +24,7 @@ def _make_phenotype(n=20, keys=None, fid=None, seed=42):
         fid = np.arange(n) // 2  # pairs
     sm = SampleMeta(iid=np.arange(n), fid=fid)
     values = {k: rng.randn(n) for k in keys}
-    return NPhenotypeArray(samples=sm, values=values)
+    return PhenotypeArray(samples=sm, values=values)
 
 
 def _make_pedigree(n=20, parent_n=20):
@@ -208,7 +208,7 @@ class TestSampleStatisticsEdgeCases:
         """Phenotype with no keys should return empty arrays."""
         stat = SampleStatistics()
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         result = stat.estimate({0: pheno}, {}, generation=0)
         assert len(result['keys']) == 0
         assert len(result['var']) == 0

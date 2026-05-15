@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, NoiseComponent, AggregationComponent, ArchNode,
     SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
@@ -28,8 +28,8 @@ def _make_family_haplotypes():
 
 
 def _make_phenotypes_with_values(hap, vals, name='X'):
-    """Create an NPhenotypeArray with specific values."""
-    pheno = NPhenotypeArray(samples=hap.samples)
+    """Create an PhenotypeArray with specific values."""
+    pheno = PhenotypeArray(samples=hap.samples)
     pheno._values[name] = np.asarray(vals, dtype=np.float64)
     return pheno
 
@@ -169,7 +169,7 @@ class TestSiblingParser:
 class TestSiblingErrors:
     def test_missing_source_raises(self):
         hap = _make_family_haplotypes()
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         comp = SiblingMeanComponent('nonexistent')
         node = ArchNode(outputs=['out'], component=comp, inputs=['nonexistent'])
         with pytest.raises(ValueError, match="not found"):

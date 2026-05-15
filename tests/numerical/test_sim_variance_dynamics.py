@@ -16,7 +16,7 @@ from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
 )
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.stats import SampleStatistics
@@ -44,7 +44,7 @@ class TestVarianceBoundedness:
             pheno = sim.phenotype_history[sim.generation]
             variances.append(np.var(pheno['Y']))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42, callbacks=[track],
@@ -73,7 +73,7 @@ class TestVarianceBoundedness:
             pheno = sim.phenotype_history[sim.generation]
             env_vars.append(np.var(pheno['Y.E']))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42, callbacks=[track],
@@ -111,7 +111,7 @@ class TestAssortativeInflatesVariance:
                 pheno = sim.phenotype_history[sim.generation]
                 final_gvars.append(np.var(pheno['Y.G']))
 
-            sim = NSimulation(
+            sim = Simulation(
                 hap, arch, mate_cls,
                 RecombinationMap.constant_map(m=m, p=0.5),
                 seed=42, callbacks=[track],
@@ -140,7 +140,7 @@ class TestMultiGenFiniteness:
         arch.add('Y.E', NoiseComponent(variance=0.7))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42, retain_haplotypes=1, retain_phenotypes=1,

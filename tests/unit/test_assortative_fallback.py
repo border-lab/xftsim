@@ -12,15 +12,15 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.mate import RandomMating, LinearAssortativeMating, NMateAssignment
+from xftsim.struct import SampleMeta, PhenotypeArray
+from xftsim.mate import RandomMating, LinearAssortativeMating, MateAssignment
 
 
 def _make_samples_and_phenotypes(n=100, seed=42):
     rng = np.random.RandomState(seed)
     sex = np.tile([0, 1], (n + 1) // 2)[:n]
     sm = SampleMeta(iid=np.arange(n), sex=sex)
-    pheno = NPhenotypeArray(samples=sm, values={
+    pheno = PhenotypeArray(samples=sm, values={
         'Y': rng.randn(n),
         'X': rng.randn(n),
     })
@@ -34,7 +34,7 @@ class TestAssortativeFallbackToRandom:
         mate = LinearAssortativeMating(component_names=['Y'], r=0.0, offspring_per_pair=2)
         rng = np.random.RandomState(42)
         result = mate.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(result, NMateAssignment)
+        assert isinstance(result, MateAssignment)
         assert result.offspring_samples.n > 0
 
     def test_phenotypes_none_produces_valid_assignment(self):
@@ -43,7 +43,7 @@ class TestAssortativeFallbackToRandom:
         mate = LinearAssortativeMating(component_names=['Y'], r=0.5, offspring_per_pair=2)
         rng = np.random.RandomState(42)
         result = mate.mate(sm, rng=rng, phenotypes=None)
-        assert isinstance(result, NMateAssignment)
+        assert isinstance(result, MateAssignment)
         assert result.offspring_samples.n > 0
 
 
@@ -58,7 +58,7 @@ class TestAssortativeComponentHandling:
         rng = np.random.RandomState(42)
         # Should still produce valid output — score will be mostly noise
         result = mate.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(result, NMateAssignment)
+        assert isinstance(result, MateAssignment)
         assert result.offspring_samples.n > 0
 
     def test_some_components_missing(self):
@@ -70,7 +70,7 @@ class TestAssortativeComponentHandling:
         )
         rng = np.random.RandomState(42)
         result = mate.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(result, NMateAssignment)
+        assert isinstance(result, MateAssignment)
         assert result.offspring_samples.n > 0
 
     def test_zero_variance_component(self):
@@ -79,7 +79,7 @@ class TestAssortativeComponentHandling:
         sex = np.tile([0, 1], (n + 1) // 2)[:n]
         sm = SampleMeta(iid=np.arange(n), sex=sex)
         # Create constant phenotype — zero variance
-        pheno = NPhenotypeArray(samples=sm, values={
+        pheno = PhenotypeArray(samples=sm, values={
             'Y': np.ones(n) * 5.0,  # constant, sd=0
         })
         mate = LinearAssortativeMating(
@@ -87,7 +87,7 @@ class TestAssortativeComponentHandling:
         )
         rng = np.random.RandomState(42)
         result = mate.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(result, NMateAssignment)
+        assert isinstance(result, MateAssignment)
         assert result.offspring_samples.n > 0
 
 
@@ -100,7 +100,7 @@ class TestAssortativeHighR:
         )
         rng = np.random.RandomState(42)
         result = mate.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(result, NMateAssignment)
+        assert isinstance(result, MateAssignment)
         assert result.offspring_samples.n > 0
 
     def test_high_negative_r(self):
@@ -111,7 +111,7 @@ class TestAssortativeHighR:
         )
         rng = np.random.RandomState(42)
         result = mate.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(result, NMateAssignment)
+        assert isinstance(result, MateAssignment)
         assert result.offspring_samples.n > 0
 
 
@@ -124,7 +124,7 @@ class TestAssortativeMultiComponent:
         )
         rng = np.random.RandomState(42)
         result = mate.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(result, NMateAssignment)
+        assert isinstance(result, MateAssignment)
 
     def test_offspring_per_pair_one(self):
         """offspring_per_pair=1 should produce half as many offspring."""
@@ -159,7 +159,7 @@ class TestAssortativeNumerical:
             sex = np.tile([0, 1], n // 2)
             sm = SampleMeta(iid=np.arange(n), sex=sex)
             values = rng.randn(n)
-            pheno = NPhenotypeArray(samples=sm, values={'Y': values})
+            pheno = PhenotypeArray(samples=sm, values={'Y': values})
             mate = LinearAssortativeMating(
                 component_names=['Y'], r=0.8, offspring_per_pair=2,
             )
@@ -180,7 +180,7 @@ class TestAssortativeNumerical:
             sex = np.tile([0, 1], n // 2)
             sm = SampleMeta(iid=np.arange(n), sex=sex)
             values = rng.randn(n)
-            pheno = NPhenotypeArray(samples=sm, values={'Y': values})
+            pheno = PhenotypeArray(samples=sm, values={'Y': values})
             mate = LinearAssortativeMating(
                 component_names=['Y'], r=-0.8, offspring_per_pair=2,
             )

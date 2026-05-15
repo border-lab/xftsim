@@ -1,5 +1,5 @@
 """
-Unit tests for NSimulation callbacks and early stopping.
+Unit tests for Simulation callbacks and early stopping.
 
 Tests:
 1. Callback is called each generation
@@ -13,7 +13,7 @@ import pytest
 
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -31,7 +31,7 @@ def _make_sim(n=50, m=5, callbacks=None, seed=42):
     arch.add('Y', AggregationComponent('Y.G + Y.E'))
     mate = RandomMating(offspring_per_pair=2)
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
-    return NSimulation(
+    return Simulation(
         hap, arch, mate, rmap,
         callbacks=callbacks or [],
         seed=seed,

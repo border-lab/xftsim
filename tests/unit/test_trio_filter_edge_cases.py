@@ -12,15 +12,15 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray
 from xftsim.filters import TrioFilter, TrioView
 
 
 def _make_pheno(n, keys=None, seed=42):
-    """Create NPhenotypeArray with given keys."""
+    """Create PhenotypeArray with given keys."""
     rng = np.random.RandomState(seed)
     sm = SampleMeta(iid=np.arange(n))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     for k in (keys or ['Y']):
         pheno[k] = rng.randn(n)
     return pheno
@@ -107,10 +107,10 @@ class TestTrioFilterExtraction:
         filt = TrioFilter()
         parent_vals = np.arange(20, dtype=np.float64)
         parent_sm = SampleMeta(iid=np.arange(20))
-        parent_pheno = NPhenotypeArray(samples=parent_sm, values={'Y': parent_vals})
+        parent_pheno = PhenotypeArray(samples=parent_sm, values={'Y': parent_vals})
 
         offspring_sm = SampleMeta(iid=np.arange(4), generation=1)
-        offspring_pheno = NPhenotypeArray(
+        offspring_pheno = PhenotypeArray(
             samples=offspring_sm,
             values={'Y': np.array([0.0, 1.0, 2.0, 3.0])},
         )

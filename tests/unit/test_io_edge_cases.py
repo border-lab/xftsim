@@ -22,7 +22,7 @@ import shutil
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, CNoiseComponent,
@@ -31,7 +31,7 @@ from xftsim.arch import (
 )
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.io import (
     save_haplotypes_npz, load_haplotypes_npz,
     save_phenotypes_npz, load_phenotypes_npz,
@@ -106,7 +106,7 @@ class TestPhenotypeManyKeys:
         """Phenotype with 10+ keys all preserved in roundtrip."""
         n = 50
         samples = SampleMeta(iid=np.arange(n))
-        pheno = NPhenotypeArray(samples)
+        pheno = PhenotypeArray(samples)
 
         rng = np.random.RandomState(42)
         keys = [f'trait_{i}' for i in range(15)]
@@ -293,7 +293,7 @@ class TestCheckpointAssortativeMating:
             component_names=['Y'], r=0.6, offspring_per_pair=2,
         )
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=mating,
@@ -328,7 +328,7 @@ class TestCheckpointRetention:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
@@ -374,7 +374,7 @@ class TestCheckpointRetention:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),

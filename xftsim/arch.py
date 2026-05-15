@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Union
 from collections import OrderedDict
 
-from xftsim.struct import HaplotypeOperator, NPhenotypeArray, PedigreeArray
+from xftsim.struct import HaplotypeOperator, PhenotypeArray, PedigreeArray
 from xftsim.effect import EffectSpec
 
 
@@ -42,7 +42,7 @@ class ArchComponent(ABC):
 
     @abstractmethod
     def compute(self, node: "ArchNode", haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs) -> np.ndarray:
         """
         Execute this component and return the result array.
 
@@ -52,7 +52,7 @@ class ArchComponent(ABC):
             The node being executed (provides inputs, outputs, grouping).
         haplotypes : HaplotypeOperator
             Current generation's haplotype data.
-        phenotypes : NPhenotypeArray
+        phenotypes : PhenotypeArray
             Current phenotype array (may already have upstream values).
         **kwargs
             Additional context: phenotype_history, pedigree_history, generation.
@@ -85,7 +85,7 @@ class GeneticComponent(ArchComponent):
         self.effects = effects
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         if self.effects.standardized:
             return haplotypes.standardized_matvec(self.effects.effects)
         else:
@@ -146,7 +146,7 @@ class HaplotypeGeneticComponent(ArchComponent):
         self.haplotype = haplotype
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         if self.haplotype == 'maternal':
             return haplotypes.matvec_maternal(self.effects.effects)
         else:
@@ -228,7 +228,7 @@ class NoiseComponent(ArchComponent):
         self.variance = float(variance)
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         n = haplotypes.n
         rng = kwargs.get('rng', np.random.RandomState())
         labels = _resolve_grouping(node.grouping, haplotypes, **kwargs)
@@ -274,7 +274,7 @@ class CNoiseComponent(ArchComponent):
         return self.cov.shape[0]
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         n = haplotypes.n
         rng = kwargs.get('rng', np.random.RandomState())
         labels = _resolve_grouping(node.grouping, haplotypes, **kwargs)
@@ -313,7 +313,7 @@ class ThresholdComponent(ArchComponent):
         self.threshold = float(threshold)
 
     def compute(self, node: "ArchNode", haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         y = phenotypes[self.source]
         return (y > self.threshold).astype(np.float64)
 
@@ -358,7 +358,7 @@ class AggregationComponent(ArchComponent):
         return result
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         n = haplotypes.n
         result = _evaluate_expression(self.expression, phenotypes, n)
         return result
@@ -448,7 +448,7 @@ def _shunting_yard(tokens: list[tuple[str, object]]) -> list[tuple[str, object]]
     return output
 
 
-def _evaluate_expression(expr: str, phenotypes: NPhenotypeArray, n: int) -> np.ndarray:
+def _evaluate_expression(expr: str, phenotypes: PhenotypeArray, n: int) -> np.ndarray:
     """Evaluate an arithmetic expression using phenotype values."""
     tokens = _tokenize(expr)
     rpn = _shunting_yard(tokens)
@@ -517,7 +517,7 @@ class _ParentalComponent(ArchComponent):
         self.normalize: bool = normalize
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         generation = kwargs.get('generation', 0)
         phenotype_history = kwargs.get('phenotype_history', {})
         pedigree_history = kwargs.get('pedigree_history', {})
@@ -650,7 +650,7 @@ class _SiblingComponent(ArchComponent):
         self.source_name = source_name
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray, **kwargs: object) -> np.ndarray:
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         if self.source_name not in phenotypes:
             raise ValueError(
                 f"{type(self).__name__}: source '{self.source_name}' not found "
@@ -978,9 +978,9 @@ class Architecture:
         return [id_to_node[nid] for nid in sorted_ids]
 
     def compute(self, haplotypes: HaplotypeOperator,
-                phenotypes: NPhenotypeArray | None = None,
+                phenotypes: PhenotypeArray | None = None,
                 rng: np.random.RandomState | None = None,
-                **kwargs: object) -> NPhenotypeArray:
+                **kwargs: object) -> PhenotypeArray:
         """
         Execute all nodes in topological order.
 
@@ -988,7 +988,7 @@ class Architecture:
         ----------
         haplotypes : HaplotypeOperator
             Current generation's haplotype data.
-        phenotypes : NPhenotypeArray, optional
+        phenotypes : PhenotypeArray, optional
             Existing phenotype array to write into. Created if None.
         rng : np.random.RandomState, optional
             Random state for noise components.
@@ -997,11 +997,11 @@ class Architecture:
 
         Returns
         -------
-        NPhenotypeArray
+        PhenotypeArray
             The phenotype array with all computed values.
         """
         if phenotypes is None:
-            phenotypes = NPhenotypeArray(samples=haplotypes.samples)
+            phenotypes = PhenotypeArray(samples=haplotypes.samples)
 
         if rng is None:
             rng = np.random.RandomState()

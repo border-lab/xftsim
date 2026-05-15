@@ -18,7 +18,7 @@ from xftsim.arch import (
 )
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -38,7 +38,7 @@ def _build_sim_with_sibling_components(n=200, m=20, seed=42,
             arch.add(name, comp, inputs=['Y'])
     rmap = RecombinationMap.constant_map(m=m)
     mate = RandomMating(offspring_per_pair=2)
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mate, recombination_map=rmap, seed=seed,
     )

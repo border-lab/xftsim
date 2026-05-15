@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from xftsim.mate import LinearAssortativeMating, RandomMating
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 
 def _make_phenotypes(n, component_values=None, seed=42):
@@ -23,7 +23,7 @@ def _make_phenotypes(n, component_values=None, seed=42):
     rng = np.random.RandomState(seed)
     sex = np.tile([0, 1], n // 2)[:n]  # alternating 0, 1
     sm = SampleMeta(iid=np.arange(n), sex=sex)
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     if component_values:
         for name, vals in component_values.items():
             pheno._values[name] = np.asarray(vals, dtype=np.float64)

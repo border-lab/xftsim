@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import (
-    SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray,
+    SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray, PedigreeArray,
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects, SparseEffects
 from xftsim.arch import (
@@ -230,7 +230,7 @@ class TestCheckpointCoverage:
         from xftsim.founders import founder_haplotypes_uniform_AFs
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=n, m=m)
@@ -244,7 +244,7 @@ class TestCheckpointCoverage:
 
         rm = RecombinationMap.constant_map(m=m, p=0.5)
         mating = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rm, seed=42,
         )
@@ -253,7 +253,7 @@ class TestCheckpointCoverage:
     def test_checkpoint_with_assortative_mating(self, tmp_path):
         from xftsim.mate import LinearAssortativeMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.founders import founder_haplotypes_uniform_AFs
 
         np.random.seed(42)
@@ -267,7 +267,7 @@ class TestCheckpointCoverage:
         mating = LinearAssortativeMating(
             component_names=['Y'], r=0.3, offspring_per_pair=2,
         )
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rm, seed=42,
         )
@@ -505,7 +505,7 @@ class TestGraphHaplotypeCheckpoint:
         from xftsim.effect import AdditiveEffects
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from tests.testdata import TestGRG
 
         # Load GRG as the founder haplotypes
@@ -521,7 +521,7 @@ class TestGraphHaplotypeCheckpoint:
         rm = RecombinationMap.constant_map(m=m, p=0.5)
         mating = RandomMating(offspring_per_pair=2)
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=grg_op, architecture=arch,
             mating_regime=mating, recombination_map=rm, seed=42,
         )

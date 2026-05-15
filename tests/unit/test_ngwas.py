@@ -15,7 +15,7 @@ Covers:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.gwas import GWAS, GWASResult, PGS
 
 
@@ -31,13 +31,13 @@ def _make_hap(n, m, seed=42):
 
 
 def _make_phenotype_from_hap(hap, beta, noise_sd=0.0, seed=99):
-    """Create NPhenotypeArray with Y = G @ beta + noise."""
+    """Create PhenotypeArray with Y = G @ beta + noise."""
     rng = np.random.RandomState(seed)
     G = hap.diploid_genotypes.astype(np.float64)
     y = G @ beta
     if noise_sd > 0:
         y = y + rng.normal(0, noise_sd, size=len(y))
-    pheno = NPhenotypeArray(samples=hap.samples)
+    pheno = PhenotypeArray(samples=hap.samples)
     pheno['Y'] = y
     return pheno
 
@@ -113,7 +113,7 @@ class TestGWASPValues:
         n, m = 500, 50
         hap = _make_hap(n, m, seed=40)
         rng = np.random.RandomState(41)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()
@@ -143,7 +143,7 @@ class TestGWASPValues:
         n, m = 200, 30
         hap = _make_hap(n, m, seed=60)
         rng = np.random.RandomState(61)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()
@@ -161,7 +161,7 @@ class TestGWASMultipleKeys:
         hap = _make_hap(n, m, seed=70)
         rng = np.random.RandomState(71)
 
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y1'] = rng.normal(0, 1, size=n)
         pheno['Y2'] = rng.normal(5, 2, size=n)
 
@@ -177,7 +177,7 @@ class TestGWASMultipleKeys:
         hap = _make_hap(n, m, seed=72)
         rng = np.random.RandomState(73)
 
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y1'] = rng.normal(0, 1, size=n)
         pheno['Y2'] = rng.normal(0, 1, size=n)
 
@@ -194,7 +194,7 @@ class TestGWASSampleSubset:
         n, m = 400, 10
         hap = _make_hap(n, m, seed=80)
         rng = np.random.RandomState(81)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         # Use first 200 samples
@@ -211,7 +211,7 @@ class TestGWASOutputAttributes:
         n, m = 100, 5
         hap = _make_hap(n, m, seed=90)
         rng = np.random.RandomState(91)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()
@@ -234,7 +234,7 @@ class TestGWASOutputAttributes:
         n, m = 300, 20
         hap = _make_hap(n, m, seed=92)
         rng = np.random.RandomState(93)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()
@@ -255,7 +255,7 @@ class TestGWASEdgeCases:
         n = 100
         hap = _make_hap(n, 1, seed=100)
         rng = np.random.RandomState(101)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()
@@ -265,7 +265,7 @@ class TestGWASEdgeCases:
         """Constant phenotype should produce zero beta and nan SE."""
         n, m = 100, 5
         hap = _make_hap(n, m, seed=110)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = np.ones(n) * 3.0
 
         res = GWAS(hap, pheno).run()
@@ -278,7 +278,7 @@ class TestGWASEdgeCases:
         n, m = 2, 5
         hap = _make_hap(n, m, seed=120)
         rng = np.random.RandomState(121)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()
@@ -296,7 +296,7 @@ class TestGWASEdgeCases:
         geno[:, 1, :] = 0
         hap = DenseHaplotypeArray(genotypes=geno)
 
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()

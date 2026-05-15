@@ -13,7 +13,7 @@ from xftsim.arch import (
 )
 from xftsim.effect import MultivariateEffects
 from xftsim.parser import parse_formula
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 class TestMVGeneticComponent:

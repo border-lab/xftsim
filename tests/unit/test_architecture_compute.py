@@ -2,7 +2,7 @@
 Unit tests for Architecture.compute() and related methods.
 
 Tests:
-1. compute auto-creates NPhenotypeArray
+1. compute auto-creates PhenotypeArray
 2. compute with explicit phenotypes
 3. compute with multi-output (MVGenetic)
 4. compute propagates values through DAG
@@ -16,7 +16,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, ArchNode, GeneticComponent, MVGeneticComponent,
     NoiseComponent, CNoiseComponent, AggregationComponent,
@@ -38,12 +38,12 @@ def _make_hap(n=20, m=10, seed=42):
 
 class TestArchitectureCompute:
     def test_auto_creates_phenotypes(self):
-        """compute with phenotypes=None should create NPhenotypeArray."""
+        """compute with phenotypes=None should create PhenotypeArray."""
         hap = _make_hap()
         arch = Architecture()
         arch.add('Y.E', NoiseComponent(variance=1.0))
         result = arch.compute(hap, rng=np.random.RandomState(42))
-        assert isinstance(result, NPhenotypeArray)
+        assert isinstance(result, PhenotypeArray)
         assert 'Y.E' in result._values
 
     def test_with_explicit_phenotypes(self):
@@ -51,7 +51,7 @@ class TestArchitectureCompute:
         hap = _make_hap()
         arch = Architecture()
         arch.add('Y.E', NoiseComponent(variance=1.0))
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = arch.compute(hap, phenotypes=pheno, rng=np.random.RandomState(42))
         assert result is pheno
         assert 'Y.E' in pheno._values

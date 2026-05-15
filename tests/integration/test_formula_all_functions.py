@@ -13,7 +13,7 @@ import pytest
 
 from xftsim.arch import Architecture
 from xftsim.effect import AdditiveEffects, MultivariateEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -34,7 +34,7 @@ class TestFormulaAllFunctions:
         )
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(3)
         assert sim.generation == 2
         assert np.all(np.isfinite(sim.phenotype_history[2]['Y']))
@@ -50,7 +50,7 @@ class TestFormulaAllFunctions:
         )
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
         assert np.all(np.isfinite(sim.phenotype_history[1]['Y']))
 
@@ -65,7 +65,7 @@ class TestFormulaAllFunctions:
         )
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
         pheno = sim.phenotype_history[1]
         assert 'Y.sm' in pheno
@@ -82,7 +82,7 @@ class TestFormulaAllFunctions:
         )
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(3)
         # At gen 2, mother/father values should be from gen 1
         pheno = sim.phenotype_history[2]
@@ -100,7 +100,7 @@ class TestFormulaAllFunctions:
         )
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
         pheno = sim.phenotype_history[1]
         assert 'E1' in pheno

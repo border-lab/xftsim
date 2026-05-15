@@ -9,7 +9,7 @@ Stochastic protocol: tolerance ~ 4/sqrt(N), N=10000.
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, HaplotypeGeneticComponent,
     NoiseComponent, AggregationComponent,
@@ -126,7 +126,7 @@ class TestHaplotypeGeneticInSimulation:
         import sys, os
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
         from testdata import TestSimulation
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
@@ -143,7 +143,7 @@ class TestHaplotypeGeneticInSimulation:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -159,7 +159,7 @@ class TestHaplotypeGeneticInSimulation:
         import sys, os
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
         from testdata import TestSimulation
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
@@ -177,7 +177,7 @@ class TestHaplotypeGeneticInSimulation:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )

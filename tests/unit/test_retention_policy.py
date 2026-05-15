@@ -1,5 +1,5 @@
 """
-Unit tests for NSimulation retention policy edge cases.
+Unit tests for Simulation retention policy edge cases.
 
 Tests:
 1. retain_haplotypes=0 keeps only current generation
@@ -22,7 +22,7 @@ from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, Aggregat
 from xftsim.effect import AdditiveEffects
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 def _simple_sim(n=50, m=10, retain_haplotypes=1, retain_phenotypes=2, seed=42):
@@ -35,7 +35,7 @@ def _simple_sim(n=50, m=10, retain_haplotypes=1, retain_phenotypes=2, seed=42):
     arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
     mating = RandomMating(offspring_per_pair=2)
     rmap = RecombinationMap.constant_map(m=m)
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=mating,
@@ -125,7 +125,7 @@ class TestDefaultRetention:
         arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=5)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=mating,

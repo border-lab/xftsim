@@ -14,14 +14,14 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.stats import SampleStatistics, GenerationResult
 from xftsim.filters import TrioView, SibPairView
 
 
 def _make_pheno(n, values_dict, generation=0):
     sm = SampleMeta(iid=np.arange(n), generation=generation)
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     for k, v in values_dict.items():
         pheno._values[k] = np.asarray(v, dtype=np.float64)
     return pheno

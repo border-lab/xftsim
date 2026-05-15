@@ -197,7 +197,7 @@ def _load_config_file(path: str) -> dict:
 
 
 def build_simulation_from_config(config: dict):
-    """Build an NSimulation from a parsed config dict.
+    """Build an Simulation from a parsed config dict.
 
     Parameters
     ----------
@@ -207,7 +207,7 @@ def build_simulation_from_config(config: dict):
 
     Returns
     -------
-    tuple[NSimulation, dict]
+    tuple[Simulation, dict]
         The configured simulation and output settings dict.
 
     Raises
@@ -222,7 +222,7 @@ def build_simulation_from_config(config: dict):
     from xftsim.reproduce import RecombinationMap
     from xftsim.stats import SampleStatistics
     from xftsim.filters import TrioFilter, SibPairFilter
-    from xftsim.sim import NSimulation
+    from xftsim.sim import Simulation
 
     # --- Founders ---
     founder_cfg = config.get("founder", {})
@@ -336,7 +336,7 @@ def build_simulation_from_config(config: dict):
     retain_haplotypes = sim_cfg.get("retain_haplotypes", 1)
     retain_phenotypes = sim_cfg.get("retain_phenotypes", 2)
 
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=founder_hap,
         architecture=architecture,
         mating_regime=mating_regime,
@@ -439,7 +439,7 @@ def resume(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Extra detail"),
 ):
     """Resume a simulation from a checkpoint directory."""
-    from xftsim.sim import NSimulation
+    from xftsim.sim import Simulation
     from xftsim.stats import SampleStatistics
 
     mode = _detect_output_mode(plain, rich_flag)
@@ -452,7 +452,7 @@ def resume(
     out.info(f"Resuming from checkpoint: {checkpoint_dir}")
 
     try:
-        sim = NSimulation.from_checkpoint(
+        sim = Simulation.from_checkpoint(
             checkpoint_dir,
             statistics=[SampleStatistics()],
         )
@@ -671,7 +671,7 @@ def _run_simulation(sim, n_gen: int, out: _Output,
 
     Parameters
     ----------
-    sim : NSimulation
+    sim : Simulation
         The simulation to run.
     n_gen : int
         Number of generations.

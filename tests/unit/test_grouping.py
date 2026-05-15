@@ -8,7 +8,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation, TestMeta
 
-from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, NoiseComponent, CNoiseComponent, AggregationComponent, ArchNode,
 )

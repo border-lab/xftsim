@@ -9,8 +9,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
 from xftsim.filters import TrioFilter, SibPairFilter, TrioView, SibPairView
-from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.sim import NSimulation
+from xftsim.struct import SampleMeta, PhenotypeArray
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 
 
@@ -21,7 +21,7 @@ class TestTrioFilter:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime(offspring_per_pair=2)
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_phenotypes=10)
         sim.run(3)
         return sim
@@ -68,7 +68,7 @@ class TestSibPairFilter:
         arch = TestSimulation.simple_architecture(m=20, h2=0.5)
         rm = RandomMating(offspring_per_pair=3)  # 3 per pair for sib pairs
         rmap = TestSimulation.recombination_map(m=20)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_phenotypes=10)
         sim.run(2)
         return sim
@@ -129,7 +129,7 @@ class TestTrioFilterEdgeCases:
             paternal_idx=np.array([2, 2, 3, 3]),
             parent_n=4,
         )
-        pheno2 = NPhenotypeArray(samples=SampleMeta(iid=np.arange(4), sex=np.array([0,1,0,1])))
+        pheno2 = PhenotypeArray(samples=SampleMeta(iid=np.arange(4), sex=np.array([0,1,0,1])))
         pheno2._values['Y'] = np.ones(4)
         result = tf.apply(2, {2: pheno2}, {2: ped})
         assert result is None
@@ -140,7 +140,7 @@ class TestTrioFilterEdgeCases:
         arch = TestSimulation.simple_architecture(m=20, h2=0.5)
         rm = RandomMating(offspring_per_pair=2)
         rmap = TestSimulation.recombination_map(m=20)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
+        sim = Simulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
         sim.run(3)
         tf = TrioFilter()
         view = tf.apply(2, sim.phenotype_history, sim.pedigree_history)
@@ -159,7 +159,7 @@ class TestTrioFilterEdgeCases:
         arch = TestSimulation.simple_architecture(m=20, h2=0.5)
         rm = RandomMating(offspring_per_pair=2)
         rmap = TestSimulation.recombination_map(m=20)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
+        sim = Simulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
         sim.run(2)
         # Add an extra key only to gen 1
         sim.phenotype_history[1]._values['EXTRA'] = np.ones(sim.phenotype_history[1].samples.n)
@@ -181,7 +181,7 @@ class TestSibPairFilterEdgeCases:
             fid=np.arange(n),  # each individual in own family
             sex=np.tile([0, 1], 5),
         )
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         pheno._values['Y'] = np.random.RandomState(42).randn(n)
         view = sf.apply(0, {0: pheno}, {})
         assert isinstance(view, SibPairView)
@@ -204,7 +204,7 @@ class TestSibPairFilterEdgeCases:
             fid=np.zeros(n, dtype=np.int64),  # all same family
             sex=np.tile([0, 1], (n + 1) // 2)[:n],
         )
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         pheno._values['Y'] = np.arange(n, dtype=np.float64)
         view = sf.apply(0, {0: pheno}, {})
         expected_pairs = k * (k - 1) // 2
@@ -219,7 +219,7 @@ class TestSibPairFilterEdgeCases:
             fid=np.array([0, 0, 0, 1, 1, 1]),
             sex=np.tile([0, 1], 3),
         )
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         pheno._values['Y'] = np.arange(n, dtype=np.float64)
         view = sf.apply(0, {0: pheno}, {})
         # 2 families of 3 → 3 pairs each = 6 total
@@ -238,7 +238,7 @@ class TestSibPairFilterEdgeCases:
             fid=np.repeat(np.arange(10), 2),  # 10 families of 2
             sex=np.tile([0, 1], 10),
         )
-        pheno = NPhenotypeArray(samples=samples)
+        pheno = PhenotypeArray(samples=samples)
         pheno._values['Y'] = np.random.RandomState(42).randn(n)
         view = sf.apply(0, {0: pheno}, {})
         assert view.n_pairs == 10  # 10 families × 1 pair each

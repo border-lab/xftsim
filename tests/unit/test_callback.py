@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from tests.testdata import TestSimulation
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 def _make_sim(callbacks=None, seed=42, n_gen=3):
@@ -11,7 +11,7 @@ def _make_sim(callbacks=None, seed=42, n_gen=3):
     arch = TestSimulation.simple_architecture(m=30, h2=0.5, seed=123)
     rmap = TestSimulation.recombination_map(m=30)
     mate = TestSimulation.mating_regime()
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mate, recombination_map=rmap,
         callbacks=callbacks or [], seed=seed,

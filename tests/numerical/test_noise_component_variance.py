@@ -15,7 +15,7 @@ from xftsim.arch import (
     GeneticComponent, AggregationComponent, ArchNode,
 )
 from xftsim.effect import AdditiveEffects
-from xftsim.struct import NPhenotypeArray
+from xftsim.struct import PhenotypeArray
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -30,7 +30,7 @@ class TestNoiseComponentVariance:
 
         comp = NoiseComponent(variance=2.0)
         node = ArchNode(outputs=['E'], component=comp, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng)
 
@@ -44,7 +44,7 @@ class TestNoiseComponentVariance:
 
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['E'], component=comp, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng)
 
@@ -58,7 +58,7 @@ class TestNoiseComponentVariance:
 
         comp = CNoiseComponent(cov=target_cov)
         node = ArchNode(outputs=['E1', 'E2'], component=comp, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng)
 
@@ -74,7 +74,7 @@ class TestNoiseComponentVariance:
 
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['E'], component=comp, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
 
         rng1 = np.random.RandomState(42)
         result1 = comp.compute(node, hap, pheno, rng=rng1)

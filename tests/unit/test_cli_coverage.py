@@ -350,7 +350,7 @@ class TestRunSimulation:
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         from xftsim.stats import SampleStatistics
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=30, m=10)
@@ -361,7 +361,7 @@ class TestRunSimulation:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rm = RecombinationMap.constant_map(m=10, p=0.5)
         mating = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=mating,
@@ -423,7 +423,7 @@ class TestInfoCommand:
         from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.io import save_simulation_checkpoint
         from typer.testing import CliRunner
 
@@ -436,7 +436,7 @@ class TestInfoCommand:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rm = RecombinationMap.constant_map(m=10, p=0.5)
         mating = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rm, seed=42,
         )
@@ -562,7 +562,7 @@ class TestResumeCommand:
         from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.io import save_simulation_checkpoint
 
         np.random.seed(42)
@@ -574,7 +574,7 @@ class TestResumeCommand:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rm = RecombinationMap.constant_map(m=10, p=0.5)
         mating = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rm, seed=42,
         )
@@ -810,7 +810,7 @@ class TestInfoRichMode:
         from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.io import save_simulation_checkpoint
 
         np.random.seed(42)
@@ -822,7 +822,7 @@ class TestInfoRichMode:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rm = RecombinationMap.constant_map(m=10, p=0.5)
         mating = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rm, seed=42,
         )
@@ -898,7 +898,7 @@ class TestRunSimulationRichProgress:
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         from xftsim.stats import SampleStatistics
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=30, m=10)
@@ -909,7 +909,7 @@ class TestRunSimulationRichProgress:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rm = RecombinationMap.constant_map(m=10, p=0.5)
         mating = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rm,
             statistics=[SampleStatistics()],
@@ -931,7 +931,7 @@ class TestRunSimulationFailure:
         from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
 
         np.random.seed(42)
         hap = founder_haplotypes_uniform_AFs(n=30, m=10)
@@ -942,7 +942,7 @@ class TestRunSimulationFailure:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rm = RecombinationMap.constant_map(m=10, p=0.5)
         mating = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rm, seed=42,
         )

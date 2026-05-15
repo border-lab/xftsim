@@ -41,8 +41,8 @@ class TestHaplotypeGeneticCompute:
         eff = AdditiveEffects.from_h2(h2=0.5, m=5, seed=42)
         comp = HaplotypeGeneticComponent(effects=eff, haplotype='maternal')
         node = ArchNode(outputs=['Y.Hm'], component=comp, inputs=[])
-        from xftsim.struct import NPhenotypeArray
-        pheno = NPhenotypeArray(samples=hap.samples)
+        from xftsim.struct import PhenotypeArray
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno)
         # Manual: hap[:,:,0] @ effects
         expected = hap.genotypes[:, :, 0].astype(float) @ eff.effects
@@ -53,8 +53,8 @@ class TestHaplotypeGeneticCompute:
         eff = AdditiveEffects.from_h2(h2=0.5, m=5, seed=42)
         comp = HaplotypeGeneticComponent(effects=eff, haplotype='paternal')
         node = ArchNode(outputs=['Y.Hp'], component=comp, inputs=[])
-        from xftsim.struct import NPhenotypeArray
-        pheno = NPhenotypeArray(samples=hap.samples)
+        from xftsim.struct import PhenotypeArray
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(node, hap, pheno)
         expected = hap.genotypes[:, :, 1].astype(float) @ eff.effects
         np.testing.assert_allclose(result, expected)
@@ -63,8 +63,8 @@ class TestHaplotypeGeneticCompute:
         """Haploid maternal + paternal = diploid genetic value."""
         hap = _make_hap()
         eff = AdditiveEffects.from_h2(h2=0.5, m=5, seed=42)
-        from xftsim.struct import NPhenotypeArray
-        pheno = NPhenotypeArray(samples=hap.samples)
+        from xftsim.struct import PhenotypeArray
+        pheno = PhenotypeArray(samples=hap.samples)
 
         comp_m = HaplotypeGeneticComponent(effects=eff, haplotype='maternal')
         comp_p = HaplotypeGeneticComponent(effects=eff, haplotype='paternal')

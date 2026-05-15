@@ -1,5 +1,5 @@
 """
-Unit tests for NSimulation properties, repr, validation, and edge cases.
+Unit tests for Simulation properties, repr, validation, and edge cases.
 
 Tests:
 1. haplotypes property returns current gen haplotypes
@@ -22,7 +22,7 @@ import pytest
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -40,7 +40,7 @@ def _make_sim(n=50, m=10, seed=42, **kwargs):
     arch.add('Y', AggregationComponent('Y.G + Y.E'))
     rm = RandomMating(offspring_per_pair=2)
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
-    return NSimulation(hap, arch, rm, rmap, seed=seed, **kwargs)
+    return Simulation(hap, arch, rm, rmap, seed=seed, **kwargs)
 
 
 class TestSimulationProperties:
@@ -83,7 +83,7 @@ class TestSimulationRepr:
     def test_repr_format(self):
         sim = _make_sim()
         r = repr(sim)
-        assert 'NSimulation' in r
+        assert 'Simulation' in r
         assert 'generation=0' in r
 
     def test_repr_after_run(self):
@@ -104,7 +104,7 @@ class TestValidation:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rm = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=10, p=0.5)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         with pytest.raises(ValueError, match="Effect dimension mismatch"):
             sim.run(1)
 

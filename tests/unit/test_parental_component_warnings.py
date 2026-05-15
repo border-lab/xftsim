@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import warnings
 
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray, DenseHaplotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray, DenseHaplotypeArray
 from xftsim.arch import (
     Architecture, ArchNode,
     MotherComponent, FatherComponent, ParentComponent,
@@ -34,7 +34,7 @@ def _make_hap(n=10, m=5, seed=42, generation=0):
 
 def _make_pheno(n, keys_values, generation=0):
     sm = SampleMeta(iid=np.arange(n), generation=generation)
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     for k, v in keys_values.items():
         pheno._values[k] = np.asarray(v, dtype=np.float64)
     return pheno

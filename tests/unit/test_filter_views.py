@@ -16,7 +16,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray
 from xftsim.filters import TrioFilter, SibPairFilter, TrioView, SibPairView
 
 
@@ -25,7 +25,7 @@ def _make_pheno(n, keys, fid=None, generation=0):
         fid = np.arange(n)
     sm = SampleMeta(iid=np.arange(n), fid=fid, generation=generation)
     vals = {k: np.arange(n, dtype=float) for k in keys}
-    return NPhenotypeArray(samples=sm, values=vals)
+    return PhenotypeArray(samples=sm, values=vals)
 
 
 class TestTrioFilterEdgeCases:
@@ -60,7 +60,7 @@ class TestTrioFilterEdgeCases:
         filt = TrioFilter()
         parent_pheno = _make_pheno(10, ['Y'])  # only Y
         offspring_sm = SampleMeta(iid=np.arange(4), fid=np.array([0, 0, 1, 1]), generation=1)
-        offspring_pheno = NPhenotypeArray(
+        offspring_pheno = PhenotypeArray(
             samples=offspring_sm,
             values={
                 'Y': np.array([1.0, 2.0, 3.0, 4.0]),
@@ -87,12 +87,12 @@ class TestTrioFilterEdgeCases:
         """Trio values should be correctly aligned by pedigree."""
         filt = TrioFilter()
         parent_sm = SampleMeta(iid=np.arange(4), generation=0)
-        parent_pheno = NPhenotypeArray(
+        parent_pheno = PhenotypeArray(
             samples=parent_sm,
             values={'Y': np.array([10.0, 20.0, 30.0, 40.0])},
         )
         offspring_sm = SampleMeta(iid=np.arange(2), generation=1)
-        offspring_pheno = NPhenotypeArray(
+        offspring_pheno = PhenotypeArray(
             samples=offspring_sm,
             values={'Y': np.array([100.0, 200.0])},
         )
@@ -181,7 +181,7 @@ class TestSibPairFilterEdgeCases:
         """Sib pair phenotype values should match original phenotypes."""
         filt = SibPairFilter()
         sm = SampleMeta(iid=np.arange(4), fid=np.array([0, 0, 1, 1]))
-        pheno = NPhenotypeArray(
+        pheno = PhenotypeArray(
             samples=sm,
             values={'Y': np.array([10.0, 20.0, 30.0, 40.0])},
         )

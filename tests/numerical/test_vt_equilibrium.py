@@ -14,7 +14,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent,
@@ -44,7 +44,7 @@ class TestVTEquilibrium:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=seed,
             retain_haplotypes=2,
             retain_phenotypes=n_gen + 1,
@@ -123,7 +123,7 @@ class TestVTEquilibrium:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim_no_vt = NSimulation(
+        sim_no_vt = Simulation(
             hap, arch, mate, rmap, seed=seed,
             retain_haplotypes=2, retain_phenotypes=n_gen + 1,
         )

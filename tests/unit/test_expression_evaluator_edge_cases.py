@@ -19,12 +19,12 @@ import numpy as np
 import pytest
 
 from xftsim.arch import _tokenize, _shunting_yard, _evaluate_expression
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 
 def _make_pheno(n=4, **kv):
     sm = SampleMeta(iid=np.arange(n), fid=np.arange(n))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     for key, val in kv.items():
         pheno._values[key] = np.asarray(val, dtype=np.float64)
     return pheno

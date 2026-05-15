@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from xftsim.arch import AggregationComponent, ArchNode, _evaluate_expression
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -23,7 +23,7 @@ from testdata import TestSimulation
 
 def _eval(expr, pheno_dict, n=10):
     sm = SampleMeta(iid=np.arange(n))
-    pheno = NPhenotypeArray(sm)
+    pheno = PhenotypeArray(sm)
     for k, v in pheno_dict.items():
         pheno[k] = v
     return _evaluate_expression(expr, pheno, n)

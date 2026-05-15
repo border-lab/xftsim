@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Union
 
-from xftsim.struct import NPhenotypeArray, PedigreeArray
+from xftsim.struct import PhenotypeArray, PedigreeArray
 
 
 @dataclass
@@ -66,7 +66,7 @@ class Filter(ABC):
         ----------
         generation : int
             Current generation number.
-        phenotype_history : dict[int, NPhenotypeArray]
+        phenotype_history : dict[int, PhenotypeArray]
             Generation -> phenotypes mapping.
         pedigree_history : dict[int, PedigreeArray]
             Generation -> pedigree mapping.
@@ -88,7 +88,7 @@ class TrioFilter(Filter):
     """
 
     def apply(self, generation: int,
-              phenotype_history: dict[int, NPhenotypeArray],
+              phenotype_history: dict[int, PhenotypeArray],
               pedigree_history: dict[int, PedigreeArray]) -> TrioView | None:
         if generation == 0 or generation not in pedigree_history:
             return None
@@ -130,7 +130,7 @@ class SibPairFilter(Filter):
     """
 
     def apply(self, generation: int,
-              phenotype_history: dict[int, NPhenotypeArray],
+              phenotype_history: dict[int, PhenotypeArray],
               pedigree_history: dict[int, PedigreeArray]) -> SibPairView | None:
         if generation not in phenotype_history:
             return None
@@ -206,11 +206,11 @@ class UnrelatedView(FilteredView):
     ----------
     indices : np.ndarray
         Indices into the original sample array (one per family).
-    phenotypes : NPhenotypeArray
+    phenotypes : PhenotypeArray
         Subset of phenotypes for the selected individuals.
     """
     indices: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.intp))
-    phenotypes: NPhenotypeArray = None
+    phenotypes: PhenotypeArray = None
 
 
 class UnrelatedFilter(Filter):
@@ -222,7 +222,7 @@ class UnrelatedFilter(Filter):
     """
 
     def apply(self, generation: int,
-              phenotype_history: dict[int, NPhenotypeArray],
+              phenotype_history: dict[int, PhenotypeArray],
               pedigree_history: dict[int, PedigreeArray]) -> UnrelatedView | None:
         if generation not in phenotype_history:
             return None
@@ -253,7 +253,7 @@ class AscertainedView(FilteredView):
     ----------
     indices : np.ndarray
         Indices into the original sample array.
-    phenotypes : NPhenotypeArray
+    phenotypes : PhenotypeArray
         Subset of phenotypes for selected individuals.
     ascertainment_key : str
         The phenotype key used for ascertainment.
@@ -261,7 +261,7 @@ class AscertainedView(FilteredView):
         The quantile threshold value(s) used.
     """
     indices: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.intp))
-    phenotypes: NPhenotypeArray = None
+    phenotypes: PhenotypeArray = None
     ascertainment_key: str = ""
     threshold: float = 0.0
 
@@ -295,7 +295,7 @@ class AscertainmentFilter(Filter):
         self.tail: str = tail
 
     def apply(self, generation: int,
-              phenotype_history: dict[int, NPhenotypeArray],
+              phenotype_history: dict[int, PhenotypeArray],
               pedigree_history: dict[int, PedigreeArray]) -> AscertainedView | None:
         if generation not in phenotype_history:
             return None
@@ -342,13 +342,13 @@ class SubsampleView(FilteredView):
     ----------
     indices : np.ndarray
         Indices into the original sample array.
-    phenotypes : NPhenotypeArray
+    phenotypes : PhenotypeArray
         Subset of phenotypes for selected individuals.
     n_subsample : int
         Number of individuals in the subsample.
     """
     indices: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.intp))
-    phenotypes: NPhenotypeArray = None
+    phenotypes: PhenotypeArray = None
     n_subsample: int = 0
 
 
@@ -384,7 +384,7 @@ class SubsampleFilter(Filter):
         self._seed = seed
 
     def apply(self, generation: int,
-              phenotype_history: dict[int, NPhenotypeArray],
+              phenotype_history: dict[int, PhenotypeArray],
               pedigree_history: dict[int, PedigreeArray]) -> SubsampleView | None:
         if generation not in phenotype_history:
             return None

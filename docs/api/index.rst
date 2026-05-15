@@ -11,7 +11,7 @@ These are the ``n*`` modules that replace the legacy architecture.
    * - Module
      - Description
    * - :doc:`sim`
-     - Forward-time simulation loop (``NSimulation``)
+     - Forward-time simulation loop (``Simulation``)
    * - :doc:`arch`
      - Architecture DAG, components, and nodes
    * - :doc:`effect`
@@ -27,7 +27,7 @@ These are the ``n*`` modules that replace the legacy architecture.
    * - :doc:`io`
      - Serialization and I/O
    * - :doc:`struct`
-     - Core data structures (``HaplotypeOperator``, ``NPhenotypeArray``, etc.)
+     - Core data structures (``HaplotypeOperator``, ``PhenotypeArray``, etc.)
    * - :doc:`parser`
      - Formula DSL parser
    * - :doc:`cli`

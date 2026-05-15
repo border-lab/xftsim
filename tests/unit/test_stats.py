@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
 from xftsim.stats import SampleStatistics, GenerationResult
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.filters import TrioFilter
 
 
@@ -20,7 +20,7 @@ class TestSampleStatistics:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(1)
 
         stat = SampleStatistics()
@@ -36,7 +36,7 @@ class TestSampleStatistics:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(1)
 
         stat = SampleStatistics()
@@ -64,7 +64,7 @@ class TestSimWithStats:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          statistics=[SampleStatistics()])
         sim.run(3)
         assert len(sim.results) == 3  # one per generation (0, 1, 2)
@@ -75,7 +75,7 @@ class TestSimWithStats:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          statistics=[SampleStatistics(), SampleStatistics()])
         sim.run(2)
         # Two SampleStatistics → keys 'SampleStatistics' and 'SampleStatistics_1'
@@ -97,7 +97,7 @@ class TestSimWithStats:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          statistics=[SampleStatistics(), MeanStatistic()])
         sim.run(2)
         stats = sim.results[0].statistics
@@ -110,7 +110,7 @@ class TestSimWithStats:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          statistics=[SampleStatistics()])
         sim.run(3)
         gens = [r.generation for r in sim.results]
@@ -126,9 +126,9 @@ class TestSampleStatisticsEdgeCases:
 
     def test_single_phenotype_key(self):
         """Single key should produce 1x1 cov matrix."""
-        from xftsim.struct import SampleMeta, NPhenotypeArray
+        from xftsim.struct import SampleMeta, PhenotypeArray
         sm = SampleMeta(iid=np.arange(50))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['Y'] = np.random.RandomState(42).randn(50)
         stat = SampleStatistics()
         result = stat.estimate({0: pheno}, {}, 0)
@@ -142,10 +142,10 @@ class TestSampleStatisticsEdgeCases:
         assert result is None
 
     def test_no_phenotype_keys(self):
-        """Empty NPhenotypeArray should return empty cov."""
-        from xftsim.struct import SampleMeta, NPhenotypeArray
+        """Empty PhenotypeArray should return empty cov."""
+        from xftsim.struct import SampleMeta, PhenotypeArray
         sm = SampleMeta(iid=np.arange(10))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         stat = SampleStatistics()
         result = stat.estimate({0: pheno}, {}, 0)
         assert result['keys'] == []
@@ -157,7 +157,7 @@ class TestSampleStatisticsEdgeCases:
         arch = TestSimulation.bivariate_architecture(m=50)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(1)
         stat = SampleStatistics()
         result = stat.estimate(sim.phenotype_history, {}, 0)
@@ -171,7 +171,7 @@ class TestSampleStatisticsEdgeCases:
         rm = TestSimulation.mating_regime(offspring_per_pair=3)
         rmap = TestSimulation.recombination_map(m=50)
         from xftsim.filters import SibPairFilter
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, rm, rmap, seed=42,
             retain_phenotypes=10,
             filters={'sib_pairs': SibPairFilter()},
@@ -188,7 +188,7 @@ class TestSampleStatisticsEdgeCases:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(1)
         stat = SampleStatistics()
         result = stat.estimate(sim.phenotype_history, {}, 0)

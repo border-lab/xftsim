@@ -16,7 +16,7 @@ import tempfile
 import os
 import json
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.effect import AdditiveEffects, SparseEffects
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
@@ -107,7 +107,7 @@ class TestEmptyPhenotypeIO:
     def test_empty_phenotype_roundtrip(self):
         """Phenotype with no values should roundtrip."""
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, 'empty_pheno.npz')
             save_phenotypes_npz(pheno, path)

@@ -16,15 +16,15 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.mate import LinearAssortativeMating, NMateAssignment
+from xftsim.struct import SampleMeta, PhenotypeArray
+from xftsim.mate import LinearAssortativeMating, MateAssignment
 
 
 def _make_samples_and_phenotypes(n=50, seed=42):
-    """Create SampleMeta and NPhenotypeArray for testing."""
+    """Create SampleMeta and PhenotypeArray for testing."""
     sm = SampleMeta(iid=np.arange(n), generation=0)
     rng = np.random.RandomState(seed)
-    pheno = NPhenotypeArray(
+    pheno = PhenotypeArray(
         samples=sm,
         values={'Y': rng.normal(0, 1, n)},
     )
@@ -63,7 +63,7 @@ class TestFallbackToRandom:
         lam = LinearAssortativeMating(['Y'], r=0.0)
         rng = np.random.RandomState(42)
         assignment = lam.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
         assert assignment.n_offspring > 0
 
     def test_no_phenotypes_falls_back(self):
@@ -71,7 +71,7 @@ class TestFallbackToRandom:
         lam = LinearAssortativeMating(['Y'], r=0.5)
         rng = np.random.RandomState(42)
         assignment = lam.mate(sm, rng=rng, phenotypes=None)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
         assert assignment.n_offspring > 0
 
 
@@ -83,7 +83,7 @@ class TestComponentNames:
         rng = np.random.RandomState(42)
         # Should not raise, just no assortment
         assignment = lam.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
 
     def test_single_component(self):
         sm, pheno = _make_samples_and_phenotypes()
@@ -95,7 +95,7 @@ class TestComponentNames:
     def test_multiple_components(self):
         sm = SampleMeta(iid=np.arange(50), generation=0)
         rng = np.random.RandomState(42)
-        pheno = NPhenotypeArray(
+        pheno = PhenotypeArray(
             samples=sm,
             values={
                 'Y1': rng.normal(0, 1, 50),
@@ -113,7 +113,7 @@ class TestDisassortative:
         lam = LinearAssortativeMating(['Y'], r=-0.5)
         rng = np.random.RandomState(42)
         assignment = lam.mate(sm, rng=rng, phenotypes=pheno)
-        assert isinstance(assignment, NMateAssignment)
+        assert isinstance(assignment, MateAssignment)
         assert assignment.n_offspring > 0
 
 
@@ -186,7 +186,7 @@ class TestNoMales:
             iid=np.arange(10),
             sex=np.zeros(10, dtype=int),  # all female
         )
-        pheno = NPhenotypeArray(
+        pheno = PhenotypeArray(
             samples=sm,
             values={'Y': np.ones(10)},
         )
@@ -199,7 +199,7 @@ class TestNoMales:
             iid=np.arange(10),
             sex=np.ones(10, dtype=int),  # all male
         )
-        pheno = NPhenotypeArray(
+        pheno = PhenotypeArray(
             samples=sm,
             values={'Y': np.ones(10)},
         )

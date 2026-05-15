@@ -2,7 +2,7 @@ Mating
 ======
 
 Mate assignment strategies. Each mating regime produces an
-``NMateAssignment`` linking offspring to parents by index.
+``MateAssignment`` linking offspring to parents by index.
 
 .. automodule:: xftsim.mate
    :members:

@@ -16,7 +16,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics
 from xftsim.io import save_simulation_checkpoint
 
@@ -32,7 +32,7 @@ def _make_sim(n=200, m=20, seed=42, **kwargs):
     arch.add('Y.G', GeneticComponent(eff))
     arch.add('Y.E', NoiseComponent(variance=0.5))
     arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
         recombination_map=RecombinationMap.constant_map(m=m),
@@ -50,7 +50,7 @@ class TestCheckpointResumeNumerical:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             assert sim_resumed.generation == 2
             sim_resumed.continue_run(2)
             assert sim_resumed.generation == 4
@@ -65,7 +65,7 @@ class TestCheckpointResumeNumerical:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             sim_resumed.continue_run(3)
             pheno = sim_resumed.phenotypes
             assert 'Y' in pheno
@@ -84,7 +84,7 @@ class TestCheckpointResumeNumerical:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             sim_resumed.continue_run(2)
             # After retention, should have at most retain+1 entries
             assert len(sim_resumed.haplotype_history) <= 3
@@ -103,7 +103,7 @@ class TestCheckpointResumeNumerical:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(
+            sim_resumed = Simulation.from_checkpoint(
                 tmpdir, statistics=[SampleStatistics()],
             )
             sim_resumed.continue_run(2)
@@ -128,7 +128,7 @@ class TestCheckpointResumeNumerical:
         tmpdir = tempfile.mkdtemp()
         try:
             save_simulation_checkpoint(sim, tmpdir)
-            sim_resumed = NSimulation.from_checkpoint(tmpdir)
+            sim_resumed = Simulation.from_checkpoint(tmpdir)
             sim_resumed.continue_run(3)
             af = sim_resumed.haplotypes.recompute_af()
             assert np.all(af >= 0.0)

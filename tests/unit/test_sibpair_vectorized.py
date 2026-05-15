@@ -25,16 +25,16 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.filters import SibPairFilter
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 def _make_pheno_with_fids(n, fids, seed=42):
-    """Helper to create NPhenotypeArray with specified FIDs."""
+    """Helper to create PhenotypeArray with specified FIDs."""
     rng = np.random.RandomState(seed)
     sm = SampleMeta(iid=np.arange(n), fid=np.asarray(fids, dtype=np.int64))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     pheno['Y'] = rng.normal(0, 1, n)
     return pheno
 
@@ -293,7 +293,7 @@ class TestSibPairVectorizedStructure:
         fids = np.array([0, 0], dtype=np.int64)
         rng = np.random.RandomState(42)
         sm = SampleMeta(iid=np.arange(2), fid=fids)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng.normal(0, 1, 2)
         pheno['Z'] = rng.normal(0, 1, 2)
 
@@ -355,7 +355,7 @@ class TestSibPairVectorizedPhenotypeValues:
         fids = np.array([0, 0, 0], dtype=np.int64)
         vals = np.array([10.0, 20.0, 30.0])
         sm = SampleMeta(iid=np.arange(3), fid=fids)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = vals
 
         filt = SibPairFilter()
@@ -382,7 +382,7 @@ class TestSibPairVectorizedPhenotypeValues:
         z_vals = np.array([1.0, 2.0])
 
         sm = SampleMeta(iid=np.arange(2), fid=fids)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = y_vals
         pheno['Z'] = z_vals
 
@@ -415,7 +415,7 @@ class TestSibPairVectorizedWithSimulation:
         recomb = TestSimulation.recombination_map(m=50, p=0.5)
         mating = TestSimulation.mating_regime(offspring_per_pair=3)
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=founders,
             architecture=arch,
             recombination_map=recomb,
@@ -455,7 +455,7 @@ class TestSibPairVectorizedWithSimulation:
         recomb = TestSimulation.recombination_map(m=50, p=0.5)
         mating = TestSimulation.mating_regime(offspring_per_pair=2)
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=founders,
             architecture=arch,
             recombination_map=recomb,

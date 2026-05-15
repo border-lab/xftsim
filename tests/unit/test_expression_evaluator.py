@@ -14,12 +14,12 @@ from xftsim.arch import (
     _tokenize, _shunting_yard, _evaluate_expression,
     AggregationComponent,
 )
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 
 def _make_pheno(n=5, **values):
     sm = SampleMeta(iid=np.arange(n))
-    return NPhenotypeArray(samples=sm, values=values)
+    return PhenotypeArray(samples=sm, values=values)
 
 
 class TestTokenize:

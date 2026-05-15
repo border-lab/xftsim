@@ -16,7 +16,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics
 from xftsim.filters import TrioFilter, SibPairFilter
 
@@ -33,7 +33,7 @@ def _make_sim(n=200, m=20, filters=None, statistics=None, callbacks=None, seed=4
     arch.add('Y.E', NoiseComponent(variance=0.5))
     arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
         recombination_map=RecombinationMap.constant_map(m=m),

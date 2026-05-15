@@ -1,7 +1,7 @@
-NSimulation
+Simulation
 ===========
 
-Forward-time genetics simulation loop. ``NSimulation`` orchestrates
+Forward-time genetics simulation loop. ``Simulation`` orchestrates
 meiosis, architecture evaluation, filtering, statistics, and callbacks
 across generations.
 

@@ -1,5 +1,5 @@
 """
-Integration tests for callback and filter interactions in NSimulation.
+Integration tests for callback and filter interactions in Simulation.
 
 Tests:
 1. Callbacks run each generation and accumulate results
@@ -15,7 +15,7 @@ import pytest
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.stats import SampleStatistics
@@ -35,7 +35,7 @@ def _make_sim(n=100, m=10, seed=42):
     arch.add('Y', AggregationComponent('Y.G + Y.E'))
     mate = RandomMating(offspring_per_pair=2)
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
-    return NSimulation(hap, arch, mate, rmap, seed=seed)
+    return Simulation(hap, arch, mate, rmap, seed=seed)
 
 
 class TestCallbackExecution:

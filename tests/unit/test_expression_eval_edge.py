@@ -18,7 +18,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, DenseHaplotypeArray, VariantMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, DenseHaplotypeArray, VariantMeta, PhenotypeArray
 from xftsim.arch import (
     Architecture, AggregationComponent, NoiseComponent,
     _tokenize, _shunting_yard, _evaluate_expression,
@@ -27,7 +27,7 @@ from xftsim.arch import (
 
 def _make_pheno(n=10, keys=None, values=None):
     sm = SampleMeta(iid=np.arange(n))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     if keys and values:
         for k, v in zip(keys, values):
             pheno[k] = v

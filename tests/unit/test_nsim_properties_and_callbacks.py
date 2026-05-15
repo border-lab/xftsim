@@ -1,5 +1,5 @@
 """
-Unit tests for NSimulation properties, callbacks, and edge cases.
+Unit tests for Simulation properties, callbacks, and edge cases.
 
 Tests:
 1. sim.haplotypes / sim.phenotypes convenience properties
@@ -8,7 +8,7 @@ Tests:
 4. Callback modifies simulation state
 5. sim.stop from callback ends simulation
 6. Multiple callbacks in order
-7. NSimulation repr
+7. Simulation repr
 8. run(1) produces gen 0 only
 """
 import numpy as np
@@ -18,7 +18,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -32,7 +32,7 @@ def _make_sim(n=100, m=20, seed=42, callbacks=None, **kwargs):
     arch.add('Y.G', GeneticComponent(eff))
     arch.add('Y.E', NoiseComponent(variance=0.5))
     arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
         recombination_map=RecombinationMap.constant_map(m=m),
@@ -110,7 +110,7 @@ class TestRepr:
     def test_repr_before_run(self):
         sim = _make_sim()
         r = repr(sim)
-        assert 'NSimulation' in r
+        assert 'Simulation' in r
         assert 'generation=0' in r
 
     def test_repr_after_run(self):

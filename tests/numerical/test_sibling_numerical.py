@@ -11,14 +11,14 @@ Verifies:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     SiblingMeanComponent, SiblingSumComponent, SiblingCountComponent,
     SiblingEldestComponent, SiblingYoungestComponent, SiblingAnyComponent,
 )
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.filters import SibPairFilter
@@ -46,7 +46,7 @@ class TestSiblingMeanVarianceReduction:
         """, effects={'beta': eff})
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=M, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         # At gen 1+, offspring have siblings (same FID)
@@ -75,7 +75,7 @@ class TestSiblingCountMatchesFamilySize:
         """, effects={'beta': eff})
         mate = RandomMating(offspring_per_pair=opp)
         rmap = RecombinationMap.constant_map(m=M, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         pheno = sim.phenotype_history[1]
@@ -99,7 +99,7 @@ class TestSiblingCorrelation:
         rmap = RecombinationMap.constant_map(m=M, p=0.5)
 
         sib_filter = SibPairFilter()
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             filters={'sib': sib_filter},
         )
@@ -133,7 +133,7 @@ class TestSiblingEldestYoungest:
         """, effects={'beta': eff})
         mate = RandomMating(offspring_per_pair=3)
         rmap = RecombinationMap.constant_map(m=M, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         pheno = sim.phenotype_history[1]
@@ -159,7 +159,7 @@ class TestSiblingAnyBinary:
         """, effects={'beta': eff})
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=M, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         pheno = sim.phenotype_history[1]

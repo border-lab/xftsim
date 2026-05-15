@@ -17,7 +17,7 @@ from xftsim.arch import (
     MotherComponent, FatherComponent, ParentComponent,
     NoiseComponent, ArchNode,
 )
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray, DenseHaplotypeArray, VariantMeta
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray, DenseHaplotypeArray, VariantMeta
 
 
 def _dummy_hap(n, m=5):
@@ -30,7 +30,7 @@ class TestParentalFounderFallback:
     def test_gen0_no_founder_returns_zeros(self):
         """Generation 0 with no founder_component → zeros + warning."""
         hap = _dummy_hap(10)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         comp = MotherComponent('Y')
         node = ArchNode(outputs=['Y.m'], component=comp, inputs=[], grouping=None)
 
@@ -44,7 +44,7 @@ class TestParentalFounderFallback:
     def test_gen0_with_founder_uses_fallback(self):
         """Generation 0 with founder_component → noise fallback."""
         hap = _dummy_hap(10)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         founder = NoiseComponent(variance=1.0)
         comp = MotherComponent('Y', founder_component=founder)
         node = ArchNode(outputs=['Y.m'], component=comp, inputs=[], grouping=None)
@@ -59,7 +59,7 @@ class TestParentalFounderFallback:
     def test_missing_prev_gen_phenotype_returns_zeros(self):
         """When prev gen was pruned from history → zeros + warning."""
         hap = _dummy_hap(4)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         parent_sm = SampleMeta(iid=np.arange(10), generation=0)
         ped = PedigreeArray(
             offspring_samples=hap.samples,
@@ -86,12 +86,12 @@ class TestParentalFounderFallback:
     def test_phenotype_name_not_found_raises(self):
         """Missing phenotype name in prev gen → ValueError."""
         parent_sm = SampleMeta(iid=np.arange(10), generation=0)
-        parent_pheno = NPhenotypeArray(parent_sm)
+        parent_pheno = PhenotypeArray(parent_sm)
         parent_pheno['X'] = np.ones(10)  # Has 'X' but not 'Y'
 
         offspring_sm = SampleMeta(iid=np.arange(4), generation=1)
         hap = _dummy_hap(4)
-        pheno = NPhenotypeArray(offspring_sm)
+        pheno = PhenotypeArray(offspring_sm)
         ped = PedigreeArray(
             offspring_samples=offspring_sm,
             maternal_idx=np.array([0, 0, 1, 1]),
@@ -113,7 +113,7 @@ class TestParentalFounderFallback:
     def test_father_founder_noise(self):
         """FatherComponent with noise founder at gen 0."""
         hap = _dummy_hap(8)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         founder = NoiseComponent(variance=2.0)
         comp = FatherComponent('Y', founder_component=founder)
         node = ArchNode(outputs=['Y.f'], component=comp, inputs=[], grouping=None)
@@ -126,7 +126,7 @@ class TestParentalFounderFallback:
     def test_no_pedigree_at_gen_returns_zeros(self):
         """ParentComponent at gen 2 but no pedigree for gen 2 → zeros."""
         hap = _dummy_hap(5)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         comp = ParentComponent('Y')
         node = ArchNode(outputs=['Y.p'], component=comp, inputs=[], grouping=None)
 

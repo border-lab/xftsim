@@ -18,7 +18,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent,
@@ -26,7 +26,7 @@ from xftsim.arch import (
 )
 from xftsim.mate import LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -41,7 +41,7 @@ class TestScoreStandardization:
         rng_pheno = np.random.RandomState(42)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
 
         # Component with mean=10, sd=3
         pheno['A'] = rng_pheno.normal(10, 3, size=n)
@@ -89,7 +89,7 @@ class TestMultiComponentAveraging:
         rng_pheno = np.random.RandomState(100)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
 
         # Three independent components with different distributions
         pheno['trait1'] = rng_pheno.normal(0, 1, size=n)
@@ -140,7 +140,7 @@ class TestNoiseAddition:
         rng_pheno = np.random.RandomState(200)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng_pheno.normal(0, 1, size=n)
 
         # Test with r=0.6 (abs_r=0.6, noise_weight=sqrt(0.4)≈0.632)
@@ -170,7 +170,7 @@ class TestNoiseAddition:
         rng_pheno = np.random.RandomState(300)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng_pheno.normal(0, 1, size=n)
 
         # Test r=0.3 (high noise: sqrt(0.91)≈0.95)
@@ -210,7 +210,7 @@ class TestDisassortativeMating:
         rng_pheno = np.random.RandomState(400)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng_pheno.normal(0, 1, size=n)
 
         # Strong disassortative mating
@@ -235,7 +235,7 @@ class TestDisassortativeMating:
         rng_pheno = np.random.RandomState(500)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng_pheno.normal(0, 1, size=n)
 
         # Very strong disassortative mating
@@ -271,7 +271,7 @@ class TestModerateAssortment:
         rng_pheno = np.random.RandomState(600)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng_pheno.normal(0, 1, size=n)
 
         mate = LinearAssortativeMating(
@@ -297,7 +297,7 @@ class TestModerateAssortment:
         rng_pheno = np.random.RandomState(700)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng_pheno.normal(0, 1, size=n)
 
         r_values = [0.1, 0.3, 0.5, 0.7, 0.9]
@@ -332,7 +332,7 @@ class TestRankOrderPairing:
         rng_pheno = np.random.RandomState(800)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng_pheno.normal(0, 1, size=n)
 
         # Very high r means minimal noise
@@ -361,7 +361,7 @@ class TestRankOrderPairing:
         rng_pheno = np.random.RandomState(900)
         sex = np.tile([0, 1], n // 2)
         sm = SampleMeta(iid=np.arange(n), sex=sex)
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno['Y'] = rng_pheno.normal(0, 1, size=n)
 
         # With r=0.98, noise is minimal
@@ -403,7 +403,7 @@ class TestMultiTraitMultiGen:
             component_names=['trait1', 'trait2'], r=0.6, offspring_per_pair=2
         )
 
-        sim1 = NSimulation(
+        sim1 = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=mate,
@@ -430,7 +430,7 @@ class TestMultiTraitMultiGen:
         assert corr1 > 0.2, f"Gen 0 composite corr={corr1:.3f}, expected >0.2"
 
         # Run 2: multi-generation to verify later generations also show correlation
-        sim2 = NSimulation(
+        sim2 = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=mate,

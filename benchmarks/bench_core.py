@@ -20,7 +20,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from xftsim.struct import (
-    SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray,
+    SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray,
 )
 from xftsim.effect import AdditiveEffects
 from xftsim.arch import (
@@ -28,7 +28,7 @@ from xftsim.arch import (
 )
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
 
 # Suppress repetitive warnings during benchmarks
@@ -148,13 +148,13 @@ def bench_architecture_compute(n, m, repeats=3):
 
 
 def bench_simulation(n, m, generations, repeats=1):
-    """Time NSimulation.run(generations) end to end."""
+    """Time Simulation.run(generations) end to end."""
     def fn():
         hap = _make_haplotypes(n, m, seed=42)
         arch = _make_architecture(m)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=mate,
@@ -172,7 +172,7 @@ def bench_io_checkpoint(n, m, repeats=1):
     arch = _make_architecture(m)
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
     mate = RandomMating(offspring_per_pair=2)
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=mate,

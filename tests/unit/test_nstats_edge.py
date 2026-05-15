@@ -12,13 +12,13 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.stats import SampleStatistics, GenerationResult
 
 
 def _make_pheno(n, **kwargs):
     sm = SampleMeta(iid=np.arange(n))
-    return NPhenotypeArray(samples=sm, values=kwargs)
+    return PhenotypeArray(samples=sm, values=kwargs)
 
 
 class TestSampleStatisticsEdgeCases:

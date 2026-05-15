@@ -17,7 +17,7 @@ from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent,
     NoiseComponent, AggregationComponent,
 )
-from xftsim.struct import NPhenotypeArray
+from xftsim.struct import PhenotypeArray
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -26,11 +26,11 @@ from testdata import TestSimulation
 
 class TestComputeWithExistingPhenotypes:
     def test_compute_writes_into_existing(self):
-        """Compute with pre-existing NPhenotypeArray should add keys."""
+        """Compute with pre-existing PhenotypeArray should add keys."""
         hap = TestSimulation.founder_haplotypes(n=50, m=10, seed=42)
         arch = Architecture()
         arch.add('Y.E', NoiseComponent(variance=1.0))
-        existing = NPhenotypeArray(samples=hap.samples)
+        existing = PhenotypeArray(samples=hap.samples)
         existing['EXTRA'] = np.ones(50)
 
         result = arch.compute(hap, phenotypes=existing, rng=np.random.RandomState(42))
@@ -39,12 +39,12 @@ class TestComputeWithExistingPhenotypes:
         assert 'Y.E' in result
 
     def test_compute_without_phenotypes_creates_new(self):
-        """Compute without phenotypes= should create new NPhenotypeArray."""
+        """Compute without phenotypes= should create new PhenotypeArray."""
         hap = TestSimulation.founder_haplotypes(n=50, m=10, seed=42)
         arch = Architecture()
         arch.add('Y.E', NoiseComponent(variance=1.0))
         result = arch.compute(hap, rng=np.random.RandomState(42))
-        assert isinstance(result, NPhenotypeArray)
+        assert isinstance(result, PhenotypeArray)
         assert 'Y.E' in result
 
 

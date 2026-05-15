@@ -1,5 +1,5 @@
 """
-Unit tests for NSimulation internal methods.
+Unit tests for Simulation internal methods.
 
 Tests focus on internal method behavior:
 - _enforce_retention: history pruning logic for haplotypes/phenotypes/pedigrees
@@ -22,7 +22,7 @@ from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, Aggregat
 from xftsim.effect import AdditiveEffects
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.filters import TrioFilter, SibPairFilter
 from xftsim.stats import SampleStatistics
 
@@ -39,7 +39,7 @@ def _minimal_sim(n=100, m=20, retain_haplotypes=1, retain_phenotypes=2,
     mating = RandomMating(offspring_per_pair=2)
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
 
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=mating,

@@ -13,7 +13,7 @@ import pytest
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap, meiosis
 
@@ -34,7 +34,7 @@ class TestAlleleFrequencyConservation:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42, retain_haplotypes=1,

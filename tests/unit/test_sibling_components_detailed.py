@@ -16,7 +16,7 @@ Also tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     SiblingMeanComponent, SiblingSumComponent, SiblingAnyComponent,
     SiblingCountComponent, SiblingEldestComponent, SiblingYoungestComponent,
@@ -25,9 +25,9 @@ from xftsim.arch import (
 
 
 def _make_pheno(n=6, values=None, key='Y'):
-    """Create NPhenotypeArray with a given value array."""
+    """Create PhenotypeArray with a given value array."""
     sm = SampleMeta(iid=np.arange(n), fid=np.array([0, 0, 1, 1, 2, 2]))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     if values is not None:
         pheno._values[key] = np.asarray(values, dtype=np.float64)
     return pheno

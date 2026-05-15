@@ -4,15 +4,15 @@ Phase 2 tests: mate assignment, meiosis, simulation loop.
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
-from xftsim.mate import NMateAssignment, RandomMating
+from xftsim.struct import SampleMeta, DenseHaplotypeArray, PhenotypeArray, PedigreeArray
+from xftsim.mate import MateAssignment, RandomMating
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MVGeneticComponent, HaplotypeGeneticComponent,
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -20,7 +20,7 @@ from testdata import TestSimulation
 
 
 # ---------------------------------------------------------------------------
-# NMateAssignment tests
+# MateAssignment tests
 # ---------------------------------------------------------------------------
 
 class TestNMateAssignment:
@@ -29,7 +29,7 @@ class TestNMateAssignment:
 
     def test_creation(self):
         samples = self._samples(4)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=samples,
             maternal_idx=np.array([0, 0, 1, 1]),
             paternal_idx=np.array([2, 2, 3, 3]),
@@ -39,7 +39,7 @@ class TestNMateAssignment:
     def test_length_mismatch_maternal(self):
         samples = self._samples(4)
         with pytest.raises(ValueError, match="maternal_idx length"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=samples,
                 maternal_idx=np.array([0, 0]),
                 paternal_idx=np.array([2, 2, 3, 3]),
@@ -48,7 +48,7 @@ class TestNMateAssignment:
     def test_length_mismatch_paternal(self):
         samples = self._samples(4)
         with pytest.raises(ValueError, match="paternal_idx length"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=samples,
                 maternal_idx=np.array([0, 0, 1, 1]),
                 paternal_idx=np.array([2, 2]),
@@ -57,7 +57,7 @@ class TestNMateAssignment:
     def test_negative_maternal(self):
         samples = self._samples(2)
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=samples,
                 maternal_idx=np.array([-1, 0]),
                 paternal_idx=np.array([0, 1]),
@@ -66,7 +66,7 @@ class TestNMateAssignment:
     def test_negative_paternal(self):
         samples = self._samples(2)
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=samples,
                 maternal_idx=np.array([0, 0]),
                 paternal_idx=np.array([0, -1]),
@@ -233,7 +233,7 @@ class TestMeiosis:
 
 
 # ---------------------------------------------------------------------------
-# NSimulation tests
+# Simulation tests
 # ---------------------------------------------------------------------------
 
 class TestNSimulation:
@@ -247,13 +247,13 @@ class TestNSimulation:
 
     def test_three_gen_completes(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(3)
         assert sim.generation == 2
 
     def test_history_populated(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
+        sim = Simulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
         sim.run(3)
         # Phenotypes should exist for gens 0, 1, 2
         assert 0 in sim.phenotype_history
@@ -262,7 +262,7 @@ class TestNSimulation:
 
     def test_retention_haplotypes(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_haplotypes=1, retain_phenotypes=10)
         sim.run(4)
         # With retain_haplotypes=1, only current gen should remain
@@ -271,7 +271,7 @@ class TestNSimulation:
 
     def test_retention_phenotypes(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_haplotypes=10, retain_phenotypes=1)
         sim.run(4)
         # With retain_phenotypes=1, only recent gens should remain
@@ -280,7 +280,7 @@ class TestNSimulation:
 
     def test_population_size(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(3)
         # With balanced sex and opp=2, population stays constant
         assert sim.haplotypes.n == 500
@@ -290,7 +290,7 @@ class TestNSimulation:
         call_count = [0]
         def counter(s):
             call_count[0] += 1
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[counter])
+        sim = Simulation(hap, arch, rm, rmap, seed=42, callbacks=[counter])
         sim.run(3)
         # Callback called once per generation (0, 1, 2)
         assert call_count[0] == 3
@@ -300,13 +300,13 @@ class TestNSimulation:
         def stopper(s):
             if s.generation >= 1:
                 s.stop = True
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[stopper])
+        sim = Simulation(hap, arch, rm, rmap, seed=42, callbacks=[stopper])
         sim.run(10)
         assert sim.generation == 1
 
     def test_phenotype_keys(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(2)
         keys = list(sim.phenotypes.keys)
         assert 'Y.G' in keys
@@ -315,14 +315,14 @@ class TestNSimulation:
 
     def test_phenotype_shape(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(2)
         assert sim.phenotypes['Y'].shape == (sim.haplotypes.n,)
 
     def test_single_gen(self, sim_components):
         """Running with n_generations=1 should just compute gen-0 phenotypes."""
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(1)
         assert sim.generation == 0
         assert 0 in sim.phenotype_history
@@ -339,7 +339,7 @@ class TestPedigreeIntegrity:
         arch = TestSimulation.simple_architecture(m=50)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
+        sim = Simulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
         sim.run(3)
         for gen in range(1, 3):
             ped = sim.pedigree_history[gen]
@@ -353,7 +353,7 @@ class TestPedigreeIntegrity:
         arch = TestSimulation.simple_architecture(m=50)
         rm = RandomMating(offspring_per_pair=3)
         rmap = TestSimulation.recombination_map(m=50)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
+        sim = Simulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
         sim.run(2)
         ped = sim.pedigree_history[1]
         # Siblings (same maternal_idx and paternal_idx) should share FID
@@ -384,7 +384,7 @@ class TestGeneticCovariance:
         arch = TestSimulation.simple_architecture(m=m, h2=h2, seed=123)
         rm = TestSimulation.mating_regime()
         rmap = TestSimulation.recombination_map(m=m)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(1)
 
         pheno = sim.phenotype_history[0]
@@ -411,7 +411,7 @@ class TestValidation:
 
         rmap = RecombinationMap.constant_map(m=50, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
 
         with pytest.raises(ValueError, match="Effect dimension mismatch"):
             sim.run(1)
@@ -422,13 +422,13 @@ class TestValidation:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5, seed=42)
         rmap = RecombinationMap.constant_map(m=50, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(1)  # Should not raise
         assert np.all(np.isfinite(sim.phenotype_history[0]['Y']))
 
 
 # ---------------------------------------------------------------------------
-# NSimulation edge case and continue_run tests
+# Simulation edge case and continue_run tests
 # ---------------------------------------------------------------------------
 
 class TestContinueRun:
@@ -443,7 +443,7 @@ class TestContinueRun:
     def test_continue_run_extends_generation(self, sim_components):
         """continue_run should advance generations from where run left off."""
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_haplotypes=10, retain_phenotypes=10)
         sim.run(3)
         assert sim.generation == 2
@@ -455,7 +455,7 @@ class TestContinueRun:
     def test_continue_run_zero_additional(self, sim_components):
         """continue_run(0) should be a no-op."""
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(2)
         gen_before = sim.generation
         sim.continue_run(0)
@@ -464,7 +464,7 @@ class TestContinueRun:
     def test_continue_run_phenotypes_finite(self, sim_components):
         """Phenotypes from continue_run should be finite."""
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(2)
         sim.continue_run(3)
         pheno = sim.phenotype_history[sim.generation]
@@ -476,7 +476,7 @@ class TestContinueRun:
         call_log = []
         def logger(s):
             call_log.append(s.generation)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[logger])
+        sim = Simulation(hap, arch, rm, rmap, seed=42, callbacks=[logger])
         sim.run(2)  # gens 0, 1 → 2 callbacks
         assert len(call_log) == 2
         sim.continue_run(2)  # gens 2, 3 → 2 more callbacks
@@ -489,7 +489,7 @@ class TestContinueRun:
         def stopper(s):
             if s.generation >= 3:
                 s.stop = True
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[stopper])
+        sim = Simulation(hap, arch, rm, rmap, seed=42, callbacks=[stopper])
         sim.run(2)
         sim.continue_run(5)
         assert sim.generation == 3
@@ -497,7 +497,7 @@ class TestContinueRun:
     def test_continue_run_retention(self, sim_components):
         """Retention policy should be enforced during continue_run."""
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_haplotypes=1, retain_phenotypes=2)
         sim.run(3)
         sim.continue_run(3)
@@ -518,19 +518,19 @@ class TestNSimulationEdgeCases:
 
     def test_repr(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         r = repr(sim)
-        assert 'NSimulation' in r
+        assert 'Simulation' in r
         assert 'generation=0' in r
 
     def test_haplotypes_property(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         assert sim.haplotypes is hap
 
     def test_phenotypes_property_after_run(self, sim_components):
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim = Simulation(hap, arch, rm, rmap, seed=42)
         sim.run(1)
         assert 'Y' in sim.phenotypes.keys
 
@@ -540,7 +540,7 @@ class TestNSimulationEdgeCases:
         counts = [0, 0]
         def cb1(s): counts[0] += 1
         def cb2(s): counts[1] += 1
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[cb1, cb2])
+        sim = Simulation(hap, arch, rm, rmap, seed=42, callbacks=[cb1, cb2])
         sim.run(3)
         assert counts[0] == 3
         assert counts[1] == 3
@@ -548,7 +548,7 @@ class TestNSimulationEdgeCases:
     def test_no_pedigree_at_gen0(self, sim_components):
         """Generation 0 should have no pedigree."""
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
+        sim = Simulation(hap, arch, rm, rmap, seed=42, retain_phenotypes=10)
         sim.run(2)
         assert 0 not in sim.pedigree_history
         assert 1 in sim.pedigree_history
@@ -561,9 +561,9 @@ class TestNSimulationEdgeCases:
         arch = TestSimulation.simple_architecture(m=50, h2=0.5)
         rm = TestSimulation.mating_regime(offspring_per_pair=2)
         rmap = TestSimulation.recombination_map(m=50)
-        sim1 = NSimulation(hap1, arch, rm, rmap, seed=42)
+        sim1 = Simulation(hap1, arch, rm, rmap, seed=42)
         sim1.run(1)
-        sim2 = NSimulation(hap2, arch, rm, rmap, seed=42)
+        sim2 = Simulation(hap2, arch, rm, rmap, seed=42)
         sim2.run(1)
         np.testing.assert_array_equal(
             sim1.phenotype_history[0]['Y'],
@@ -573,9 +573,9 @@ class TestNSimulationEdgeCases:
     def test_different_seeds_differ(self, sim_components):
         """Different seeds should produce different results."""
         hap, arch, rm, rmap = sim_components
-        sim1 = NSimulation(hap, arch, rm, rmap, seed=42)
+        sim1 = Simulation(hap, arch, rm, rmap, seed=42)
         sim1.run(2)
-        sim2 = NSimulation(hap, arch, rm, rmap, seed=99)
+        sim2 = Simulation(hap, arch, rm, rmap, seed=99)
         sim2.run(2)
         assert not np.array_equal(
             sim1.phenotype_history[1]['Y'],
@@ -585,7 +585,7 @@ class TestNSimulationEdgeCases:
     def test_retain_all(self, sim_components):
         """Large retention should keep all generations."""
         hap, arch, rm, rmap = sim_components
-        sim = NSimulation(hap, arch, rm, rmap, seed=42,
+        sim = Simulation(hap, arch, rm, rmap, seed=42,
                          retain_haplotypes=100, retain_phenotypes=100)
         sim.run(5)
         for g in range(5):
@@ -598,7 +598,7 @@ class TestNSimulationEdgeCases:
         from xftsim.filters import SibPairFilter
         hap, arch, rm, rmap = sim_components
         rm_3 = RandomMating(offspring_per_pair=3)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, rm_3, rmap, seed=42,
             retain_phenotypes=10,
             filters={'sib_pairs': SibPairFilter()},
@@ -625,7 +625,7 @@ class TestSimCallbackEdgeCases:
         hap, arch, rm, rmap = sim_components
         def bad_callback(sim):
             raise RuntimeError("callback error")
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[bad_callback])
+        sim = Simulation(hap, arch, rm, rmap, seed=42, callbacks=[bad_callback])
         with pytest.raises(RuntimeError, match="callback error"):
             sim.run(2)
 
@@ -635,7 +635,7 @@ class TestSimCallbackEdgeCases:
         received = []
         def track_callback(s):
             received.append(s.generation)
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[track_callback])
+        sim = Simulation(hap, arch, rm, rmap, seed=42, callbacks=[track_callback])
         sim.run(3)
         assert received == [0, 1, 2]
 
@@ -645,7 +645,7 @@ class TestSimCallbackEdgeCases:
         counts = [0, 0]
         def cb1(s): counts[0] += 1
         def cb2(s): counts[1] += 1
-        sim = NSimulation(hap, arch, rm, rmap, seed=42, callbacks=[cb1, cb2])
+        sim = Simulation(hap, arch, rm, rmap, seed=42, callbacks=[cb1, cb2])
         sim.run(3)
         assert counts == [3, 3]
 
@@ -665,7 +665,7 @@ class TestSimValidationEdgeCases:
         arch.add('Y2', AggregationComponent('Y2.G + Y2.E'))
 
         rmap = RecombinationMap.constant_map(m=20, p=0.5)
-        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
+        sim = Simulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
         with pytest.raises(ValueError, match="Effect dimension mismatch"):
             sim.run(1)
 
@@ -679,7 +679,7 @@ class TestSimValidationEdgeCases:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
         rmap = RecombinationMap.constant_map(m=20, p=0.5)
-        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
+        sim = Simulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
         with pytest.raises(ValueError, match="Effect dimension mismatch"):
             sim.run(1)
 
@@ -693,7 +693,7 @@ class TestSimValidationEdgeCases:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
         rmap = RecombinationMap.constant_map(m=20, p=0.5)
-        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
+        sim = Simulation(hap, arch, RandomMating(offspring_per_pair=2), rmap, seed=42)
         sim.run(1)  # Should not raise
         assert np.all(np.isfinite(sim.phenotypes['Y']))
 
@@ -706,7 +706,7 @@ class TestSimRetentionEdgeCases:
         hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
         arch = TestSimulation.simple_architecture(m=20, h2=0.5, seed=123)
         rmap = RecombinationMap.constant_map(m=20, p=0.5)
-        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
+        sim = Simulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
                          seed=42, retain_haplotypes=0)
         sim.run(5)
         # Only the most recent gen's haplotypes should remain
@@ -722,7 +722,7 @@ class TestSimRetentionEdgeCases:
         hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
         arch = TestSimulation.simple_architecture(m=20, h2=0.5, seed=123)
         rmap = RecombinationMap.constant_map(m=20, p=0.5)
-        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
+        sim = Simulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
                          seed=42, retain_phenotypes=1)
         sim.run(5)
         # Should have at most 2 generations in phenotype history
@@ -734,7 +734,7 @@ class TestSimRetentionEdgeCases:
         hap = TestSimulation.founder_haplotypes(n=100, m=20, seed=42)
         arch = TestSimulation.simple_architecture(m=20, h2=0.5, seed=123)
         rmap = RecombinationMap.constant_map(m=20, p=0.5)
-        sim = NSimulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
+        sim = Simulation(hap, arch, RandomMating(offspring_per_pair=2), rmap,
                          seed=42, retain_haplotypes=1, retain_phenotypes=1)
         sim.run(1)
         assert 0 in sim.haplotype_history

@@ -16,7 +16,7 @@ from xftsim.arch import (
     AggregationComponent,
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 import sys
@@ -357,7 +357,7 @@ def test_variance_consistency_across_generations():
     mate_fn = RandomMating(offspring_per_pair=2)
 
     # Create simulation
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         recombination_map=rmap,

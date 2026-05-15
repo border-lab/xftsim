@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
-from xftsim.mate import RandomMating, NMateAssignment
+from xftsim.mate import RandomMating, MateAssignment
 
 
 def _make_haplotypes(n, seed=42):
@@ -164,13 +164,13 @@ class TestRandomMatingBehavior:
 
 
 class TestNMateAssignmentValidation:
-    """Tests for NMateAssignment validation."""
+    """Tests for MateAssignment validation."""
 
     def test_mismatched_maternal_length(self):
         """maternal_idx length mismatch should raise."""
         samples = SampleMeta(iid=np.arange(4), sex=np.array([0,1,0,1]))
         with pytest.raises(ValueError, match="maternal_idx length"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=samples,
                 maternal_idx=np.array([0, 0]),  # length 2 != 4
                 paternal_idx=np.array([1, 1, 1, 1]),
@@ -180,7 +180,7 @@ class TestNMateAssignmentValidation:
         """paternal_idx length mismatch should raise."""
         samples = SampleMeta(iid=np.arange(4), sex=np.array([0,1,0,1]))
         with pytest.raises(ValueError, match="paternal_idx length"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=samples,
                 maternal_idx=np.array([0, 0, 0, 0]),
                 paternal_idx=np.array([1]),  # length 1 != 4
@@ -190,17 +190,17 @@ class TestNMateAssignmentValidation:
         """Negative maternal indices should raise."""
         samples = SampleMeta(iid=np.arange(2), sex=np.array([0,1]))
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=samples,
                 maternal_idx=np.array([-1, 0]),
                 paternal_idx=np.array([1, 1]),
             )
 
     def test_repr(self):
-        """NMateAssignment repr should not crash."""
+        """MateAssignment repr should not crash."""
         hap = _make_haplotypes(n=20)
         mate = RandomMating()
         assignment = mate.mate(hap.samples, rng=np.random.RandomState(0))
         r = repr(assignment)
-        assert "NMateAssignment" in r
+        assert "MateAssignment" in r
         assert "n_offspring" in r

@@ -11,11 +11,11 @@ import numpy as np
 import pytest
 
 from xftsim.arch import _tokenize, _shunting_yard, _evaluate_expression
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 
 def _make_pheno(**kwargs):
-    """Helper to make a NPhenotypeArray with named arrays."""
+    """Helper to make a PhenotypeArray with named arrays."""
     n = None
     for v in kwargs.values():
         n = len(v)
@@ -23,7 +23,7 @@ def _make_pheno(**kwargs):
     if n is None:
         n = 5
     sm = SampleMeta(iid=np.arange(n))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     for k, v in kwargs.items():
         pheno[k] = np.asarray(v, dtype=np.float64)
     return pheno, n

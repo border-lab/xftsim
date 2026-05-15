@@ -1,5 +1,5 @@
 """
-Unit tests for NHaplotypeArrayAccessor and DenseHaplotypeArray compatibility.
+Unit tests for HaplotypeArrayAccessor and DenseHaplotypeArray compatibility.
 
 Tests:
 1. .xft accessor properties: n, m, generation, samples, variants, af_empirical

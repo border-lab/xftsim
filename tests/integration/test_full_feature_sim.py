@@ -13,13 +13,13 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MVGeneticComponent, CNoiseComponent, MotherComponent, SiblingMeanComponent,
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.filters import TrioFilter, SibPairFilter
@@ -45,7 +45,7 @@ class TestSimulationWithTrioFilter:
 
         trio_filter = TrioFilter()
         stats = SampleStatistics()
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             filters={'trio': trio_filter},
             statistics=[stats],
@@ -71,7 +71,7 @@ class TestSimulationWithTrioFilter:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
 
         trio_filter = TrioFilter()
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             filters={'trio': trio_filter},
             retain_phenotypes=3,
@@ -98,7 +98,7 @@ class TestSimulationWithSibPairFilter:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
 
         sib_filter = SibPairFilter()
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             filters={'sib': sib_filter},
         )
@@ -125,7 +125,7 @@ class TestSimulationWithCallbackAndFilter:
             if sim.generation >= 2:
                 sim.stop = True
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             filters={'trio': TrioFilter()},
             statistics=[SampleStatistics()],
@@ -150,7 +150,7 @@ class TestSimulationMultiTrait:
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             statistics=[SampleStatistics()],
         )
@@ -181,7 +181,7 @@ class TestSimulationWithVTAndFilters:
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             filters={'trio': TrioFilter()},
             retain_phenotypes=3,
@@ -211,7 +211,7 @@ class TestSimulationWithSiblingComponents:
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
 
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(3)
 
         # Sibling means should be finite and have lower variance than Y
@@ -234,7 +234,7 @@ class TestRetentionWithFilters:
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=1,
             retain_phenotypes=2,
@@ -266,7 +266,7 @@ class TestRetentionWithFilters:
             pheno = sim.phenotype_history[sim.generation]
             variances.append(np.var(pheno['Y']))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=1,
             retain_phenotypes=1,

@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import warnings
 
-from xftsim.struct import SampleMeta, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, PhenotypeArray, PedigreeArray
 from xftsim.arch import (
     ArchNode, MotherComponent, FatherComponent, ParentComponent, NoiseComponent,
 )
@@ -29,7 +29,7 @@ def _make_context(n_offspring=4, n_parent=10, seed=42):
     """Create haplotypes, phenotype_history, and pedigree_history for testing."""
     hap = TestSimulation.founder_haplotypes(n=n_offspring, m=5, seed=seed)
     parent_sm = SampleMeta(iid=np.arange(n_parent), generation=0)
-    parent_pheno = NPhenotypeArray(
+    parent_pheno = PhenotypeArray(
         samples=parent_sm,
         values={'Y': np.arange(n_parent, dtype=float)},
     )
@@ -51,7 +51,7 @@ class TestGen0Fallback:
         hap = TestSimulation.founder_haplotypes(n=5, m=3, seed=42)
         comp = MotherComponent('Y')
         node = ArchNode(outputs=['Y.m'], component=comp, inputs=['Y'])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             result = comp.compute(node, hap, pheno, generation=0)
@@ -65,7 +65,7 @@ class TestGen0Fallback:
         fallback = NoiseComponent(variance=1.0)
         comp = MotherComponent('Y', founder_component=fallback)
         node = ArchNode(outputs=['Y.m'], component=comp, inputs=['Y'])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, generation=0, rng=rng)
         assert result.shape == (5,)
@@ -85,7 +85,7 @@ class TestRetentionPrunedFallback:
         )
         comp = MotherComponent('Y')
         node = ArchNode(outputs=['Y.m'], component=comp, inputs=['Y'])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         # Generation 2, pedigree exists, but prev gen phenotypes pruned
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -106,7 +106,7 @@ class TestMissingPhenotype:
         hap, pheno_hist, ped_hist = _make_context()
         comp = MotherComponent('NONEXISTENT')
         node = ArchNode(outputs=['Y.m'], component=comp, inputs=['NONEXISTENT'])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         with pytest.raises(ValueError, match="not found"):
             comp.compute(
                 node, hap, pheno,
@@ -122,7 +122,7 @@ class TestMotherComponent:
         hap, pheno_hist, ped_hist = _make_context()
         comp = MotherComponent('Y')
         node = ArchNode(outputs=['Y.m'], component=comp, inputs=['Y'])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(
             node, hap, pheno,
             generation=1,
@@ -136,7 +136,7 @@ class TestMotherComponent:
         hap, pheno_hist, ped_hist = _make_context()
         comp = MotherComponent('Y')
         node = ArchNode(outputs=['Y.m'], component=comp, inputs=['Y'])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(
             node, hap, pheno,
             generation=1,
@@ -152,7 +152,7 @@ class TestFatherComponent:
         hap, pheno_hist, ped_hist = _make_context()
         comp = FatherComponent('Y')
         node = ArchNode(outputs=['Y.f'], component=comp, inputs=['Y'])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(
             node, hap, pheno,
             generation=1,
@@ -169,7 +169,7 @@ class TestParentComponent:
         hap, pheno_hist, ped_hist = _make_context()
         comp = ParentComponent('Y')
         node = ArchNode(outputs=['Y.p'], component=comp, inputs=['Y'])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = comp.compute(
             node, hap, pheno,
             generation=1,

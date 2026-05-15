@@ -13,7 +13,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, MVGeneticComponent, NoiseComponent,
     AggregationComponent, ArchNode,
@@ -34,7 +34,7 @@ class TestEmptyArchitecture:
         arch = Architecture()
         hap = _make_hap()
         pheno = arch.compute(hap)
-        assert isinstance(pheno, NPhenotypeArray)
+        assert isinstance(pheno, PhenotypeArray)
         assert len(pheno.keys) == 0
 
     def test_empty_nodes(self):
@@ -86,14 +86,14 @@ class TestComputeOptions:
         arch.add('Y', NoiseComponent(variance=1.0))
         hap = _make_hap()
         pheno = arch.compute(hap, phenotypes=None, rng=np.random.RandomState(42))
-        assert isinstance(pheno, NPhenotypeArray)
+        assert isinstance(pheno, PhenotypeArray)
         assert 'Y' in pheno.keys
 
     def test_uses_provided_phenotype(self):
         arch = Architecture()
         arch.add('Y', NoiseComponent(variance=1.0))
         hap = _make_hap()
-        existing = NPhenotypeArray(samples=hap.samples)
+        existing = PhenotypeArray(samples=hap.samples)
         existing._values['pre'] = np.ones(20)
         result = arch.compute(hap, phenotypes=existing, rng=np.random.RandomState(42))
         assert result is existing

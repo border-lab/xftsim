@@ -12,7 +12,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import CNoiseComponent, ArchNode
 
 
@@ -56,7 +56,7 @@ class TestCNoiseCompute:
         comp = CNoiseComponent(cov=cov)
         node = ArchNode(outputs=['A', 'B'], component=comp, inputs=[], grouping=None)
         hap = _make_hap(n=10)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng, generation=0, pedigree_history={})
         assert result.shape == (10, 2)
@@ -66,7 +66,7 @@ class TestCNoiseCompute:
         comp = CNoiseComponent(cov=cov)
         node = ArchNode(outputs=['A', 'B', 'C'], component=comp, inputs=[], grouping=None)
         hap = _make_hap(n=8)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng, generation=0, pedigree_history={})
         assert result.shape == (8, 3)
@@ -76,7 +76,7 @@ class TestCNoiseCompute:
         comp = CNoiseComponent(cov=cov)
         node = ArchNode(outputs=['A', 'B'], component=comp, inputs=[])
         hap = _make_hap(n=10)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         r1 = comp.compute(node, hap, pheno, rng=np.random.RandomState(42),
                           generation=0, pedigree_history={})
         r2 = comp.compute(node, hap, pheno, rng=np.random.RandomState(42),

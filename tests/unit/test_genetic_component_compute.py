@@ -16,7 +16,7 @@ from xftsim.arch import (
     GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent, ArchNode,
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects
-from xftsim.struct import NPhenotypeArray
+from xftsim.struct import PhenotypeArray
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -31,7 +31,7 @@ class TestGeneticComponentCompute:
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=42)
         comp = GeneticComponent(eff)
         node = ArchNode(outputs=['Y.G'], component=comp, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
 
         result = comp.compute(node, hap, pheno)
         assert result.shape == (n,)
@@ -44,7 +44,7 @@ class TestGeneticComponentCompute:
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, standardized=False, seed=42)
         comp = GeneticComponent(eff)
         node = ArchNode(outputs=['Y.G'], component=comp, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
 
         result = comp.compute(node, hap, pheno)
         expected = hap.matvec(eff.effects)
@@ -60,7 +60,7 @@ class TestMVGeneticComponentCompute:
         comp = MVGeneticComponent(mv)
         node = ArchNode(outputs=['Y1.G', 'Y2.G'], component=comp,
                         inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
 
         result = comp.compute(node, hap, pheno)
         assert result.shape == (n, 2)
@@ -82,7 +82,7 @@ class TestHaplotypeGeneticComponent:
 
         comp = HaplotypeGeneticComponent(eff, haplotype='maternal')
         node = ArchNode(outputs=['Y.mat'], component=comp, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
 
         result = comp.compute(node, hap, pheno)
         expected = hap.matvec_maternal(eff.effects)
@@ -96,7 +96,7 @@ class TestHaplotypeGeneticComponent:
 
         comp = HaplotypeGeneticComponent(eff, haplotype='paternal')
         node = ArchNode(outputs=['Y.pat'], component=comp, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
 
         result = comp.compute(node, hap, pheno)
         expected = hap.matvec_paternal(eff.effects)
@@ -111,7 +111,7 @@ class TestHaplotypeGeneticComponent:
         comp_mat = HaplotypeGeneticComponent(eff, haplotype='maternal')
         comp_pat = HaplotypeGeneticComponent(eff, haplotype='paternal')
         node = ArchNode(outputs=['tmp'], component=comp_mat, inputs=[], grouping=None)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
 
         mat = comp_mat.compute(node, hap, pheno)
         pat = comp_pat.compute(node, hap, pheno)

@@ -5,7 +5,7 @@ import pytest
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.arch import Architecture
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from tests.testdata import TestSimulation
@@ -21,7 +21,7 @@ def _run_formula_sim(formula, effects, n_gen=2, n=500, m=50, seed=42):
     arch = Architecture.from_formula(formula, effects=effects)
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
     mate = RandomMating(offspring_per_pair=2)
-    sim = NSimulation(
+    sim = Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mate, recombination_map=rmap, seed=seed,
     )
@@ -63,7 +63,7 @@ class TestFormulaSimple:
         hap = _make_hap(seed=42)
         rmap = RecombinationMap.constant_map(m=50, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim2 = NSimulation(
+        sim2 = Simulation(
             founder_haplotypes=hap, architecture=arch2,
             mating_regime=mate, recombination_map=rmap, seed=42,
         )

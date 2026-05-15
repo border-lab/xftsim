@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import warnings
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray, PedigreeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray, PedigreeArray
 from xftsim.arch import ArchNode, MotherComponent, FatherComponent, ParentComponent
 
 
@@ -20,7 +20,7 @@ def _make_context():
     n_offspring = 6
     # Parent phenotype (only has 'A', not 'B')
     parent_sm = SampleMeta(iid=np.arange(n_parent))
-    parent_pheno = NPhenotypeArray(
+    parent_pheno = PhenotypeArray(
         samples=parent_sm,
         values={'A': np.ones(n_parent)},
     )
@@ -31,7 +31,7 @@ def _make_context():
     offspring_hap = DenseHaplotypeArray(
         genotypes=offspring_geno, samples=offspring_sm, variants=offspring_vm,
     )
-    offspring_pheno = NPhenotypeArray(samples=offspring_sm)
+    offspring_pheno = PhenotypeArray(samples=offspring_sm)
     # Pedigree
     maternal_idx = np.array([0, 1, 2, 3, 4, 0])
     paternal_idx = np.array([5, 6, 7, 8, 9, 5])

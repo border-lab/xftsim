@@ -13,15 +13,15 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.filters import SibPairFilter, SibPairView
 
 
 def _make_pheno_with_fids(fids, values=None):
-    """Create NPhenotypeArray with given FIDs."""
+    """Create PhenotypeArray with given FIDs."""
     n = len(fids)
     sm = SampleMeta(iid=np.arange(n), fid=np.asarray(fids))
-    pheno = NPhenotypeArray(samples=sm)
+    pheno = PhenotypeArray(samples=sm)
     if values is not None:
         for k, v in values.items():
             pheno[k] = v

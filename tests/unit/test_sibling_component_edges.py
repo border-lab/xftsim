@@ -15,7 +15,7 @@ from xftsim.arch import (
     SiblingMeanComponent, SiblingSumComponent,
     ArchNode,
 )
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.effect import AdditiveEffects
 
 import sys, os
@@ -28,7 +28,7 @@ class TestSiblingComponentEdges:
         """Sibling component with nonexistent source should raise ValueError."""
         n = 10
         hap = TestSimulation.founder_haplotypes(n=n, m=5, seed=42)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         pheno['Y'] = np.random.normal(0, 1, n)
 
         comp = SiblingMeanComponent('NONEXISTENT')
@@ -41,7 +41,7 @@ class TestSiblingComponentEdges:
         """Without grouping (labels=None), should return values copy."""
         n = 10
         hap = TestSimulation.founder_haplotypes(n=n, m=5, seed=42)
-        pheno = NPhenotypeArray(hap.samples)
+        pheno = PhenotypeArray(hap.samples)
         pheno['Y'] = np.arange(n, dtype=np.float64)
 
         comp = SiblingMeanComponent('Y')
@@ -62,7 +62,7 @@ class TestSiblingComponentEdges:
         n = 12
         fids = np.repeat(np.arange(3), 4)
         sm = SampleMeta(iid=np.arange(n), fid=fids)
-        pheno = NPhenotypeArray(sm)
+        pheno = PhenotypeArray(sm)
         pheno['Y'] = np.array([1, 2, 3, 4, 10, 20, 30, 40, 100, 200, 300, 400],
                               dtype=np.float64)
 
@@ -97,7 +97,7 @@ class TestSiblingComponentEdges:
         n = 6
         fids = np.array([0, 0, 0, 1, 1, 1])
         sm = SampleMeta(iid=np.arange(n), fid=fids)
-        pheno = NPhenotypeArray(sm)
+        pheno = PhenotypeArray(sm)
         pheno['Y'] = np.array([1.0, 2.0, 3.0, 10.0, 20.0, 30.0])
 
         # Create haplotypes with matching samples (same fids)

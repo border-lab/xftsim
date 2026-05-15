@@ -153,7 +153,7 @@ class TestLoadConfigFile:
 
 
 # ---------------------------------------------------------------------------
-# Config → NSimulation
+# Config → Simulation
 # ---------------------------------------------------------------------------
 
 class TestBuildSimulationFromConfig:

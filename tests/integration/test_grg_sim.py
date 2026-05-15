@@ -5,7 +5,7 @@ import pytest
 pygrgl = pytest.importorskip("pygrgl")
 
 from xftsim.struct import GraphHaplotypeOperator, DenseHaplotypeArray, SampleMeta
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
@@ -30,7 +30,7 @@ def _make_sim(grg_op, seed=42):
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
     mate = RandomMating(offspring_per_pair=2)
 
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=founder,
         architecture=arch,
         mating_regime=mate,
@@ -82,7 +82,7 @@ class TestGRGSimulation:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim_dense = NSimulation(
+        sim_dense = Simulation(
             founder_haplotypes=dense_founder,
             architecture=arch, mating_regime=mate,
             recombination_map=rmap, seed=seed,

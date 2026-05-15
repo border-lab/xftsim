@@ -9,7 +9,7 @@ Verifies:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.gwas import GWAS, PGS
@@ -185,7 +185,7 @@ class TestGWASNullCalibration:
         n, m = 2000, 50
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=70)
         rng = np.random.RandomState(71)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()
@@ -201,7 +201,7 @@ class TestGWASNullCalibration:
         n, m = 5000, 200
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=72)
         rng = np.random.RandomState(73)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         pheno['Y'] = rng.normal(0, 1, size=n)
 
         res = GWAS(hap, pheno).run()

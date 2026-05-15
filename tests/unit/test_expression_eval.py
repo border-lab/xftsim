@@ -10,14 +10,14 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 from xftsim.arch import _tokenize, _shunting_yard, _evaluate_expression
 
 
 def _make_pheno(n=5, **kwargs):
-    """Helper to create NPhenotypeArray with given values."""
+    """Helper to create PhenotypeArray with given values."""
     sm = SampleMeta(iid=np.arange(n))
-    return NPhenotypeArray(samples=sm, values=kwargs)
+    return PhenotypeArray(samples=sm, values=kwargs)
 
 
 class TestTokenize:
@@ -161,7 +161,7 @@ class TestEvaluateExpression:
     def test_dotted_names(self):
         """Dotted names like Y.G + Y.E."""
         sm = SampleMeta(iid=np.arange(3))
-        pheno = NPhenotypeArray(samples=sm, values={
+        pheno = PhenotypeArray(samples=sm, values={
             'Y.G': np.array([1.0, 2.0, 3.0]),
             'Y.E': np.array([0.5, 0.5, 0.5]),
         })

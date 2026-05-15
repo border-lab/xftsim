@@ -14,7 +14,7 @@ from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, Aggregat
 from xftsim.arch import MotherComponent, SiblingMeanComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -34,7 +34,7 @@ class TestVTWithGroupedNoise:
         arch.add('Y', AggregationComponent('Y.G + Y.shared + Y.E'),
                  inputs=['Y.G', 'Y.shared', 'Y.E'])
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=rmap, seed=42,
@@ -54,7 +54,7 @@ class TestVTWithGroupedNoise:
         arch.add('Y', AggregationComponent('Y.G + Y.shared + Y.E'),
                  inputs=['Y.G', 'Y.shared', 'Y.E'])
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=rmap, seed=42,
@@ -85,7 +85,7 @@ class TestMotherVTWithGroupedNoise:
         arch.add('Y', AggregationComponent('Y.G + 0.2 * Y.VT + Y.shared + Y.E'),
                  inputs=['Y.G', 'Y.VT', 'Y.shared', 'Y.E'])
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=rmap, seed=42,
@@ -109,7 +109,7 @@ class TestSiblingMeanWithGroupedNoise:
                  inputs=['Y.G', 'Y.shared', 'Y.E'])
         arch.add('Y.sibmean', SiblingMeanComponent('Y'), inputs=['Y'])
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=rmap, seed=42,

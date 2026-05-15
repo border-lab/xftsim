@@ -14,7 +14,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 def _make_multi_chrom_sim(n=200, m_per_chrom=25, n_chrom=2, seed=42):
@@ -41,7 +41,7 @@ def _make_multi_chrom_sim(n=200, m_per_chrom=25, n_chrom=2, seed=42):
     rmap = RecombinationMap(p=0.1, m=m, chrom=chrom)
     mate = RandomMating(offspring_per_pair=2)
 
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mate, recombination_map=rmap, seed=seed,
     )

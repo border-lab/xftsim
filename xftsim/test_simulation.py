@@ -30,7 +30,7 @@ from xftsim.arch import (
 )
 from xftsim.mate import GeneralAssortativeMating, BatchedMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics, HasemanElstonEstimator
 
 # ── Parameters (matched to ey_sim.py) ──────────────────────────────────────
@@ -154,7 +154,7 @@ mating = BatchedMating(
 
 # ── Simulation ─────────────────────────────────────────────────────────────
 
-sim = NSimulation(
+sim = Simulation(
     founder_haplotypes=founder_haplotypes,
     architecture=arch,
     mating_regime=mating,

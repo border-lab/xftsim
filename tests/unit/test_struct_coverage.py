@@ -5,8 +5,8 @@ Targets uncovered lines in struct.py for:
 - SampleMeta (extra validation, unique_identifier, with_generation, repr)
 - VariantMeta (extra validation, __getitem__, subset, to_variant_index, repr)
 - DenseHaplotypeArray (chrom, pos_bp, pos_cM, af properties, standardized methods,
-  deprecation warnings, repr, NHaplotypeArrayAccessor)
-- NPhenotypeArray (subset, repr)
+  deprecation warnings, repr, HaplotypeArrayAccessor)
+- PhenotypeArray (subset, repr)
 - PedigreeArray (validation, bounds checking)
 """
 import numpy as np
@@ -14,8 +14,8 @@ import pytest
 import warnings
 
 from xftsim.struct import (
-    SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray,
-    PedigreeArray, NHaplotypeArrayAccessor,
+    SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray,
+    PedigreeArray, HaplotypeArrayAccessor,
 )
 
 
@@ -259,7 +259,7 @@ class TestDenseHaplotypeArrayCoverage:
 
     def test_xft_accessor(self, hap_with_metadata):
         acc = hap_with_metadata.xft
-        assert isinstance(acc, NHaplotypeArrayAccessor)
+        assert isinstance(acc, HaplotypeArrayAccessor)
         assert acc.n == 10
         assert acc.m == 5
         assert acc.generation == 0
@@ -367,22 +367,22 @@ class TestDenseHaplotypeArrayValidation:
         assert hap.samples.generation == 2
 
 # ---------------------------------------------------------------------------
-# NPhenotypeArray
+# PhenotypeArray
 # ---------------------------------------------------------------------------
 
 class TestNPhenotypeArrayCoverage:
     def test_subset(self):
         sm = SampleMeta(iid=np.arange(5))
-        pheno = NPhenotypeArray(samples=sm, values={"Y": np.arange(5, dtype=float)})
+        pheno = PhenotypeArray(samples=sm, values={"Y": np.arange(5, dtype=float)})
         sub = pheno.subset([1, 3])
         assert sub.samples.n == 2
         assert np.array_equal(sub["Y"], [1.0, 3.0])
 
     def test_repr(self):
         sm = SampleMeta(iid=np.arange(3))
-        pheno = NPhenotypeArray(samples=sm, values={"Y": np.zeros(3)})
+        pheno = PhenotypeArray(samples=sm, values={"Y": np.zeros(3)})
         r = repr(pheno)
-        assert "NPhenotypeArray" in r
+        assert "PhenotypeArray" in r
         assert "n=3" in r
         assert "'Y'" in r
 

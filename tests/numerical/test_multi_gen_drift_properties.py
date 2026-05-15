@@ -17,7 +17,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys
 import os
@@ -52,7 +52,7 @@ class TestMultiGenerationDriftProperties:
             component_names=['Y'], r=0.5, offspring_per_pair=2
         )
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=mating,
@@ -98,7 +98,7 @@ class TestMultiGenerationDriftProperties:
         arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
@@ -144,7 +144,7 @@ class TestMultiGenerationDriftProperties:
         arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
@@ -189,7 +189,7 @@ class TestMultiGenerationDriftProperties:
         arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
@@ -239,7 +239,7 @@ class TestMultiGenerationDriftProperties:
         arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
@@ -284,7 +284,7 @@ class TestMultiGenerationDriftProperties:
             arch.add('Y.E', NoiseComponent(variance=1.0 - h2))
             arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-            sim = NSimulation(
+            sim = Simulation(
                 founder_haplotypes=hap,
                 architecture=arch,
                 mating_regime=RandomMating(offspring_per_pair=2),
@@ -328,7 +328,7 @@ class TestMultiGenerationDriftProperties:
         arch.add('Y.E', NoiseComponent(variance=1.0 - h2_design))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
@@ -391,7 +391,7 @@ class TestMultiGenerationDriftProperties:
         arch.add('T1', AggregationComponent('T1.G + T1.E'))
         arch.add('T2', AggregationComponent('T2.G + T2.E'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),

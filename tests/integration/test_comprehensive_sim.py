@@ -14,14 +14,14 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
     MVGeneticComponent, CNoiseComponent, MotherComponent,
     HaplotypeGeneticComponent, SiblingMeanComponent,
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.filters import TrioFilter, SibPairFilter
@@ -56,7 +56,7 @@ class TestBivariateVTAssortative:
             pheno = sim.phenotype_history[sim.generation]
             variances.append(np.var(pheno['Y1']))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             filters={'trio': TrioFilter()},
             statistics=[SampleStatistics()],
@@ -94,7 +94,7 @@ class TestHaplotypeGeneticWithSiblings:
 
         mate = RandomMating(offspring_per_pair=3)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             filters={'sib': SibPairFilter()},
         )
@@ -128,7 +128,7 @@ class TestDeterministicReproduction:
             """, effects={'beta': eff})
             mate = RandomMating(offspring_per_pair=2)
             rmap = RecombinationMap.constant_map(m=m, p=0.5)
-            sim = NSimulation(hap, arch, mate, rmap, seed=99)
+            sim = Simulation(hap, arch, mate, rmap, seed=99)
             sim.run(1)  # gen 0 only
             results.append(sim.phenotype_history[0]['Y'].copy())
 
@@ -151,7 +151,7 @@ class TestLargeFamilySiblings:
         """, effects={'beta': eff})
         mate = RandomMating(offspring_per_pair=5)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         pheno = sim.phenotype_history[1]
@@ -180,7 +180,7 @@ class TestRetentionWithAllFeatures:
         def count_gens(sim):
             gen_count[0] += 1
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=1,
             retain_phenotypes=1,
@@ -248,7 +248,7 @@ class TestEarlyStoppingWithAllFeatures:
             if sim.generation >= 3:
                 sim.stop = True
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42,
@@ -279,7 +279,7 @@ class TestMultiGenPhenotypeStability:
             assert np.isfinite(v) and v > 0
             variances.append(v)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42,

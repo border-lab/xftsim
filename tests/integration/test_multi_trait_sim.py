@@ -24,7 +24,7 @@ from xftsim.arch import (
 from xftsim.effect import AdditiveEffects, MultivariateEffects
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 class TestBivariateCorrelated:
@@ -42,7 +42,7 @@ class TestBivariateCorrelated:
 
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap, seed=42,
         )
@@ -69,7 +69,7 @@ class TestThreeTrait:
 
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap, seed=42,
         )
@@ -101,7 +101,7 @@ class TestMultiTraitVT:
 
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap, seed=42,
             retain_phenotypes=2,
@@ -129,7 +129,7 @@ class TestMultiTraitFiniteness:
 
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap, seed=42,
         )
@@ -160,7 +160,7 @@ class TestMultiTraitAssortative:
 
         mating = LinearAssortativeMating(component_names=['Y'], r=0.5)
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap, seed=42,
         )

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 from xftsim.filters import TrioView, SibPairView, FilteredView
-from xftsim.struct import NPhenotypeArray, StandardizedHaplotypeOperator
+from xftsim.struct import PhenotypeArray, StandardizedHaplotypeOperator
 
 
 @dataclass
@@ -40,7 +40,7 @@ class Statistic(ABC):
     """
 
     @abstractmethod
-    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+    def estimate(self, phenotype_history: dict[int, PhenotypeArray],
                  filtered_views: dict[str, FilteredView],
                  generation: int,
                  **kwargs: Any) -> Any:
@@ -49,7 +49,7 @@ class Statistic(ABC):
 
         Parameters
         ----------
-        phenotype_history : dict[int, NPhenotypeArray]
+        phenotype_history : dict[int, PhenotypeArray]
             Generation → phenotypes mapping.
         filtered_views : dict[str, FilteredView]
             Named filtered views (from filters).
@@ -74,7 +74,7 @@ class SampleStatistics(Statistic):
     Returns a dict with 'cov' (k x k matrix), 'var' (diagonal), and 'keys'.
     """
 
-    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+    def estimate(self, phenotype_history: dict[int, PhenotypeArray],
                  filtered_views: dict[str, FilteredView],
                  generation: int,
                  **kwargs: Any) -> dict[str, Any] | None:
@@ -134,7 +134,7 @@ class HasemanElstonEstimator(Statistic):
         self.phenotype_keys = phenotype_keys
         self.n_probe = n_probe
 
-    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+    def estimate(self, phenotype_history: dict[int, PhenotypeArray],
                  filtered_views: dict[str, FilteredView],
                  generation: int,
                  **kwargs: Any) -> dict[str, dict[str, Any]] | None:
@@ -226,7 +226,7 @@ class ParentOffspringRegression(Statistic):
     def __init__(self, filter_name: str = 'trio') -> None:
         self.filter_name: str = filter_name
 
-    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+    def estimate(self, phenotype_history: dict[int, PhenotypeArray],
                  filtered_views: dict[str, FilteredView],
                  generation: int,
                  **kwargs: Any) -> dict[str, dict[str, Any]] | None:
@@ -305,7 +305,7 @@ class MatingStatistics(Statistic):
     def __init__(self, filter_name: str = 'trio') -> None:
         self.filter_name: str = filter_name
 
-    def estimate(self, phenotype_history: dict[int, NPhenotypeArray],
+    def estimate(self, phenotype_history: dict[int, PhenotypeArray],
                  filtered_views: dict[str, FilteredView],
                  generation: int,
                  **kwargs: Any) -> dict[str, Any] | None:

@@ -12,7 +12,7 @@ from xftsim.arch import (
     SiblingEldestComponent, SiblingYoungestComponent,
     ArchNode,
 )
-from xftsim.struct import SampleMeta, NPhenotypeArray, DenseHaplotypeArray, VariantMeta
+from xftsim.struct import SampleMeta, PhenotypeArray, DenseHaplotypeArray, VariantMeta
 
 
 def _make_grouped_scenario(fids, values):
@@ -21,7 +21,7 @@ def _make_grouped_scenario(fids, values):
     sm = SampleMeta(iid=np.arange(n), fid=np.array(fids))
     vm = VariantMeta(vid=np.array([f'v{i}' for i in range(3)]))
     hap = DenseHaplotypeArray(np.zeros((n, 3, 2), dtype=np.int8), samples=sm, variants=vm)
-    pheno = NPhenotypeArray(sm)
+    pheno = PhenotypeArray(sm)
     pheno['Y'] = np.array(values, dtype=np.float64)
     return hap, pheno
 

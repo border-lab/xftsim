@@ -13,7 +13,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import Architecture, NoiseComponent, AggregationComponent, GeneticComponent
 from xftsim.effect import AdditiveEffects
 
@@ -74,7 +74,7 @@ class TestEmptyArchitecture:
         arch = Architecture()
         hap = _make_hap()
         result = arch.compute(hap, rng=np.random.RandomState(42))
-        assert isinstance(result, NPhenotypeArray)
+        assert isinstance(result, PhenotypeArray)
         assert len(result.keys) == 0
 
 

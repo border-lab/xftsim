@@ -17,7 +17,7 @@ from xftsim.effect import AdditiveEffects, SparseEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 
 class TestSparseEffectsVariance:
@@ -34,7 +34,7 @@ class TestSparseEffectsVariance:
         arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
         mating = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap, seed=42,
         )
@@ -69,7 +69,7 @@ class TestSparseEffectsVariance:
         arch_dense.add('Y.G', GeneticComponent(eff_dense))
         arch_dense.add('Y.E', NoiseComponent(variance=1.0 - h2))
         arch_dense.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
-        sim_dense = NSimulation(
+        sim_dense = Simulation(
             founder_haplotypes=hap_dense, architecture=arch_dense,
             mating_regime=RandomMating(), recombination_map=RecombinationMap.constant_map(m=m),
             seed=42,
@@ -84,7 +84,7 @@ class TestSparseEffectsVariance:
         arch_sparse.add('Y.G', GeneticComponent(eff_sparse))
         arch_sparse.add('Y.E', NoiseComponent(variance=1.0 - h2))
         arch_sparse.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
-        sim_sparse = NSimulation(
+        sim_sparse = Simulation(
             founder_haplotypes=hap_sparse, architecture=arch_sparse,
             mating_regime=RandomMating(), recombination_map=RecombinationMap.constant_map(m=m),
             seed=42,

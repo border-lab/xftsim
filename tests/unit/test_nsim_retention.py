@@ -1,22 +1,22 @@
 """
-Unit tests for NSimulation retention policy and edge cases.
+Unit tests for Simulation retention policy and edge cases.
 
 Tests:
 1. _enforce_retention: haplotype pruning, phenotype pruning, pedigree pruning,
    mate_assignment pruning
 2. Retention with retain_haplotypes=0 (keep only current)
 3. Multiple statistics with same type (naming collision)
-4. NSimulation repr
+4. Simulation repr
 5. continue_run after aggressive pruning
 6. Validation: effect dimension mismatch
 """
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.stats import SampleStatistics
@@ -37,7 +37,7 @@ class TestRetentionPolicy:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        return NSimulation(
+        return Simulation(
             hap, arch, mate, rmap,
             retain_haplotypes=retain_haplotypes,
             retain_phenotypes=retain_phenotypes,
@@ -106,7 +106,7 @@ class TestMultipleStatistics:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             statistics=[SampleStatistics(), SampleStatistics()],
         )
@@ -121,7 +121,7 @@ class TestMultipleStatistics:
 
 class TestNSimulationRepr:
     def test_repr(self):
-        """NSimulation repr should show generation, n, m."""
+        """Simulation repr should show generation, n, m."""
         n, m = 50, 5
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=42)
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=42)
@@ -131,7 +131,7 @@ class TestNSimulationRepr:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         r = repr(sim)
         assert 'generation=0' in r
 
@@ -148,7 +148,7 @@ class TestValidation:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         with pytest.raises(ValueError, match="dimension mismatch"):
             sim.run(1)
 
@@ -165,7 +165,7 @@ class TestContinueRunAfterPruning:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=1, retain_phenotypes=1,
         )

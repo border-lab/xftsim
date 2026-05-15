@@ -11,13 +11,13 @@ Verifies:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, CNoiseComponent,
     AggregationComponent,
 )
 from xftsim.effect import AdditiveEffects, MultivariateEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -41,7 +41,7 @@ class TestGroupedNoiseWithinFamily:
         """, effects={'beta': eff})
         mate = RandomMating(offspring_per_pair=3)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         pheno = sim.phenotype_history[1]
@@ -70,7 +70,7 @@ class TestUngroupedNoiseIndependence:
         """, effects={'beta': eff})
         mate = RandomMating(offspring_per_pair=3)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
 
         pheno = sim.phenotype_history[1]

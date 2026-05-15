@@ -11,7 +11,7 @@ pygrgl = pytest.importorskip("pygrgl")
 from xftsim.struct import GraphHaplotypeOperator, DenseHaplotypeArray, SampleMeta
 from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 from tests.testdata import TestGRG
@@ -33,7 +33,7 @@ def _make_grg_sim(grg_op, h2=0.5, seed=42):
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
     mate = RandomMating(offspring_per_pair=2)
 
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=founder,
         architecture=arch,
         mating_regime=mate,

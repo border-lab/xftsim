@@ -9,7 +9,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 from xftsim.arch import _resolve_grouping, NoiseComponent, ArchNode
 
 
@@ -33,7 +33,7 @@ class TestSexGrouping:
         comp = NoiseComponent(variance=1.0)
         node = ArchNode(outputs=['Y.E'], component=comp, inputs=[], grouping='sex')
         hap = _make_hap_with_sex(n=10)
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         rng = np.random.RandomState(42)
         result = comp.compute(node, hap, pheno, rng=rng, generation=0, pedigree_history={})
         sex = hap.samples.sex

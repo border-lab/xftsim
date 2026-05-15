@@ -4,8 +4,8 @@ Unit tests for struct constructor validation error paths.
 Tests:
 1. DenseHaplotypeArray with mismatched samples.n raises
 2. DenseHaplotypeArray with mismatched variants.m raises
-3. NPhenotypeArray setitem with wrong shape raises
-4. NPhenotypeArray setitem with 2-D array raises
+3. PhenotypeArray setitem with wrong shape raises
+4. PhenotypeArray setitem with 2-D array raises
 5. VariantMeta __getitem__ on None core field raises KeyError
 6. VariantMeta __getitem__ on existing core field returns array
 7. VariantMeta __getitem__ on extras returns array
@@ -14,7 +14,7 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray
+from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray, PhenotypeArray
 
 
 class TestDenseHaplotypeArrayValidation:
@@ -37,21 +37,21 @@ class TestNPhenotypeArrayShapeValidation:
     def test_setitem_wrong_length(self):
         """Setting phenotype with wrong length raises ValueError."""
         sm = SampleMeta(iid=np.arange(10))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         with pytest.raises(ValueError, match="has shape.*expected"):
             pheno['Y'] = np.zeros(5)  # n=10, but providing 5
 
     def test_setitem_2d_array(self):
         """Setting phenotype with 2-D array raises ValueError."""
         sm = SampleMeta(iid=np.arange(10))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         with pytest.raises(ValueError, match="has shape.*expected"):
             pheno['Y'] = np.zeros((10, 2))  # wrong shape: (10,2) vs (10,)
 
     def test_setitem_scalar_broadcasts(self):
         """Setting phenotype with scalar should raise (not broadcast)."""
         sm = SampleMeta(iid=np.arange(10))
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         with pytest.raises(ValueError, match="has shape.*expected"):
             pheno['Y'] = np.float64(1.0)  # scalar, shape ()
 

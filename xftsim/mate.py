@@ -1,7 +1,7 @@
 """
 New mate assignment and mating regimes for the refactored simulation loop.
 
-NMateAssignment: dataclass linking offspring to parents by index.
+MateAssignment: dataclass linking offspring to parents by index.
 RandomMating: shuffles and pairs individuals to produce offspring.
 LinearAssortativeMating: rank-order pairing on a phenotypic composite.
 GeneralAssortativeMating: arbitrary K x K cross-mate correlation via QAP (Hexaly).
@@ -15,11 +15,11 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Dict
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
+from xftsim.struct import SampleMeta, PhenotypeArray
 
 
 @dataclass
-class NMateAssignment:
+class MateAssignment:
     """
     Links offspring to parents via integer indices into the parent generation.
 
@@ -60,7 +60,7 @@ class NMateAssignment:
         return self.offspring_samples.n
 
     def __repr__(self) -> str:
-        return (f"NMateAssignment(n_offspring={self.n_offspring}, "
+        return (f"MateAssignment(n_offspring={self.n_offspring}, "
                 f"generation={self.offspring_samples.generation})")
 
 
@@ -95,7 +95,7 @@ class RandomMating:
 
     def mate(self, samples: SampleMeta,
              rng: np.random.RandomState | None = None,
-             phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
+             phenotypes: PhenotypeArray | None = None) -> MateAssignment:
         """
         Produce a mate assignment from the current generation.
 
@@ -112,12 +112,12 @@ class RandomMating:
             Current generation's sample metadata.
         rng : np.random.RandomState, optional
             Random state for reproducibility.
-        phenotypes : NPhenotypeArray, optional
+        phenotypes : PhenotypeArray, optional
             Ignored by RandomMating (accepted for interface compatibility).
 
         Returns
         -------
-        NMateAssignment
+        MateAssignment
         """
         if rng is None:
             rng = np.random.RandomState()
@@ -155,7 +155,7 @@ class RandomMating:
             iid=iid, fid=fid, sex=sex_pattern, generation=generation,
         )
 
-        return NMateAssignment(
+        return MateAssignment(
             offspring_samples=offspring_samples,
             maternal_idx=maternal_idx,
             paternal_idx=paternal_idx,
@@ -198,7 +198,7 @@ class LinearAssortativeMating:
 
     def mate(self, samples: SampleMeta,
              rng: np.random.RandomState | None = None,
-             phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
+             phenotypes: PhenotypeArray | None = None) -> MateAssignment:
         """Produce a mate assignment with phenotypic assortment.
 
         Falls back to random mating if ``r == 0`` or ``phenotypes`` is None.
@@ -209,12 +209,12 @@ class LinearAssortativeMating:
             Current generation's sample metadata.
         rng : np.random.RandomState, optional
             Random state for reproducibility.
-        phenotypes : NPhenotypeArray, optional
+        phenotypes : PhenotypeArray, optional
             Current phenotypes (needed for assortment scoring).
 
         Returns
         -------
-        NMateAssignment
+        MateAssignment
         """
         if rng is None:
             rng = np.random.RandomState()
@@ -306,7 +306,7 @@ class LinearAssortativeMating:
             iid=iid, fid=fid, sex=sex_pattern, generation=generation,
         )
 
-        return NMateAssignment(
+        return MateAssignment(
             offspring_samples=offspring_samples,
             maternal_idx=maternal_idx,
             paternal_idx=paternal_idx,
@@ -430,7 +430,7 @@ class GeneralAssortativeMating:
     Parameters
     ----------
     component_names : list[str]
-        Phenotype component names (keys in NPhenotypeArray) to use.
+        Phenotype component names (keys in PhenotypeArray) to use.
         Order must match the rows/columns of ``cross_corr``.
     cross_corr : np.ndarray
         (K, K) target cross-mate correlation matrix.
@@ -473,7 +473,7 @@ class GeneralAssortativeMating:
 
     def mate(self, samples: SampleMeta,
              rng: np.random.RandomState | None = None,
-             phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
+             phenotypes: PhenotypeArray | None = None) -> MateAssignment:
         """Produce a mate assignment achieving the target cross-mate correlations.
 
         Parameters
@@ -482,12 +482,12 @@ class GeneralAssortativeMating:
             Current generation's sample metadata.
         rng : np.random.RandomState, optional
             Random state for reproducibility (used only for offspring metadata).
-        phenotypes : NPhenotypeArray
+        phenotypes : PhenotypeArray
             Current phenotypes. Must contain all ``component_names``.
 
         Returns
         -------
-        NMateAssignment
+        MateAssignment
         """
         if phenotypes is None:
             raise ValueError(
@@ -550,7 +550,7 @@ class GeneralAssortativeMating:
             iid=iid, fid=fid, sex=sex_pattern, generation=generation,
         )
 
-        return NMateAssignment(
+        return MateAssignment(
             offspring_samples=offspring_samples,
             maternal_idx=maternal_idx,
             paternal_idx=paternal_idx,
@@ -589,7 +589,7 @@ class BatchedMating:
 
     def mate(self, samples: SampleMeta,
              rng: np.random.RandomState | None = None,
-             phenotypes: NPhenotypeArray | None = None) -> NMateAssignment:
+             phenotypes: PhenotypeArray | None = None) -> MateAssignment:
         if rng is None:
             rng = np.random.RandomState()
 
@@ -634,7 +634,7 @@ class BatchedMating:
             iid=iid, fid=fid, sex=sex_pattern, generation=generation,
         )
 
-        return NMateAssignment(
+        return MateAssignment(
             offspring_samples=offspring_samples,
             maternal_idx=maternal_idx,
             paternal_idx=paternal_idx,

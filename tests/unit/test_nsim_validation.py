@@ -1,5 +1,5 @@
 """
-Unit tests for NSimulation validation, callbacks, and edge cases.
+Unit tests for Simulation validation, callbacks, and edge cases.
 
 Tests:
 1. Dimension mismatch between effects and haplotypes
@@ -25,7 +25,7 @@ from xftsim.arch import (
 from xftsim.effect import AdditiveEffects
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import SampleStatistics
 from xftsim.filters import TrioFilter, SibPairFilter
 
@@ -39,7 +39,7 @@ def _make_sim(n=20, m=10, h2=0.5, seed=42, **kwargs):
     arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
     mating = RandomMating(offspring_per_pair=2)
     rmap = RecombinationMap.constant_map(m=m)
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap, architecture=arch,
         mating_regime=mating, recombination_map=rmap,
         seed=seed, **kwargs,
@@ -57,7 +57,7 @@ class TestDimensionValidation:
         arch.add('Y', AggregationComponent('Y.G + Y.E'), inputs=['Y.G', 'Y.E'])
         mating = RandomMating()
         rmap = RecombinationMap.constant_map(m=10)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mating, recombination_map=rmap,
         )
@@ -132,7 +132,7 @@ class TestRepr:
         sim = _make_sim()
         sim.run(1)
         r = repr(sim)
-        assert 'NSimulation' in r
+        assert 'Simulation' in r
         assert 'generation=0' in r
 
 

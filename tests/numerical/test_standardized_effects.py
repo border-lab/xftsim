@@ -15,7 +15,7 @@ import pytest
 from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects, SparseEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -112,7 +112,7 @@ class TestSparseEffectsNumerical:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(5)
         pheno = sim.phenotype_history[sim.generation]
         assert np.all(np.isfinite(pheno['Y']))

@@ -17,7 +17,7 @@ from xftsim.arch import (
     SiblingMeanComponent, SiblingCountComponent,
 )
 from xftsim.effect import AdditiveEffects
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
 
@@ -39,7 +39,7 @@ class TestVTWithRetention:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         arch.add('Y.VTm', MotherComponent('Y', founder_component=NoiseComponent(variance=0.1)))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42, retain_haplotypes=1, retain_phenotypes=2,
@@ -65,7 +65,7 @@ class TestVTWithSiblings:
         arch.add('Y.sib_mean', SiblingMeanComponent('Y'), inputs=['Y'])
         arch.add('Y.sib_count', SiblingCountComponent('Y'), inputs=['Y'])
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=3),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42, retain_phenotypes=2,
@@ -95,7 +95,7 @@ class TestVTVarianceBounded:
             pheno = sim.phenotype_history[sim.generation]
             variances.append(np.var(pheno['Y']))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42, callbacks=[track_var],
@@ -126,7 +126,7 @@ class TestMultiTraitVT:
         arch.add('Y1.VTm', MotherComponent('Y1', founder_component=NoiseComponent(variance=0.1)))
         arch.add('Y2.VTm', MotherComponent('Y2', founder_component=NoiseComponent(variance=0.1)))
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, RandomMating(offspring_per_pair=2),
             RecombinationMap.constant_map(m=m, p=0.5),
             seed=42, retain_phenotypes=2,

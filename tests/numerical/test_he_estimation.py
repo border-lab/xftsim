@@ -26,7 +26,7 @@ from xftsim.effect import AdditiveEffects
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.stats import (
     HasemanElstonEstimator,
     ParentOffspringRegression,
@@ -38,7 +38,7 @@ from xftsim.filters import TrioFilter, SibPairFilter
 
 def _make_sim(n=1000, m=50, h2=0.5, offspring_per_pair=2,
               statistics=None, filters=None, mating=None, seed=42):
-    """Build a simple single-trait NSimulation."""
+    """Build a simple single-trait Simulation."""
     hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=seed)
     eff = AdditiveEffects.from_h2(h2=h2, m=m, seed=seed + 1)
     arch = Architecture()
@@ -49,7 +49,7 @@ def _make_sim(n=1000, m=50, h2=0.5, offspring_per_pair=2,
     if mating is None:
         mating = RandomMating(offspring_per_pair=offspring_per_pair)
 
-    return NSimulation(
+    return Simulation(
         founder_haplotypes=hap,
         architecture=arch,
         mating_regime=mating,
@@ -307,7 +307,7 @@ class TestMatingStatsSimulation:
             component_names=['Y'], r=0.5, offspring_per_pair=2,
         )
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap,
             architecture=arch,
             mating_regime=mating,

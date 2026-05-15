@@ -9,7 +9,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from testdata import TestSimulation
 
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 from xftsim.mate import RandomMating, LinearAssortativeMating
 from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
@@ -40,7 +40,7 @@ class TestCombinedVTAssortative:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = LinearAssortativeMating(['Y'], r=0.3, offspring_per_pair=2)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -69,7 +69,7 @@ class TestCombinedVTAssortative:
         trio_filter = TrioFilter()
         stats = SampleStatistics()
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
             filters={'trio': trio_filter},
@@ -101,7 +101,7 @@ class TestCombinedVTAssortative:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -132,7 +132,7 @@ class TestCombinedVTAssortative:
         mate = LinearAssortativeMating(['Y1'], r=0.3, offspring_per_pair=2)
         stats = SampleStatistics()
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
             statistics=[stats],
@@ -168,7 +168,7 @@ class TestCombinedSiblingEffects:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=3)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )
@@ -195,7 +195,7 @@ class TestCombinedSiblingEffects:
         sib_filter = SibPairFilter()
         stats = SampleStatistics()
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
             filters={'sib': sib_filter},
@@ -233,7 +233,7 @@ class TestAllFeaturesCombined:
         def counter(sim):
             callbacks_called[0] += 1
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
             filters={'trio': trio_filter},
@@ -267,7 +267,7 @@ class TestAllFeaturesCombined:
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = LinearAssortativeMating(['Y'], r=0.3, offspring_per_pair=3)
 
-        sim = NSimulation(
+        sim = Simulation(
             hap, arch, mate, rmap, seed=42,
             retain_haplotypes=2, retain_phenotypes=3,
         )

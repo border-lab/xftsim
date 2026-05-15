@@ -18,7 +18,7 @@ from xftsim.arch import (
 )
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap
-from xftsim.sim import NSimulation
+from xftsim.sim import Simulation
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -38,7 +38,7 @@ class TestVerticalTransmissionChain:
         # No inputs= on MotherComponent — it reads from phenotype_history at runtime
         arch.add('Y.m', MotherComponent('Y'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -65,7 +65,7 @@ class TestVerticalTransmissionChain:
         arch.add('Y.m', MotherComponent('Y', founder_component=NoiseComponent(variance=0.1)))
         arch.add('Y', AggregationComponent('Y.G + Y.E + 0.3 * Y.m'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -90,7 +90,7 @@ class TestVerticalTransmissionChain:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         arch.add('Y.f', FatherComponent('Y'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -116,7 +116,7 @@ class TestVerticalTransmissionChain:
         arch.add('Y.m', MotherComponent('Y', founder_component=NoiseComponent(variance=1.0)))
         arch.add('Y', AggregationComponent('Y.G + Y.E + Y.m'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),
@@ -140,7 +140,7 @@ class TestVerticalTransmissionChain:
         arch.add('Y.m', MotherComponent('Y'))
         arch.add('Y', AggregationComponent('Y.G + Y.E + 0.3 * Y.m'))
 
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=RandomMating(offspring_per_pair=2),
             recombination_map=RecombinationMap.constant_map(m=m),

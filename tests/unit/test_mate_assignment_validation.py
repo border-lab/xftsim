@@ -1,5 +1,5 @@
 """
-Unit tests for NMateAssignment validation and edge cases.
+Unit tests for MateAssignment validation and edge cases.
 
 Tests:
 1. Valid construction
@@ -18,14 +18,14 @@ Tests:
 import numpy as np
 import pytest
 
-from xftsim.struct import SampleMeta, NPhenotypeArray
-from xftsim.mate import NMateAssignment, RandomMating, LinearAssortativeMating
+from xftsim.struct import SampleMeta, PhenotypeArray
+from xftsim.mate import MateAssignment, RandomMating, LinearAssortativeMating
 
 
 class TestNMateAssignmentValidation:
     def test_valid_construction(self):
         sm = SampleMeta(iid=np.arange(4), generation=1)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.array([0, 0, 1, 1]),
             paternal_idx=np.array([2, 2, 3, 3]),
@@ -35,7 +35,7 @@ class TestNMateAssignmentValidation:
     def test_maternal_idx_length_mismatch(self):
         sm = SampleMeta(iid=np.arange(4), generation=1)
         with pytest.raises(ValueError, match="maternal_idx length"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 0]),
                 paternal_idx=np.array([2, 2, 3, 3]),
@@ -44,7 +44,7 @@ class TestNMateAssignmentValidation:
     def test_paternal_idx_length_mismatch(self):
         sm = SampleMeta(iid=np.arange(4), generation=1)
         with pytest.raises(ValueError, match="paternal_idx length"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 0, 1, 1]),
                 paternal_idx=np.array([2, 2]),
@@ -53,7 +53,7 @@ class TestNMateAssignmentValidation:
     def test_negative_maternal_idx(self):
         sm = SampleMeta(iid=np.arange(2), generation=1)
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([-1, 0]),
                 paternal_idx=np.array([0, 1]),
@@ -62,7 +62,7 @@ class TestNMateAssignmentValidation:
     def test_negative_paternal_idx(self):
         sm = SampleMeta(iid=np.arange(2), generation=1)
         with pytest.raises(ValueError, match="negative"):
-            NMateAssignment(
+            MateAssignment(
                 offspring_samples=sm,
                 maternal_idx=np.array([0, 1]),
                 paternal_idx=np.array([0, -1]),
@@ -71,7 +71,7 @@ class TestNMateAssignmentValidation:
     def test_dtype_coercion(self):
         """int32 arrays should be coerced to int64."""
         sm = SampleMeta(iid=np.arange(2), generation=1)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.array([0, 1], dtype=np.int32),
             paternal_idx=np.array([1, 0], dtype=np.int32),
@@ -81,13 +81,13 @@ class TestNMateAssignmentValidation:
 
     def test_repr(self):
         sm = SampleMeta(iid=np.arange(4), generation=2)
-        ma = NMateAssignment(
+        ma = MateAssignment(
             offspring_samples=sm,
             maternal_idx=np.array([0, 0, 1, 1]),
             paternal_idx=np.array([2, 2, 3, 3]),
         )
         r = repr(ma)
-        assert 'NMateAssignment' in r
+        assert 'MateAssignment' in r
         assert 'n_offspring=4' in r
 
 
@@ -140,7 +140,7 @@ class TestLinearAssortativeMatingValidation:
             iid=np.arange(10),
             sex=np.tile([0, 1], 5),
         )
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['Y'] = np.arange(10, dtype=float)
 
         mating = LinearAssortativeMating(component_names=['Y'], r=0.0)
@@ -163,7 +163,7 @@ class TestLinearAssortativeMatingValidation:
             iid=np.arange(10),
             sex=np.tile([0, 1], 5),
         )
-        pheno = NPhenotypeArray(samples=sm)
+        pheno = PhenotypeArray(samples=sm)
         pheno._values['X'] = np.arange(10, dtype=float)
 
         mating = LinearAssortativeMating(component_names=['Y'], r=0.5)

@@ -128,9 +128,9 @@ class TestSparseEffectsIntegration:
         hap = TestGenomes.simple(n=50, m=100, seed=42)
 
         from xftsim.arch import ArchNode
-        from xftsim.struct import NPhenotypeArray
+        from xftsim.struct import PhenotypeArray
         node = ArchNode(outputs=['Y.G'], component=gc, inputs=[])
-        pheno = NPhenotypeArray(samples=hap.samples)
+        pheno = PhenotypeArray(samples=hap.samples)
         result = gc.compute(node, hap, pheno)
         assert result.shape == (50,)
         assert np.all(np.isfinite(result))
@@ -150,7 +150,7 @@ class TestSparseEffectsIntegration:
     def test_sparse_sim_runs(self):
         """Full simulation with SparseEffects should complete."""
         from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
-        from xftsim.sim import NSimulation
+        from xftsim.sim import Simulation
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
         from tests.testdata import TestSimulation
@@ -165,7 +165,7 @@ class TestSparseEffectsIntegration:
         hap = TestSimulation.founder_haplotypes(n=500, m=m, seed=42)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
-        sim = NSimulation(
+        sim = Simulation(
             founder_haplotypes=hap, architecture=arch,
             mating_regime=mate, recombination_map=rmap, seed=42,
         )
