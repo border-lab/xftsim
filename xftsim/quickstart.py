@@ -144,6 +144,18 @@ def summarize(sim: Simulation) -> pd.DataFrame:
             'spouse_r_pheno_2': spouse.get('pheno_2', np.nan),
             'n_mating_pairs': ms.get('n_mating_pairs', np.nan),
         })
+
+    # Gen 0's MatingStatistics row is empty because spouse correlations are
+    # computed via TrioView, which is empty at the founder generation. The
+    # gen 1 row's spouse_r values, however, are computed over the unique
+    # parent pairs of gen 1 — i.e. exactly the founder mate pairing from
+    # mate_assignments[0]. Backfill the gen 0 row from gen 1 so the table
+    # reads naturally.
+    if len(rows) >= 2 and rows[0]['generation'] == 0:
+        for trait in TRAIT_NAMES:
+            rows[0][f'spouse_r_{trait}'] = rows[1][f'spouse_r_{trait}']
+        rows[0]['n_mating_pairs'] = rows[1]['n_mating_pairs']
+
     return pd.DataFrame.from_records(rows)
 
 
