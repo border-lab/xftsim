@@ -834,12 +834,7 @@ def cov2cor(A):
     """
     with np.errstate(invalid='ignore'):
         S = np.diag(1 / np.sqrt(np.diag(A)))
-        if isinstance(A, xr.DataArray):
-            cols = A.xft.as_pd().columns
-            # there must be a better way than this...
-            output = pd.DataFrame(
-                S @ A @ S).set_index(A.index).T.set_index(A.index)
-        elif isinstance(A, pd.DataFrame):
+        if isinstance(A, pd.DataFrame):
             output = pd.DataFrame(
                 S @ A @ S).set_index(A.index).T.set_index(A.index)
         else:

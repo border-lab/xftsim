@@ -1,5 +1,5 @@
 """
-Tests covering struct.py gaps for NEW classes only.
+Tests covering struct.py gaps for the active classes.
 
 Targets uncovered lines in struct.py for:
 - SampleMeta (extra validation, unique_identifier, with_generation, repr)
@@ -8,7 +8,6 @@ Targets uncovered lines in struct.py for:
   deprecation warnings, repr, NHaplotypeArrayAccessor)
 - NPhenotypeArray (subset, repr)
 - PedigreeArray (validation, bounds checking)
-- HaplotypeArray base class (NotImplementedError paths)
 """
 import numpy as np
 import pytest
@@ -16,7 +15,7 @@ import warnings
 
 from xftsim.struct import (
     SampleMeta, VariantMeta, DenseHaplotypeArray, NPhenotypeArray,
-    PedigreeArray, HaplotypeArray, NHaplotypeArrayAccessor, NHaplotypeArray,
+    PedigreeArray, NHaplotypeArrayAccessor,
 )
 
 
@@ -324,44 +323,6 @@ class TestDenseHaplotypeArrayCoverage:
 # HaplotypeArray base class
 # ---------------------------------------------------------------------------
 
-class TestHaplotypeArrayBase:
-    def test_n_raises(self):
-        h = HaplotypeArray()
-        with pytest.raises(NotImplementedError):
-            _ = h.n
-
-    def test_m_raises(self):
-        h = HaplotypeArray()
-        with pytest.raises(NotImplementedError):
-            _ = h.m
-
-    def test_diploid_genotypes_raises(self):
-        h = HaplotypeArray()
-        with pytest.raises(NotImplementedError):
-            _ = h.diploid_genotypes
-
-    def test_af_empirical_raises(self):
-        h = HaplotypeArray()
-        with pytest.raises(NotImplementedError):
-            _ = h.af_empirical
-
-    def test_to_diploid_standardized_raises(self):
-        h = HaplotypeArray()
-        with pytest.raises(NotImplementedError):
-            h.to_diploid_standardized()
-
-    def test_standardized_matvec_raises(self):
-        """standardized_matvec delegates to to_diploid_standardized -> NotImplementedError."""
-        h = HaplotypeArray()
-        with pytest.raises(NotImplementedError):
-            h.standardized_matvec(np.ones(5))
-
-    def test_standardized_rmatvec_raises(self):
-        h = HaplotypeArray()
-        with pytest.raises(NotImplementedError):
-            h.standardized_rmatvec(np.ones(5))
-
-
 # ---------------------------------------------------------------------------
 # DenseHaplotypeArray constructor validation
 # ---------------------------------------------------------------------------
@@ -404,11 +365,6 @@ class TestDenseHaplotypeArrayValidation:
             samples=samples,
         )
         assert hap.samples.generation == 2
-
-    def test_NHaplotypeArray_alias(self):
-        """NHaplotypeArray should be an alias for DenseHaplotypeArray."""
-        assert NHaplotypeArray is DenseHaplotypeArray
-
 
 # ---------------------------------------------------------------------------
 # NPhenotypeArray
