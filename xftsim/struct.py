@@ -719,7 +719,7 @@ class DenseHaplotypeArray(HaplotypeOperator):
         copy: bool = True,
     ) -> "DenseHaplotypeArray":
         """
-        Return a new NHaplotypeArray with a subset of samples and/or variants.
+        Return a new DenseHaplotypeArray with a subset of samples and/or variants.
 
         Parameters
         ----------
@@ -732,7 +732,7 @@ class DenseHaplotypeArray(HaplotypeOperator):
 
         Returns
         -------
-        NHaplotypeArray
+        DenseHaplotypeArray
             Subsetted haplotype array.
         """
         if sample_idx is None:
@@ -765,7 +765,7 @@ class DenseHaplotypeArray(HaplotypeOperator):
 
         Returns
         -------
-        NHaplotypeArray
+        DenseHaplotypeArray
             Subsetted haplotype array.
         """
         if isinstance(key, tuple):
@@ -795,7 +795,7 @@ class DenseHaplotypeArray(HaplotypeOperator):
 
         Returns
         -------
-        NHaplotypeArray
+        DenseHaplotypeArray
             Haplotype array with specified samples/variants removed.
         """
         sample_idx = slice(None)
@@ -1404,11 +1404,6 @@ class NHaplotypeArrayAccessor:
     def to_diploid_standardized(self, af: np.ndarray = None, scale: bool = False) -> np.ndarray:
         """Return standardized diploid genotypes."""
         return self._haplotypes.to_diploid_standardized(af=af, scale=scale)
-
-
-# Backward-compatible alias
-NHaplotypeArray = DenseHaplotypeArray
-
 
 
 # ---------------------------------------------------------------------------

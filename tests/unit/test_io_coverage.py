@@ -418,7 +418,7 @@ class TestReadPlink1AsPseudohaplotypes:
             pytest.skip("pandas_plink + pyarrow incompatibility")
 
     def test_read_plink1_basic(self):
-        """Read PLINK 1 bfiles and get NHaplotypeArray."""
+        """Read PLINK 1 bfiles and get DenseHaplotypeArray."""
         from xftsim.io import read_plink1_as_pseudohaplotypes
 
         hap = read_plink1_as_pseudohaplotypes(self.PLINK_PATH)

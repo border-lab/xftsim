@@ -98,9 +98,9 @@ def genotypes_to_pseudo_haplotypes(genotypes: np.ndarray) -> np.ndarray:
 
 
 def read_plink1_as_pseudohaplotypes(path: str,
-                                    generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                    generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """
-    Reads in PLINK 1 binary genotype data and returns a NHaplotypeArray object containing pseudo-haplotypes by
+    Reads in PLINK 1 binary genotype data and returns a DenseHaplotypeArray object containing pseudo-haplotypes by
     randomly assigning haplotypes at heterozygous sites.
 
     Parameters
@@ -112,7 +112,7 @@ def read_plink1_as_pseudohaplotypes(path: str,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         Pseudo-haplotype array. The "pseudo-" prefix refers to the fact that the
         plink bfile format doesn't track phase.
 
@@ -168,7 +168,7 @@ def read_plink1_as_pseudohaplotypes(path: str,
 
     samples = xft.struct.SampleMeta(iid=iid, fid=fid, sex=sex)
 
-    return xft.struct.NHaplotypeArray(
+    return xft.struct.DenseHaplotypeArray(
         genotypes=haplotypes_3d,
         generation=generation,
         samples=samples,
@@ -177,7 +177,7 @@ def read_plink1_as_pseudohaplotypes(path: str,
 
 
 def haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
-                                  generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                  generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """Construct haplotype array from sgkit DataArray.
     Useful in conjuction with sgkit.io.vcf.vcf_to_zarr() and sgkit.load_dataset()
 
@@ -190,7 +190,7 @@ def haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         Haplotype array.
     """
     # Genotypes are already in 3D format (samples, variants, ploidy)
@@ -222,7 +222,7 @@ def haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
         one_allele=one_allele,
     )
 
-    return xft.struct.NHaplotypeArray(
+    return xft.struct.DenseHaplotypeArray(
         genotypes=genotypes,
         generation=generation,
         samples=samples,
@@ -230,14 +230,14 @@ def haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
     )
 
 
-def save_haplotypes_npz(haplotypes: xft.struct.NHaplotypeArray,
+def save_haplotypes_npz(haplotypes: xft.struct.DenseHaplotypeArray,
                         path: str) -> None:
     """
-    Save NHaplotypeArray to compressed numpy format.
+    Save DenseHaplotypeArray to compressed numpy format.
 
     Parameters
     ----------
-    haplotypes : xft.struct.NHaplotypeArray
+    haplotypes : xft.struct.DenseHaplotypeArray
         The haplotype data to save.
     path : str
         The path to save to (will add .npz extension if not present).
@@ -270,9 +270,9 @@ def save_haplotypes_npz(haplotypes: xft.struct.NHaplotypeArray,
     np.savez_compressed(path, **save_dict)
 
 
-def load_haplotypes_npz(path: str) -> xft.struct.NHaplotypeArray:
+def load_haplotypes_npz(path: str) -> xft.struct.DenseHaplotypeArray:
     """
-    Load NHaplotypeArray from compressed numpy format.
+    Load DenseHaplotypeArray from compressed numpy format.
 
     Parameters
     ----------
@@ -281,7 +281,7 @@ def load_haplotypes_npz(path: str) -> xft.struct.NHaplotypeArray:
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         The loaded haplotype array.
     """
     data = np.load(path, allow_pickle=True)

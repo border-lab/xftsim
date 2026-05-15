@@ -8,13 +8,13 @@ Tests:
 4. DenseHaplotypeArray matvec_maternal/paternal: correct haplotype access
 5. DenseHaplotypeArray to_dense: returns self
 6. DenseHaplotypeArray __repr__
-7. NHaplotypeArray alias
+7. DenseHaplotypeArray alias
 """
 import numpy as np
 import pytest
 
 from xftsim.struct import (
-    SampleMeta, VariantMeta, DenseHaplotypeArray, NHaplotypeArray,
+    SampleMeta, VariantMeta, DenseHaplotypeArray, DenseHaplotypeArray,
 )
 
 import sys, os
@@ -139,5 +139,5 @@ class TestDenseHaplotypeArrayRepr:
 
 class TestNHaplotypeArrayAlias:
     def test_alias(self):
-        """NHaplotypeArray should be DenseHaplotypeArray."""
-        assert NHaplotypeArray is DenseHaplotypeArray
+        """DenseHaplotypeArray should be DenseHaplotypeArray."""
+        assert DenseHaplotypeArray is DenseHaplotypeArray

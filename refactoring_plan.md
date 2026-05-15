@@ -1,10 +1,10 @@
 # Refactoring Plan
 
 **→ Add in SampleMeta and VariantMeta to index the new genotype array**
-- New Constructor that is NHaplotypeArray(genotypes, generation, samples, variants)
+- New Constructor that is DenseHaplotypeArray(genotypes, generation, samples, variants)
 
 ## Founders.py
-- All functions include new version of NHaplotypeArray
+- All functions include new version of DenseHaplotypeArray
 
 ## io.py
 - read_plink() as pseudohaplotypes()
@@ -14,7 +14,7 @@
 - RecombinationMap.from_haplotypes() [adjust return values]
 - Meiosis.reproduce()
 - → Create offspring_samples of type SampleMeta
-- Return new NHaplotypeArray()
+- Return new DenseHaplotypeArray()
 
 ## Sim.py
 ```python

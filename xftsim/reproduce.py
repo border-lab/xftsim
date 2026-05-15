@@ -89,14 +89,14 @@ class RecombinationMap:
         return RecombinationMap(p=p, m=m)
 
     @staticmethod
-    def from_haplotypes(haplotypes: xft.struct.NHaplotypeArray,
+    def from_haplotypes(haplotypes: xft.struct.DenseHaplotypeArray,
                         p: float = 0.5) -> "RecombinationMap":
         """
         Create a constant recombination map from haplotypes.
 
         Parameters
         ----------
-        haplotypes : NHaplotypeArray
+        haplotypes : DenseHaplotypeArray
             Haplotypes data.
         p : float, optional
             Probability, default is 0.5.
@@ -190,7 +190,7 @@ def _meiosis_3d(parental_genotypes,
     return offspring_genotypes
 
 
-def meiosis(parental_haplotypes: xft.struct.NHaplotypeArray,
+def meiosis(parental_haplotypes: xft.struct.DenseHaplotypeArray,
             recombination_map: RecombinationMap,
             maternal_inds: NDArray[Shape["*"], Int64],
             paternal_inds: NDArray[Shape["*"], Int64],
@@ -200,7 +200,7 @@ def meiosis(parental_haplotypes: xft.struct.NHaplotypeArray,
 
     Parameters
     ----------
-    parental_haplotypes : NHaplotypeArray
+    parental_haplotypes : DenseHaplotypeArray
         Parental haplotype data.
     recombination_map : RecombinationMap
         Recombination probabilities.

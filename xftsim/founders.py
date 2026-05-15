@@ -19,7 +19,7 @@ import xftsim as xft
 def founder_haplotypes_from_AFs(n: int,
                                 afs: Iterable,
                                 diploid: bool = True,
-                                generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """
     Generate founder haplotypes from specified allele frequencies.
 
@@ -36,7 +36,7 @@ def founder_haplotypes_from_AFs(n: int,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         An object representing a set of haplotypes generated from the given allele frequencies.
     """
     afs = np.asarray(afs).ravel()
@@ -58,7 +58,7 @@ def founder_haplotypes_from_AFs(n: int,
     vid = np.arange(m, dtype=np.int64)
     variants = xft.struct.VariantMeta(vid=vid, af=afs)
 
-    return xft.struct.NHaplotypeArray(
+    return xft.struct.DenseHaplotypeArray(
         genotypes=genotypes,
         generation=generation,
         samples=samples,
@@ -69,7 +69,7 @@ def founder_haplotypes_from_AFs(n: int,
 def founder_haplotypes_uniform_AFs(n: int,
                                    m: int,
                                    minMAF: float = .1,
-                                   generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                   generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """
     Generate founder haplotypes from uniform-distributed allele frequencies.
 
@@ -86,7 +86,7 @@ def founder_haplotypes_uniform_AFs(n: int,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         An object representing a set of haplotypes generated with uniform allele frequencies.
     """
     afs = np.random.uniform(minMAF, 1 - minMAF, m)
@@ -97,7 +97,7 @@ def founder_haplotypes_uniform_AFs(n: int,
 
 
 def founder_haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
-                                          generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                          generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """Construct founder haplotypes array from sgkit DataArray.
     Useful in conjuction with sgkit.io.vcf.vcf_to_zarr() and sgkit.load_dataset()
 
@@ -110,16 +110,16 @@ def founder_haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         Array of founder haplotypes.
     """
     return xft.io.haplotypes_from_sgkit_dataset(gdat, generation=generation)
 
 
 def founder_haplotypes_from_plink_bfile(path: str,
-                                        generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                        generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """
-    Reads in PLINK 1 binary genotype data and returns a NHaplotypeArray object containing pseudo-haplotypes by
+    Reads in PLINK 1 binary genotype data and returns a DenseHaplotypeArray object containing pseudo-haplotypes by
     randomly assigning haplotypes at heterozygous sites.
 
     Parameters
@@ -131,7 +131,7 @@ def founder_haplotypes_from_plink_bfile(path: str,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         Founder Pseudo-haplotype array. The "pseudo-" prefix refers to the fact that the
         plink bfile format doesn't track phase.
     """
