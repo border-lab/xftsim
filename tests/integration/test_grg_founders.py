@@ -1,37 +1,61 @@
-"""Integration tests: Generate data with MSPrime and load it into a GRG operator"""
-import xftsim as xft
+"""Integration tests: msprime coalescent simulation into a GRG-backed founder operator."""
+import numpy as np
+import pytest
+
+pygrgl = pytest.importorskip("pygrgl")
+pytest.importorskip("msprime")
+
 from xftsim.founders import founder_haplotypes_from_msprime_grg
+from xftsim.struct import GraphHaplotypeOperator
 
 
-def test_msprime_founder_generation():
-    print("Starting Test: msprime founder generation to GRG...")
+N_INDIVIDUALS = 10
+SEQ_LEN = 100_000
+MUTATION_RATE = 1e-7
+RECOMBINATION_RATE = 1e-8
 
-    n_individuals = 10
-    seq_len = 100_000  # 100kb
 
-    operator = founder_haplotypes_from_msprime_grg(
-        n=n_individuals,
-        sequence_length=seq_len,
-        mutation_rate=1e-7,
-        recombination_rate=1e-8,
+@pytest.fixture(scope="module")
+def msprime_operator():
+    """Build a GRG founder operator once and share across tests in this module."""
+    return founder_haplotypes_from_msprime_grg(
+        n=N_INDIVIDUALS,
+        sequence_length=SEQ_LEN,
+        mutation_rate=MUTATION_RATE,
+        recombination_rate=RECOMBINATION_RATE,
     )
 
-    print("Checking results...")
 
-    assert operator.samples.n == n_individuals, f"Expected {n_individuals} samples, got {operator.samples.n}"
-    assert len(operator.samples.iid) == n_individuals
+class TestMsprimeGRGFounders:
+    def test_returns_graph_operator(self, msprime_operator):
+        """Founder generation should return a GraphHaplotypeOperator."""
+        assert isinstance(msprime_operator, GraphHaplotypeOperator)
 
-    num_variants = operator.variants.m
-    print(f"Generated {num_variants} variants.")
-    assert num_variants > 0, "Simulation generated 0 variants. Check mutation rate."
-    assert len(operator.variants.pos_bp) == num_variants
-    assert len(operator.variants.pos_cM) == num_variants
+    def test_sample_count(self, msprime_operator):
+        """SampleMeta should reflect the requested number of diploid individuals."""
+        assert msprime_operator.samples.n == N_INDIVIDUALS
+        assert len(msprime_operator.samples.iid) == N_INDIVIDUALS
 
-    assert operator._grg.num_samples == n_individuals * 2
-    assert operator._grg.num_mutations == num_variants
+    def test_grg_internal_samples(self, msprime_operator):
+        """GRG stores two haploid samples per diploid individual."""
+        assert msprime_operator._grg.num_samples == 2 * N_INDIVIDUALS
 
-    print("SUCCESS: MSPrime GRG founder generation works correctly!")
+    def test_variant_count_positive(self, msprime_operator):
+        """The requested mutation rate should produce at least one variant."""
+        assert msprime_operator.variants.m > 0
 
+    def test_variant_metadata_lengths(self, msprime_operator):
+        """GRG mutation count and variant arrays should all agree on m."""
+        m = msprime_operator.variants.m
+        assert msprime_operator._grg.num_mutations == m
+        assert len(msprime_operator.variants.pos_bp) == m
+        assert len(msprime_operator.variants.pos_cM) == m
 
-if __name__ == "__main__":
-    test_msprime_founder_generation()
+    def test_default_chrom_label(self, msprime_operator):
+        """msprime path assigns the placeholder chromosome label '1' to every variant."""
+        assert np.all(msprime_operator.variants.chrom == "1")
+
+    def test_pos_cM_scaling(self, msprime_operator):
+        """pos_cM should be pos_bp * recombination_rate * 100."""
+        expected = msprime_operator.variants.pos_bp * RECOMBINATION_RATE * 100.0
+        np.testing.assert_allclose(msprime_operator.variants.pos_cM, expected)

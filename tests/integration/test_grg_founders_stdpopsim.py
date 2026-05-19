@@ -1,41 +1,62 @@
-"""Integration tests: Generate data with stdpopsim and load it into a GRG operator"""
-import xftsim as xft
+"""Integration tests: stdpopsim demographic-model simulation into a GRG-backed founder operator."""
+import numpy as np
+import pytest
+
+pygrgl = pytest.importorskip("pygrgl")
+pytest.importorskip("msprime")
+pytest.importorskip("stdpopsim")
+
 from xftsim.founders import founder_haplotypes_from_stdpopsim_grg
+from xftsim.struct import GraphHaplotypeOperator
 
 
-def test_stdpopsim_founder_generation():
-    print("Starting Test: stdpopsim founder generation to GRG...")
+SAMPLES = {"YRI": 5, "CEU": 5, "CHB": 5}
+N_INDIVIDUALS = sum(SAMPLES.values())
+MODEL_ID = "OutOfAfrica_3G09"
+CHROMOSOME = "chr22"
+SPECIES_ID = "HomSap"
+LEFT = 0
+RIGHT = 500_000
 
-    samples = {"YRI": 5, "CEU": 5, "CHB": 5}
-    n_individuals = sum(samples.values())
 
-    operator = founder_haplotypes_from_stdpopsim_grg(
-        samples=samples,
-        model_id="OutOfAfrica_3G09",
-        chromosome="chr22",
-        species_id="HomSap",
-        left=0,
-        right=500_000,
+@pytest.fixture(scope="module")
+def stdpopsim_operator():
+    """Build a GRG founder operator from stdpopsim once and share across tests in this module."""
+    return founder_haplotypes_from_stdpopsim_grg(
+        samples=SAMPLES,
+        model_id=MODEL_ID,
+        chromosome=CHROMOSOME,
+        species_id=SPECIES_ID,
+        left=LEFT,
+        right=RIGHT,
     )
 
-    print("Checking results...")
 
-    assert operator.samples.n == n_individuals, f"Expected {n_individuals} samples, got {operator.samples.n}"
-    assert len(operator.samples.iid) == n_individuals
+class TestStdpopsimGRGFounders:
+    def test_returns_graph_operator(self, stdpopsim_operator):
+        """Founder generation should return a GraphHaplotypeOperator."""
+        assert isinstance(stdpopsim_operator, GraphHaplotypeOperator)
 
-    num_variants = operator.variants.m
-    print(f"Generated {num_variants} variants.")
-    assert num_variants > 0, "Simulation generated 0 variants. Check model/length_multiplier."
-    assert len(operator.variants.pos_bp) == num_variants
-    assert len(operator.variants.pos_cM) == num_variants
+    def test_sample_count(self, stdpopsim_operator):
+        """SampleMeta.n equals the total of all per-population sample counts."""
+        assert stdpopsim_operator.samples.n == N_INDIVIDUALS
+        assert len(stdpopsim_operator.samples.iid) == N_INDIVIDUALS
 
-    assert (operator.variants.chrom == "chr22").all(), "Variant chromosome metadata should match requested contig."
+    def test_grg_internal_samples(self, stdpopsim_operator):
+        """GRG stores two haploid samples per diploid individual."""
+        assert stdpopsim_operator._grg.num_samples == 2 * N_INDIVIDUALS
 
-    assert operator._grg.num_samples == n_individuals * 2
-    assert operator._grg.num_mutations == num_variants
+    def test_variant_count_positive(self, stdpopsim_operator):
+        """The requested window should produce at least one variant."""
+        assert stdpopsim_operator.variants.m > 0
 
-    print("SUCCESS: stdpopsim GRG founder generation works correctly!")
+    def test_variant_metadata_lengths(self, stdpopsim_operator):
+        """GRG mutation count and variant arrays should all agree on m."""
+        m = stdpopsim_operator.variants.m
+        assert stdpopsim_operator._grg.num_mutations == m
+        assert len(stdpopsim_operator.variants.pos_bp) == m
+        assert len(stdpopsim_operator.variants.pos_cM) == m
 
-
-if __name__ == "__main__":
-    test_stdpopsim_founder_generation()
+    def test_chrom_metadata_matches_request(self, stdpopsim_operator):
+        """Every variant should carry the requested chromosome label."""
+        assert np.all(stdpopsim_operator.variants.chrom == CHROMOSOME)
