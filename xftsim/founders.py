@@ -8,10 +8,6 @@ import xarray as xr
 from nptyping import NDArray, Int8, Int64, Float64, Bool, Shape, Float, Int
 from typing import Any, Hashable, List, Iterable, Callable, Union, Dict
 from functools import cached_property
-import msprime
-import tskit
-import pygrgl
-import stdpopsim
 import tempfile
 import subprocess
 from shutil import which
@@ -23,7 +19,7 @@ import xftsim as xft
 def founder_haplotypes_from_AFs(n: int,
                                 afs: Iterable,
                                 diploid: bool = True,
-                                generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """
     Generate founder haplotypes from specified allele frequencies.
 
@@ -40,7 +36,7 @@ def founder_haplotypes_from_AFs(n: int,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         An object representing a set of haplotypes generated from the given allele frequencies.
     """
     afs = np.asarray(afs).ravel()
@@ -62,7 +58,7 @@ def founder_haplotypes_from_AFs(n: int,
     vid = np.arange(m, dtype=np.int64)
     variants = xft.struct.VariantMeta(vid=vid, af=afs)
 
-    return xft.struct.NHaplotypeArray(
+    return xft.struct.DenseHaplotypeArray(
         genotypes=genotypes,
         generation=generation,
         samples=samples,
@@ -73,7 +69,7 @@ def founder_haplotypes_from_AFs(n: int,
 def founder_haplotypes_uniform_AFs(n: int,
                                    m: int,
                                    minMAF: float = .1,
-                                   generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                   generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """
     Generate founder haplotypes from uniform-distributed allele frequencies.
 
@@ -90,7 +86,7 @@ def founder_haplotypes_uniform_AFs(n: int,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         An object representing a set of haplotypes generated with uniform allele frequencies.
     """
     afs = np.random.uniform(minMAF, 1 - minMAF, m)
@@ -101,7 +97,7 @@ def founder_haplotypes_uniform_AFs(n: int,
 
 
 def founder_haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
-                                          generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                          generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """Construct founder haplotypes array from sgkit DataArray.
     Useful in conjuction with sgkit.io.vcf.vcf_to_zarr() and sgkit.load_dataset()
 
@@ -114,16 +110,16 @@ def founder_haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         Array of founder haplotypes.
     """
     return xft.io.haplotypes_from_sgkit_dataset(gdat, generation=generation)
 
 
 def founder_haplotypes_from_plink_bfile(path: str,
-                                        generation: int = 0) -> xft.struct.NHaplotypeArray:
+                                        generation: int = 0) -> xft.struct.DenseHaplotypeArray:
     """
-    Reads in PLINK 1 binary genotype data and returns a NHaplotypeArray object containing pseudo-haplotypes by
+    Reads in PLINK 1 binary genotype data and returns a DenseHaplotypeArray object containing pseudo-haplotypes by
     randomly assigning haplotypes at heterozygous sites.
 
     Parameters
@@ -135,7 +131,7 @@ def founder_haplotypes_from_plink_bfile(path: str,
 
     Returns
     -------
-    xft.struct.NHaplotypeArray
+    xft.struct.DenseHaplotypeArray
         Founder Pseudo-haplotype array. The "pseudo-" prefix refers to the fact that the
         plink bfile format doesn't track phase.
     """
@@ -192,6 +188,9 @@ def founder_haplotypes_from_msprime_grg(
     xft.struct.GraphHaplotypeOperator
         The operator containing the simulated founder graph and metadata.
     """
+    import msprime
+    import pygrgl
+
     # Step 2: Simulate Ancestry and Mutations
     ts = msprime.sim_ancestry(
         samples=n,
@@ -266,158 +265,4 @@ def founder_haplotypes_from_msprime_grg(
     # Step 5: Instantiate and Return
     return xft.struct.GraphHaplotypeOperator(
         grg=grg, generation=generation, samples=samples, variants=variants
-    )
-
-
-def founder_haplotypes_from_stdpopsim_grg(
-    samples: Dict[str, int],
-    model_id: str = "OutOfAfrica_3G09",
-    chromosome: str = "chr22",
-    species_id: str = "HomSap",
-    genetic_map: Union[str, None] = None,
-    left: Union[int, None] = None,
-    right: Union[int, None] = None,
-    mutation_rate: Union[float, None] = None,
-    engine_name: str = "msprime",
-    generation: int = 0,
-    *,
-    binary_muts: bool = False,
-    use_node_times: bool = False,
-    no_simplify: bool = False,
-    maintain_topo: bool = False,
-    ts_coals: bool = False,
-) -> xft.struct.GraphHaplotypeOperator:
-    """
-    Generate founder haplotypes from a stdpopsim demographic model and return them
-    as a GraphHaplotypeOperator.
-
-    Simulates a TreeSequence using a published stdpopsim demographic model
-    (e.g. ``HomSap`` / ``OutOfAfrica_3G09``) and converts the result to a Genotype
-    Representation Graph (GRG) via the grgl CLI.
-
-    Parameters
-    ----------
-    samples : Dict[str, int]
-        Mapping of stdpopsim population name to number of diploid individuals
-        to draw from that population (e.g. ``{"YRI": 100, "CEU": 100, "CHB": 100}``).
-        The available population names depend on the chosen demographic model.
-    model_id : str, optional
-        Identifier of the stdpopsim demographic model. Default is ``"OutOfAfrica_3G09"``.
-    chromosome : str, optional
-        Chromosome identifier passed to ``species.get_contig``. Default is ``"chr22"``.
-    species_id : str, optional
-        Species identifier used by stdpopsim. Default is ``"HomSap"`` (Homo sapiens).
-    genetic_map : str or None, optional
-        Optional stdpopsim genetic map identifier (e.g. ``"HapMapII_GRCh38"``).
-        If ``None``, the contig uses a uniform recombination rate.
-    left : int or None, optional
-        Left coordinate (in base pairs, 0-based inclusive) of a sub-region of the
-        chromosome to simulate. If ``None``, simulation starts at position 0.
-        Use together with ``right`` to shorten simulations for faster tests.
-    right : int or None, optional
-        Right coordinate (in base pairs, exclusive) of a sub-region of the
-        chromosome to simulate. If ``None``, simulation runs to the end of the
-        contig.
-    mutation_rate : float or None, optional
-        Override for the contig's mutation rate. If ``None``, defaults to the
-        demographic model's calibrated mutation rate when one is published
-        (``model.mutation_rate``); otherwise stdpopsim's species/contig default
-        is used.
-    engine_name : str, optional
-        stdpopsim simulation engine to use. Default ``"msprime"``.
-    generation : int, optional
-        Generation number for the founders. Default is 0.
-    binary_muts : bool, optional
-        Flag to pass --binary-muts to grgl.
-    use_node_times : bool, optional
-        Flag to pass --ts-node-times to grgl.
-    no_simplify : bool, optional
-        Flag to pass --no-simplify to grgl.
-    maintain_topo : bool, optional
-        Flag to pass --maintain-topo to grgl.
-    ts_coals : bool, optional
-        Flag to pass --ts-coals to grgl to calculate diploid coalescence information.
-
-    Returns
-    -------
-    xft.struct.GraphHaplotypeOperator
-        The operator containing the simulated founder graph and metadata.
-    """
-    # Step 1: Build the stdpopsim simulation specification
-    species = stdpopsim.get_species(species_id)
-    model = species.get_demographic_model(model_id)
-
-    if mutation_rate is None:
-        mutation_rate = getattr(model, "mutation_rate", None)
-
-    contig_kwargs = {}
-    if genetic_map is not None:
-        contig_kwargs["genetic_map"] = genetic_map
-    if mutation_rate is not None:
-        contig_kwargs["mutation_rate"] = mutation_rate
-    if left is not None:
-        contig_kwargs["left"] = left
-    if right is not None:
-        contig_kwargs["right"] = right
-    contig = species.get_contig(chromosome, **contig_kwargs)
-
-    # Step 2: Simulate a TreeSequence with the chosen engine
-    engine = stdpopsim.get_engine(engine_name)
-    ts = engine.simulate(model, contig, samples)
-
-    # Step 3: Convert TreeSequence to GRG (no VCF middleman)
-    with tempfile.TemporaryDirectory() as tmpdir:
-        trees_path = os.path.join(tmpdir, "founders.trees")
-        grg_path = os.path.join(tmpdir, "founders.grg")
-
-        ts.dump(trees_path)
-
-        grg_bin = which("grg")
-        if grg_bin is None:
-            raise RuntimeError(
-                "Could not find 'grg' on PATH. "
-                "Make sure pygrgl is installed and the environment is activated."
-            )
-
-        cmd = [grg_bin, "convert", trees_path, grg_path]
-        if binary_muts:
-            cmd.append("--binary-muts")
-        if use_node_times:
-            cmd.append("--ts-node-times")
-        if no_simplify:
-            cmd.append("--no-simplify")
-        if maintain_topo:
-            cmd.append("--maintain-topo")
-        if ts_coals:
-            cmd.append("--ts-coals")
-
-        subprocess.check_call(cmd)
-
-        grg = pygrgl.load_immutable_grg(grg_path)
-
-    # Step 4: Extract and Build Metadata
-    iids = np.array([f"ind_{i}" for i in range(ts.num_individuals)], dtype=str)
-    samples_meta = xft.struct.SampleMeta(iid=iids, generation=generation)
-
-    num_grg_muts = grg.num_mutations
-    vids = np.arange(num_grg_muts, dtype=int)
-    chroms = np.repeat(str(chromosome), num_grg_muts)
-    pos_bp = np.arange(num_grg_muts, dtype=int)
-    rec_rate = float(contig.recombination_map.mean_rate)
-    pos_cM = pos_bp * rec_rate * 100.0
-    zero_allele = np.repeat("0", num_grg_muts)
-    one_allele = np.repeat("1", num_grg_muts)
-
-    variants = xft.struct.VariantMeta(
-        vid=vids,
-        chrom=chroms,
-        pos_bp=pos_bp,
-        pos_cM=pos_cM,
-        zero_allele=zero_allele,
-        one_allele=one_allele,
-    )
-
-    # Step 5: Instantiate and Return
-    return xft.struct.GraphHaplotypeOperator(
-        grg=grg, generation=generation, samples=samples_meta, variants=variants
     )
