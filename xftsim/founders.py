@@ -345,6 +345,17 @@ def founder_haplotypes_from_stdpopsim_grg(
     -------
     xft.struct.GraphHaplotypeOperator
         The operator containing the simulated founder graph and metadata.
+
+    Notes
+    -----
+    Sample IIDs are prefixed with the stdpopsim population name (e.g.
+    ``"YRI_0"``, ``"YRI_1"``, ...). The full per-individual population label
+    is also stored on ``samples.extra["population"]`` so it can be used as a
+    grouping variable by :class:`xftsim.arch.GroupingComponent`.
+
+    Variant positions and alleles are read directly from the GRG; ``pos_cM``
+    is computed by integrating the contig's recombination map. ``vid`` is
+    formatted as ``"{chromosome}:{pos_bp}:{ref}:{alt}"``.
     """
     # Step 1: Build the stdpopsim simulation specification
     species = stdpopsim.get_species(species_id)
@@ -398,29 +409,57 @@ def founder_haplotypes_from_stdpopsim_grg(
 
         grg = pygrgl.load_immutable_grg(grg_path)
 
-    # Step 4: Extract and Build Metadata
-    iids = np.array([f"ind_{i}" for i in range(ts.num_individuals)], dtype=str)
-    samples_meta = xft.struct.SampleMeta(iid=iids, generation=generation)
+    # Step 4: Build sample metadata (population labels + prefixed iids)
+    pop_names = np.array(
+        [ts.population(ind.population).metadata["name"] for ind in ts.individuals()],
+        dtype=object,
+    )
+    iids = np.empty(ts.num_individuals, dtype=object)
+    pop_counter: Dict[str, int] = {}
+    for i, pop in enumerate(pop_names):
+        j = pop_counter.get(pop, 0)
+        iids[i] = f"{pop}_{j}"
+        pop_counter[pop] = j + 1
+    iids = iids.astype(str)
 
+    samples_meta = xft.struct.SampleMeta(
+        iid=iids,
+        generation=generation,
+        extra={"population": pop_names},
+    )
+
+    # Step 5: Build variant metadata (real positions, alleles, cumulative cM)
     num_grg_muts = grg.num_mutations
-    vids = np.arange(num_grg_muts, dtype=int)
+    pos_bp = np.empty(num_grg_muts, dtype=np.int64)
+    ref_alleles = np.empty(num_grg_muts, dtype=object)
+    alt_alleles = np.empty(num_grg_muts, dtype=object)
+    for i in range(num_grg_muts):
+        mut = grg.get_mutation_by_id(i)
+        pos_bp[i] = int(mut.position)
+        ref_alleles[i] = str(mut.ref_allele)
+        alt_alleles[i] = str(mut.allele)
+
     chroms = np.repeat(str(chromosome), num_grg_muts)
-    pos_bp = np.arange(num_grg_muts, dtype=int)
-    rec_rate = float(contig.recombination_map.mean_rate)
-    pos_cM = pos_bp * rec_rate * 100.0
-    zero_allele = np.repeat("0", num_grg_muts)
-    one_allele = np.repeat("1", num_grg_muts)
+    vids = np.array(
+        [f"{chromosome}:{p}:{r}:{a}"
+         for p, r, a in zip(pos_bp, ref_alleles, alt_alleles)],
+        dtype=str,
+    )
+    pos_cM = np.asarray(
+        contig.recombination_map.get_cumulative_mass(pos_bp),
+        dtype=np.float64,
+    ) * 100.0
 
     variants = xft.struct.VariantMeta(
         vid=vids,
         chrom=chroms,
         pos_bp=pos_bp,
         pos_cM=pos_cM,
-        zero_allele=zero_allele,
-        one_allele=one_allele,
+        zero_allele=ref_alleles,
+        one_allele=alt_alleles,
     )
 
-    # Step 5: Instantiate and Return
+    # Step 6: Instantiate and Return
     return xft.struct.GraphHaplotypeOperator(
-        grg=grg, generation=generation, samples=samples_meta, variants=variants
+        grg=grg, generation=generation, samples=samples_meta, variants=variants,
     )

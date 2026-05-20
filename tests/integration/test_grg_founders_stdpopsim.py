@@ -1,4 +1,6 @@
 """Integration tests: stdpopsim demographic-model simulation into a GRG-backed founder operator."""
+from collections import Counter
+
 import numpy as np
 import pytest
 
@@ -60,3 +62,50 @@ class TestStdpopsimGRGFounders:
     def test_chrom_metadata_matches_request(self, stdpopsim_operator):
         """Every variant should carry the requested chromosome label."""
         assert np.all(stdpopsim_operator.variants.chrom == CHROMOSOME)
+
+    def test_iid_prefixed_with_population(self, stdpopsim_operator):
+        """Every iid should start with one of the requested population names."""
+        pops = set(SAMPLES.keys())
+        for iid in stdpopsim_operator.samples.iid:
+            prefix = str(iid).split("_", 1)[0]
+            assert prefix in pops, f"iid {iid!r} has unknown population prefix"
+
+    def test_population_extra_present(self, stdpopsim_operator):
+        """SampleMeta.extra should carry a per-individual population label."""
+        extra = stdpopsim_operator.samples.extra
+        assert "population" in extra
+        assert len(extra["population"]) == N_INDIVIDUALS
+
+    def test_population_counts_match_request(self, stdpopsim_operator):
+        """Per-population sample counts in extra should match the input dict."""
+        pops = stdpopsim_operator.samples.extra["population"]
+        assert Counter(map(str, pops)) == SAMPLES
+
+    def test_pos_bp_monotonic(self, stdpopsim_operator):
+        """Variant positions should be non-decreasing (sites sorted by position)."""
+        pos_bp = stdpopsim_operator.variants.pos_bp
+        assert np.all(np.diff(pos_bp) >= 0)
+
+    def test_pos_bp_in_window(self, stdpopsim_operator):
+        """All variant positions should fall inside the requested [LEFT, RIGHT) window."""
+        pos_bp = stdpopsim_operator.variants.pos_bp
+        assert np.all((pos_bp >= LEFT) & (pos_bp < RIGHT))
+
+    def test_pos_cM_monotonic(self, stdpopsim_operator):
+        """Cumulative cM should be non-decreasing."""
+        pos_cM = stdpopsim_operator.variants.pos_cM
+        assert np.all(np.diff(pos_cM) >= 0)
+
+    def test_alleles_not_placeholder(self, stdpopsim_operator):
+        """Ref/alt alleles should be real strings, not the old '0'/'1' placeholders."""
+        z = stdpopsim_operator.variants.zero_allele
+        o = stdpopsim_operator.variants.one_allele
+        assert not np.all(z == "0")
+        assert not np.all(o == "1")
+
+    def test_vid_structured(self, stdpopsim_operator):
+        """vid format should be '{chrom}:{pos}:{ref}:{alt}'."""
+        vid0 = str(stdpopsim_operator.variants.vid[0])
+        parts = vid0.split(":")
+        assert len(parts) >= 4
+        assert parts[0] == CHROMOSOME
