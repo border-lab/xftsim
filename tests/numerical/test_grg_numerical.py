@@ -103,9 +103,9 @@ class TestGRGMultiGen:
         # Mean AF should not change drastically in one generation
         assert abs(af_0.mean() - af_1.mean()) < 0.1
 
-    def test_gen1_is_dense(self):
-        """After meiosis, haplotypes should be dense."""
+    def test_gen1_is_graph(self):
+        """After GRG-native meiosis, haplotypes stay as a GraphHaplotypeOperator."""
         grg_op = TestGRG.small_grg()
         sim, _ = _make_grg_sim(grg_op)
         sim.run(2)
-        assert isinstance(sim.haplotype_history[1], DenseHaplotypeArray)
+        assert isinstance(sim.haplotype_history[1], GraphHaplotypeOperator)

@@ -9,6 +9,124 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ## [Unreleased]
 
+### Added
+
+- **GRG-native meiosis via the bubble-insertion (node-insertion) algorithm**:
+  `GraphHaplotypeOperator.meiosis()` now performs recombination directly on
+  the GRG instead of materializing to dense and delegating to the numba
+  `_meiosis_3d` kernel. Previously every generation rebuilt the full
+  `(n, m, 2)` int8 matrix from the GRG, defeating the memory savings of
+  holding a GRG-backed founder set. The new path adds offspring sample
+  nodes via `pygrgl.MutableGRG.make_node`, adds bubble nodes when a
+  query interval requires only a subset of an ancestor's mutations, then
+  calls `set_samples` + `sort_mutations` to promote offspring and demote
+  parents. Returns a new `GraphHaplotypeOperator` wrapping the same
+  (mutated) GRG. The parent operator's view is stale after meiosis by
+  design — matches forward-time semantics.
+
+  Implementation in new module `xftsim/grg_recombination.py`:
+  `NonDuplicationRecombination` class plus a `_phase_to_segments` helper
+  that bridges xftsim's per-locus Bernoulli `RecombinationMap` to the
+  algorithm's bp-space segment input. Per-locus phase sampling delegates
+  to `xftsim.reproduce._meiosis_i`, preserving the existing dense-meiosis
+  distribution (chromosome boundaries forced to p=0.5, per-locus
+  probabilities respected). Algorithm follows the recombination spec's
+  Node Insertion approach: at each ancestor of a parent haplotype the
+  query interval's mutations are either direct-attached, bubbled into a
+  new node, or pruned per the standard decision matrix.
+
+  GRG positions for segment construction come from `pygrgl` directly
+  (`grg.get_mutation_by_id(i).position`) rather than `variants.pos_bp`,
+  because some founder helpers (e.g.
+  `founder_haplotypes_from_msprime_grg`) overwrite `pos_bp` with
+  `np.arange(m)` as a sequential-index placeholder. Using GRG-internal
+  positions keeps the segment intervals aligned with how the algorithm
+  filters mutations.
+
+  Includes a `debug_mode` class attribute that, when set to `True`, dumps
+  a per-visit decision trace to stdout for each `recombine_multi` call
+  (which decision branch fired at each node, what bubble was created,
+  what was pruned). Useful for diagnosing the algorithm's behavior on
+  specific topologies; off by default.
+
+- **`tests/unit/test_grg.py::TestMeiosis::test_grg_dense_phase_equivalence`**:
+  Deterministic equivalence test for the new GRG meiosis path. The dense
+  kernel (`_meiosis_3d`) and the GRG path can't be seeded against each
+  other directly — the dense kernel calls `_meiosis_i` inside a
+  `numba.prange`, whose per-thread RNG state isn't reachable from Python.
+  This test sidesteps that by pre-sampling phase vectors outside both
+  paths via `monkeypatch.setattr(xftsim.reproduce, "_meiosis_i", ...)`,
+  running GRG meiosis with the patched queue, and checking the offspring
+  genotypes cell-by-cell against a reference computed by directly
+  indexing parent genotypes with the same phases.
+
+### Changed
+
+- **All four GRG loaders switched from `pygrgl.load_immutable_grg` to
+  `pygrgl.load_mutable_grg`** ([io.py:336](xftsim/io.py),
+  [io.py:673](xftsim/io.py),
+  [founders.py:240](xftsim/founders.py),
+  [founders.py:410](xftsim/founders.py)).
+  `GraphHaplotypeOperator.meiosis()` requires a mutable GRG (calls
+  `make_node` / `connect` / `set_samples`); immutable GRGs cannot host
+  the recombination algorithm. Mutable GRGs expose the full immutable
+  read API.
+
+- **`GraphHaplotypeOperator.meiosis()` return type**: now returns
+  `GraphHaplotypeOperator` (wrapping the in-place-mutated GRG) instead of
+  `DenseHaplotypeArray`. Consumers that previously relied on the
+  dense-after-meiosis behavior should call `offspring.to_dense()`
+  explicitly. Three tests updated to reflect the new type:
+  - `test_grg.py::test_meiosis_returns_dense` → `test_meiosis_returns_graph`
+  - `test_grg_numerical.py::test_gen1_is_dense` → `test_gen1_is_graph`
+  - `test_grg_sim.py::test_multi_gen_uses_dense_after_meiosis` →
+    `test_multi_gen_stays_graph_after_meiosis`
+  Two other tests (`test_meiosis_offspring_count`,
+  `test_offspring_alleles_from_parents`) gained a `.to_dense()` call
+  before accessing `.genotypes` (an attribute that only exists on
+  `DenseHaplotypeArray`).
+
+### Known issues
+
+- **pygrgl `matmul` DOWN and `save_grg` produce wrong results when
+  `nodes_are_ordered=False`**, which the recombination algorithm
+  produces because it adds bubble nodes via `make_node()` (which
+  defaults to `force_ordered=False`). pygrgl's matmul docstring states
+  that nodes-are-ordered=True allows iterating NodeIDs as a substitute
+  for graph traversal; with the property violated, matmul DOWN returns
+  0 for samples that should carry mutations (sometimes also inflated
+  counts like 13). `save_grg` separately drops mutation-carrying root
+  nodes whose IDs sit above the topological-order range, silently
+  losing those mutations on reload. Confirmed via direct comparison of
+  `pygrgl.matmul` DOWN output against `get_down_edges` reachability
+  walks: edges, mutations, and sample status are all internally
+  consistent in the post-meiosis GRG; only `matmul` and `save_grg`
+  disagree with the live edge list.
+
+  `GraphHaplotypeOperator.meiosis()` includes a partial workaround: the
+  returned operator carries a `_grg_dirty` flag, and the first DOWN-matmul
+  call (`matvec`, `matvec_maternal`, `matvec_paternal`, `to_dense`,
+  or transitively `standardized_matvec`) triggers `_ensure_fresh_grg()`,
+  which saves the GRG to a temp file and reloads it, restoring
+  `nodes_are_ordered=True`. This fixes the case where the algorithm only
+  direct-attaches offspring to parent sample nodes (no bubbles created —
+  trivially correct allele-frequency, AF-stable across generations,
+  binary dense output). It does **not** fix the case where the algorithm
+  creates bubble nodes (any non-trivial crossover), because save+reload
+  drops the bubble nodes during serialization, losing their mutations
+  on the offspring side.
+
+  Until the custom pygrgl exposes a `sort_nodes()` (analogous to
+  `sort_mutations()`) or fixes matmul/save to traverse the live edge
+  list when `nodes_are_ordered=False`, GRG-native meiosis is correct
+  in terms of the GRG topology it produces (verified via
+  `verify_offspring_mutations`-style up-walks and via a `compute_post_recomb_anc_counts`
+  cardinality multitree check — both pass) but downstream phenotype
+  computation that flows through `matmul` DOWN can drop mutations
+  carried by bubble nodes. Affects multi-segment offspring (any
+  realistic recombination rate); affects roughly 0.5–2% of cells on a
+  10-individual / 300-variant test depending on phase density.
+
 ### Fixed
 
 - **save_architecture silently dropping unsupported component parameters**:
@@ -99,8 +217,39 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   falls back to the demographic model's calibrated rate
   (`model.mutation_rate`) when available, avoiding stdpopsim's
   contig-vs-model rate-mismatch warning.
-- **tests/integration/test_grg_founders_stdpopsim.py**: Integration test for
-  the new stdpopsim-based founder helper, mirroring `test_grg_founders.py`.
+
+  The returned `GraphHaplotypeOperator` carries real metadata on both axes.
+  Per-variant `pos_bp` and ref/alt alleles are read directly from the GRG
+  mutations (mirroring the `_extract_variant_meta_from_grg` pattern); per-variant
+  `pos_cM` is the cumulative recombination distance integrated from the contig's
+  recombination map (`contig.recombination_map.get_cumulative_mass(pos_bp) * 100`),
+  so it is correct for non-uniform maps such as `genetic_map="HapMapII_GRCh38"`
+  instead of the linear `pos_bp * mean_rate * 100` approximation. `vid` is
+  formatted as `"{chrom}:{pos_bp}:{ref}:{alt}"` (PLINK-style). Per-individual
+  population labels are read from the stdpopsim TreeSequence
+  (`ts.population(ind.population).metadata["name"]`) and surfaced two ways:
+  sample IIDs are prefixed with the population name (`"YRI_0"`, `"CEU_3"`,
+  `"CHB_4"`), and the full per-individual label is stored on
+  `samples.extra["population"]`, where it is automatically consumed by
+  `GroupingComponent.get_grouping_variable` for per-ancestry phenotype grouping
+  without further plumbing. The `extra` dict is preserved through
+  `SampleMeta.subset`, `with_generation`, and meiosis, so labels survive
+  multi-generation simulations.
+- **tests/integration/test_grg_founders.py and test_grg_founders_stdpopsim.py**:
+  Integration tests for the two GRG founder helpers (msprime and stdpopsim
+  paths). Both files were brought into line with the repo's integration-test
+  conventions: module-level `pytest.importorskip` guards for `pygrgl` /
+  `msprime` / `stdpopsim` so the file skips cleanly when those deps are
+  unavailable, a module-scoped operator fixture so the expensive `grg convert`
+  step runs once per file (~3-4s instead of per-test), and a `TestX` class
+  grouping focused single-behavior tests with one-line docstrings (no `print`
+  statements, no `__main__` block). The stdpopsim file's assertions cover the
+  full metadata surface: type, sample/variant counts, GRG-internal sample count
+  (`2 * n`), GRG-vs-`VariantMeta` mutation-count agreement, population labels
+  in iid prefix and `extra` dict (with per-population counts matching the input
+  `SAMPLES` dict), `pos_bp` monotonic and confined to `[left, right)`, `pos_cM`
+  monotonic, ref/alt alleles populated with real nucleotides (not `"0"`/`"1"`),
+  and structured `vid` format. 21 tests total (7 msprime + 14 stdpopsim).
 - **setup.py**: Added `msprime`, `tskit`, and `stdpopsim` to the `grg`
   extras_require alongside `pygrgl`. These are imported directly at the top
   of `xftsim/founders.py` for the GRG-based founder helpers and were

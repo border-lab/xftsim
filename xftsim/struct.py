@@ -1050,6 +1050,13 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         self._grg = grg
         self._generation = generation
         self._cached_af = None
+        # When meiosis mutates the GRG, pygrgl.matmul DOWN starts returning
+        # inflated values because of stale per-node "was-a-sample" flags
+        # (see meiosis() docstring). Saving + reloading the GRG regenerates
+        # those flags correctly. We defer the reload until the first
+        # DOWN-matmul call rather than running it at end-of-meiosis -- if
+        # no DOWN matmul ever runs, no reload cost is paid.
+        self._grg_dirty = False
 
         # --- Samples ---
         if samples is None:
@@ -1097,11 +1104,39 @@ class GraphHaplotypeOperator(HaplotypeOperator):
     def generation(self, value: int):
         self._generation = value
 
+    # --- matmul-staleness workaround --------------------------------------
+    # pygrgl.matmul with TraversalDirection.DOWN reads a per-node
+    # "is-sample" flag that gets baked in at GRG load time. After
+    # set_samples (called inside meiosis()) the flag is stale on every
+    # node that was a sample at load time but no longer is. The simplest
+    # robust fix from outside pygrgl is to save and reload the GRG --
+    # the load path regenerates the flag from the current sample list.
+    # Mutation IDs and positions are preserved across save+reload (only
+    # node IDs renumber), so self.variants stays valid.
+
+    def _ensure_fresh_grg(self):
+        """If the GRG has been mutated since the last reload, save it,
+        reload it, and swap ``self._grg`` to the reloaded copy. No-op
+        otherwise. Call this at the top of any method that invokes
+        ``pygrgl.matmul`` with ``TraversalDirection.DOWN``."""
+        if not self._grg_dirty:
+            return
+        import os
+        import tempfile
+        import pygrgl
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "reload.grg")
+            pygrgl.save_grg(self._grg, path)
+            self._grg = pygrgl.load_mutable_grg(path)
+        self._cached_af = None  # stale: depended on old GRG topology
+        self._grg_dirty = False
+
     # --- matrix-vector operations ---
 
     def matvec(self, v: np.ndarray) -> np.ndarray:
         """Diploid G @ v via GRG DOWN traversal (by_individual=True)."""
         import pygrgl
+        self._ensure_fresh_grg()
         v = np.asarray(v, dtype=np.float64)
         inp = np.atleast_2d(v.T)  # (K, m)
         out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalDirection.DOWN,
@@ -1126,6 +1161,7 @@ class GraphHaplotypeOperator(HaplotypeOperator):
     def matvec_maternal(self, v: np.ndarray) -> np.ndarray:
         """Maternal haplotype matvec via GRG DOWN haploid, even indices."""
         import pygrgl
+        self._ensure_fresh_grg()
         v = np.asarray(v, dtype=np.float64)
         inp = np.atleast_2d(v.T)  # (K, m)
         out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalDirection.DOWN,
@@ -1139,6 +1175,7 @@ class GraphHaplotypeOperator(HaplotypeOperator):
     def matvec_paternal(self, v: np.ndarray) -> np.ndarray:
         """Paternal haplotype matvec via GRG DOWN haploid, odd indices."""
         import pygrgl
+        self._ensure_fresh_grg()
         v = np.asarray(v, dtype=np.float64)
         inp = np.atleast_2d(v.T)  # (K, m)
         out = pygrgl.matmul(self._grg, inp, pygrgl.TraversalDirection.DOWN,
@@ -1182,6 +1219,7 @@ class GraphHaplotypeOperator(HaplotypeOperator):
     def to_dense(self) -> DenseHaplotypeArray:
         """Materialize full genotype matrix via identity matvec."""
         import pygrgl
+        self._ensure_fresh_grg()
         eye = np.eye(self.m, dtype=np.float64)  # (m, m)
         # DOWN haploid: (m, m) -> (m, 2n)
         haploid = pygrgl.matmul(self._grg, eye, pygrgl.TraversalDirection.DOWN,
@@ -1286,12 +1324,20 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         recomb._pending_sample_removals.clear()
         self._grg.sort_mutations()
 
-        return GraphHaplotypeOperator(
+        # The GRG is now in a state where pygrgl.matmul DOWN returns inflated
+        # values (every node that was a sample at load time still acts like
+        # one inside matmul DOWN's traversal, even after set_samples demotes
+        # it). UP-direction ops are unaffected. We flag the returned operator
+        # dirty; the first DOWN-matmul call will trigger a lazy save+reload
+        # that regenerates the per-node sample flags correctly.
+        offspring_op = GraphHaplotypeOperator(
             grg=self._grg,
             generation=assignment.offspring_samples.generation,
             samples=assignment.offspring_samples,
             variants=self.variants,
         )
+        offspring_op._grg_dirty = True
+        return offspring_op
 
     def __getitem__(self, key) -> DenseHaplotypeArray:
         """Materialize to dense and subset."""

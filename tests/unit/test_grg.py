@@ -205,7 +205,7 @@ class TestMeiosis:
         samples = SampleMeta(iid=tiny.samples.iid, sex=sex)
         return GraphHaplotypeOperator(tiny._grg, samples=samples)
 
-    def test_meiosis_returns_dense(self, tiny):
+    def test_meiosis_returns_graph(self, tiny):
         from xftsim.mate import RandomMating
         from xftsim.reproduce import RecombinationMap
 
@@ -214,7 +214,7 @@ class TestMeiosis:
         mate = RandomMating(offspring_per_pair=2)
         assignment = mate.mate(tiny_copy.samples, rng=np.random.RandomState(42))
         offspring = tiny_copy.meiosis(assignment, rmap)
-        assert isinstance(offspring, DenseHaplotypeArray)
+        assert isinstance(offspring, GraphHaplotypeOperator)
         assert offspring.m == tiny.m
 
     def test_meiosis_offspring_count(self, tiny):
@@ -227,8 +227,9 @@ class TestMeiosis:
         mate = RandomMating(offspring_per_pair=2)
         assignment = mate.mate(tiny_copy.samples, rng=np.random.RandomState(42))
         offspring = tiny_copy.meiosis(assignment, rmap)
+        offspring_dense = offspring.to_dense()
         assert offspring.n == len(assignment.maternal_idx)
-        assert offspring.genotypes.shape == (offspring.n, tiny.m, 2)
+        assert offspring_dense.genotypes.shape == (offspring.n, tiny.m, 2)
 
     def test_offspring_alleles_from_parents(self, tiny):
         """Each offspring allele should be present in the corresponding parent."""
@@ -236,12 +237,15 @@ class TestMeiosis:
         from xftsim.reproduce import RecombinationMap
 
         tiny_copy = self._make_balanced_grg(tiny)
+        # Snapshot parent genotypes BEFORE meiosis (in-place mutation of the
+        # GRG would otherwise rewrite the sample list out from under us).
         dense = tiny_copy.to_dense()
 
         rmap = RecombinationMap.constant_map(m=tiny.m, p=0.5)
         mate = RandomMating(offspring_per_pair=2)
         assignment = mate.mate(tiny_copy.samples, rng=np.random.RandomState(42))
         offspring = tiny_copy.meiosis(assignment, rmap)
+        offspring_dense = offspring.to_dense()
 
         # For each offspring, maternal haplotype should come from mother's two haplotypes
         for i in range(offspring.n):
@@ -249,7 +253,7 @@ class TestMeiosis:
             dad_idx = assignment.paternal_idx[i]
             for j in range(offspring.m):
                 # Offspring maternal allele ([:,j,0]) came from mother
-                off_mat = offspring.genotypes[i, j, 0]
+                off_mat = offspring_dense.genotypes[i, j, 0]
                 mom_hap0 = dense.genotypes[mom_idx, j, 0]
                 mom_hap1 = dense.genotypes[mom_idx, j, 1]
                 assert off_mat in (mom_hap0, mom_hap1), (
@@ -258,13 +262,74 @@ class TestMeiosis:
                 )
 
                 # Offspring paternal allele ([:,j,1]) came from father
-                off_pat = offspring.genotypes[i, j, 1]
+                off_pat = offspring_dense.genotypes[i, j, 1]
                 dad_hap0 = dense.genotypes[dad_idx, j, 0]
                 dad_hap1 = dense.genotypes[dad_idx, j, 1]
                 assert off_pat in (dad_hap0, dad_hap1), (
                     f"Offspring {i} variant {j}: paternal allele {off_pat} "
                     f"not in father {dad_idx}'s haplotypes ({dad_hap0}, {dad_hap1})"
                 )
+
+    def test_grg_dense_phase_equivalence(self, tiny, monkeypatch):
+        """Given identical per-locus phase vectors, the GRG meiosis path produces
+        the same offspring genotypes that a hand-applied dense reference does.
+
+        The two paths can't be seeded against each other directly -- the dense
+        kernel calls ``_meiosis_i`` inside a ``numba.prange``, whose per-thread
+        RNG state isn't reachable from Python. So we pre-sample the phase
+        vectors outside both paths, monkey-patch ``_meiosis_i`` to return them
+        in order, and check the GRG output against a reference computed by
+        directly indexing parent genotypes with the same phases. If
+        ``_phase_to_segments`` + ``recombine_multi`` translate phases into
+        offspring genotypes correctly, the two must match cell-for-cell.
+        """
+        import xftsim.reproduce as reproduce_mod
+        from xftsim.mate import MateAssignment
+        from xftsim.reproduce import RecombinationMap
+
+        # Snapshot the parent dense matrix BEFORE meiosis -- the GRG itself
+        # gets mutated in place (set_samples demotes parents to internals).
+        parent_grg = self._make_balanced_grg(tiny)
+        parent_dense = parent_grg.to_dense()
+
+        rmap = RecombinationMap.constant_map(m=tiny.m, p=0.5)
+        n_off = 6
+        mat_idx = np.array([0, 1, 2, 3, 4, 5], dtype=np.int64)
+        pat_idx = np.array([1, 0, 3, 2, 5, 4], dtype=np.int64)
+
+        # Pre-sample n_off * 2 phase vectors using the same construction as
+        # _meiosis_i: per-locus Bernoulli, cumsum mod 2.
+        rng = np.random.RandomState(0)
+        phases = [
+            (np.cumsum(rng.binomial(1, rmap._probabilities)) % 2).astype(np.int64)
+            for _ in range(n_off * 2)
+        ]
+
+        queue = list(phases)
+        # Replace the module-level _meiosis_i. GraphHaplotypeOperator.meiosis
+        # does a fresh `from xftsim.reproduce import _meiosis_i` each call,
+        # so this patch is picked up. monkeypatch handles restoration.
+        monkeypatch.setattr(reproduce_mod, "_meiosis_i", lambda _p: queue.pop(0))
+
+        assignment = MateAssignment(
+            offspring_samples=SampleMeta(iid=np.arange(n_off), generation=1),
+            maternal_idx=mat_idx, paternal_idx=pat_idx,
+        )
+        offspring_grg = parent_grg.meiosis(assignment, rmap)
+        grg_genos = offspring_grg.to_dense().genotypes
+
+        # Reference: apply the same phases directly to the dense parents.
+        # _meiosis_i is called maternal-then-paternal per offspring, so
+        # phases[2*i] is the maternal phase, phases[2*i+1] the paternal.
+        expected = np.empty((n_off, tiny.m, 2), dtype=np.int8)
+        for i in range(n_off):
+            phase_m = phases[2 * i]
+            phase_p = phases[2 * i + 1]
+            for j in range(tiny.m):
+                expected[i, j, 0] = parent_dense.genotypes[mat_idx[i], j, phase_m[j]]
+                expected[i, j, 1] = parent_dense.genotypes[pat_idx[i], j, phase_p[j]]
+
+        np.testing.assert_array_equal(grg_genos, expected)
 
     def test_meiosis_variant_meta_preserved(self, tiny):
         """Offspring should inherit variant metadata from parents."""

@@ -52,6 +52,9 @@ class NonDuplicationRecombination:
     a subset of a node's mutations (PDF section 3.3.1, Algorithm 3).
     """
 
+    # Set to True to dump per-visit decision trace to stdout.
+    debug_mode = False
+
     def __init__(self, grg):
         self.grg = grg
         self.genome_length = grg.bp_range[1]
@@ -227,6 +230,10 @@ class NonDuplicationRecombination:
         gen_v = self._gen_visited
         gen_c = self._gen_connected
 
+        if self.debug_mode:
+            print(f"[recurse_attach] enter root={root_id} interval=[{L0}, {R0}) "
+                  f"offspring={-offspring_id} gen_v={gen_v}")
+
         # Hoist attributes / globals into locals for the inner loop.
         # CPython's LOAD_FAST is faster than LOAD_ATTR; over hundreds of
         # thousands of iterations these adds up.
@@ -252,8 +259,13 @@ class NonDuplicationRecombination:
             node_id, L, R = stack_pop()
 
             if L >= R:
+                if self.debug_mode:
+                    print(f"  visit node={node_id}: skip (interval [{L}, {R}) is empty)")
                 continue
             if visited_gen[node_id] == gen_v:
+                if self.debug_mode:
+                    print(f"  visit node={node_id} interval=[{L}, {R}): "
+                          f"skip (already visited this segment)")
                 continue
             visited_gen[node_id] = gen_v
 
@@ -281,17 +293,35 @@ class NonDuplicationRecombination:
             if Iu is False:
                 Iu = get_ancestral_coverage(node_id)
 
+            if self.debug_mode:
+                rel_kind = ("all" if has_all_relevant
+                            else "none" if has_no_relevant
+                            else "partial")
+                print(f"  visit node={node_id} interval=[{L}, {R}) "
+                      f"Mu_rel={num_rel}/{num_all} ({rel_kind}) Iu={Iu}")
+
             if Iu is None:
                 # Root: only own muts matter.
                 if has_all_relevant:
                     if connected_gen[node_id] != gen_c:
+                        if self.debug_mode:
+                            print(f"    -> Direct Attach (root): connect node {node_id} "
+                                  f"to offspring {neg_offspring}, stop")
                         grg_connect(node_id, neg_offspring)
                         connected_gen[node_id] = gen_c
                         pending_sample_removals_add(node_id)
+                    elif self.debug_mode:
+                        print(f"    -> Direct Attach (root): node {node_id} already "
+                              f"connected to offspring this call, stop")
                 elif has_partial_relevant:
                     rel_mut_ids = [m[0] for m in mutation_cache[node_id][left:right]]
+                    if self.debug_mode:
+                        print(f"    -> Bubble & Strip Partial (root): bubble muts "
+                              f"{rel_mut_ids} from node {node_id}, stop")
                     bubble_id = extract_bubble(node_id, rel_mut_ids, offspring_id, (L, R))
                     connected_gen[bubble_id] = gen_c
+                elif self.debug_mode:
+                    print(f"    -> Pruning (root): no relevant muts on root {node_id}, stop")
                 continue
 
             Iu0 = Iu[0]
@@ -301,12 +331,20 @@ class NonDuplicationRecombination:
 
             if has_all_relevant and full_coverage:
                 if connected_gen[node_id] != gen_c:
+                    if self.debug_mode:
+                        print(f"    -> Direct Attach: connect node {node_id} "
+                              f"to offspring {neg_offspring}, stop")
                     grg_connect(node_id, neg_offspring)
                     connected_gen[node_id] = gen_c
                     pending_sample_removals_add(node_id)
+                elif self.debug_mode:
+                    print(f"    -> Direct Attach: node {node_id} already connected "
+                          f"to offspring this call, stop")
                 continue
 
             if has_no_relevant and ancestral_disjoint:
+                if self.debug_mode:
+                    print(f"    -> Pruning: dead end at node {node_id}, stop")
                 continue
 
             if has_no_relevant:
@@ -339,50 +377,93 @@ class NonDuplicationRecombination:
                 # multi-route paths. The frontier remains an antichain.
                 if num_all == 0 and full_coverage and len(parents) > 1:
                     if connected_gen[node_id] != gen_c:
+                        if self.debug_mode:
+                            print(f"    -> Path Compression Attach: connect node {node_id} "
+                                  f"to offspring {neg_offspring}, stop")
                         grg_connect(node_id, neg_offspring)
                         connected_gen[node_id] = gen_c
                         pending_sample_removals_add(node_id)
+                    elif self.debug_mode:
+                        print(f"    -> Path Compression Attach: node {node_id} already "
+                              f"connected to offspring this call, stop")
                     continue
                 # Inline max/min -- Python's builtins are surprisingly slow
                 # at this call rate (showed up at ~50ms in the profile).
                 newL = L if L > Iu0 else Iu0
                 newR = R if R < Iu1 else Iu1
+                case = "Path Compression" if full_coverage else "Decomposition"
                 if newL >= newR:
+                    if self.debug_mode:
+                        print(f"    -> {case}: trimmed interval [{newL}, {newR}) "
+                              f"empty at node {node_id}, stop")
                     continue
                 # Skip parents already attached to this offspring (typically
                 # bubbles created in earlier segments). Their mutations live
                 # in disjoint intervals so re-descending them only produces
                 # pruning_root events.
-                for parent in reversed(parents):
-                    if connected_gen[parent] != gen_c:
-                        stack_append((parent, newL, newR))
+                queue_parents = [p for p in parents if connected_gen[p] != gen_c]
+                if self.debug_mode:
+                    skipped = [p for p in parents if connected_gen[p] == gen_c]
+                    suffix = f" (skipped already-attached: {skipped})" if skipped else ""
+                    print(f"    -> {case}: bypass node {node_id}, recurse parents "
+                          f"{queue_parents} with [{newL}, {newR}){suffix}")
+                for parent in reversed(queue_parents):
+                    stack_append((parent, newL, newR))
                 continue
 
             # Partial / all relevant, not full coverage -> bubble + maybe recurse.
             rel_mut_ids = [m[0] for m in mutation_cache[node_id][left:right]]
+            if self.debug_mode:
+                if has_all_relevant:
+                    case = "Bubble & Strip" if ancestral_disjoint else "Bubble & Split"
+                elif full_coverage:
+                    case = "Bubble & Fill"
+                elif ancestral_disjoint:
+                    case = "Bubble & Strip Partial"
+                else:
+                    case = "Bubble & Split Partial"
             bubble_id = extract_bubble(node_id, rel_mut_ids, offspring_id, (L, R))
             connected_gen[bubble_id] = gen_c
+            if self.debug_mode:
+                print(f"    -> {case}: bubble {bubble_id} captures muts {rel_mut_ids} "
+                      f"from node {node_id}")
 
-            if not ancestral_disjoint:
-                newL = L if L > Iu0 else Iu0
-                newR = R if R < Iu1 else Iu1
-                if newL >= newR:
-                    continue
-                # Same offspring-local skip: already-attached parents have
-                # nothing useful to contribute to subsequent segments.
-                for parent in reversed(get_up_edges_cached(node_id)):
-                    if connected_gen[parent] != gen_c:
-                        stack_append((parent, newL, newR))
+            if ancestral_disjoint:
+                if self.debug_mode:
+                    print(f"      stop (ancestors disjoint from [{L}, {R}))")
+                continue
+            newL = L if L > Iu0 else Iu0
+            newR = R if R < Iu1 else Iu1
+            if newL >= newR:
+                if self.debug_mode:
+                    print(f"      stop (trimmed interval [{newL}, {newR}) empty)")
+                continue
+            # Same offspring-local skip: already-attached parents have
+            # nothing useful to contribute to subsequent segments.
+            parents = get_up_edges_cached(node_id)
+            queue_parents = [p for p in parents if connected_gen[p] != gen_c]
+            if self.debug_mode:
+                skipped = [p for p in parents if connected_gen[p] == gen_c]
+                suffix = f" (skipped already-attached: {skipped})" if skipped else ""
+                print(f"      recurse parents {queue_parents} with "
+                      f"[{newL}, {newR}){suffix}")
+            for parent in reversed(queue_parents):
+                stack_append((parent, newL, newR))
 
     # ------------------------------------------------------------------
     # Apply deferred work, evict caches
     # ------------------------------------------------------------------
 
     def _apply_pending_bubbles(self):
+        if self.debug_mode and self._pending_bubbles:
+            print(f"[apply_pending_bubbles] applying {len(self._pending_bubbles)} bubble(s)")
         for bubble_op in self._pending_bubbles:
             node_id = bubble_op['node_id']
             bubble_id = bubble_op['bubble_id']
             muts = bubble_op['relevant_mut_ids']
+            if self.debug_mode:
+                print(f"  bubble {bubble_id}: move muts {muts} from node {node_id} "
+                      f"-> bubble {bubble_id}")
             for mut_id in muts:
                 mut = self.grg.get_mutation_by_id(mut_id)
                 self.grg.add_mutation(mut, bubble_id)
@@ -394,6 +475,10 @@ class NonDuplicationRecombination:
 
     def flush_sample_updates(self):
         if self._pending_sample_removals:
+            if self.debug_mode:
+                print(f"[flush_sample_updates] removing "
+                      f"{sorted(self._pending_sample_removals)} from samples "
+                      f"(gained new bubble parents)")
             current = set(self.grg.get_sample_nodes())
             current.difference_update(self._pending_sample_removals)
             self.grg.set_samples(list(current))
@@ -428,7 +513,15 @@ class NonDuplicationRecombination:
         self._grow_node_arrays(self.grg.num_nodes - 1)
         self._gen_connected += 1
 
+        if self.debug_mode:
+            print("=" * 60)
+            print(f"[recombine] offspring={-offspring_id} hA={haplotype_A} "
+                  f"hB={haplotype_B} bp={breakpoint}")
+            print(f"[recombine] segment 1: parent={haplotype_A} interval=[0, {breakpoint})")
         self._recurse_attach(haplotype_A, offspring_id, 0, breakpoint)
+        if self.debug_mode:
+            print(f"[recombine] segment 2: parent={haplotype_B} "
+                  f"interval=[{breakpoint}, {self.genome_length})")
         self._recurse_attach(haplotype_B, offspring_id, breakpoint, self.genome_length)
 
         self._apply_pending_bubbles()
@@ -444,9 +537,16 @@ class NonDuplicationRecombination:
         self._grow_node_arrays(self.grg.num_nodes - 1)
         self._gen_connected += 1
 
+        if self.debug_mode:
+            print("=" * 60)
+            print(f"[recombine_multi] offspring={-offspring_id} segments={segments}")
+
         start = 0
         for parent_id, end in segments:
             if end > start:
+                if self.debug_mode:
+                    print(f"[recombine_multi] segment: parent={parent_id} "
+                          f"interval=[{start}, {end})")
                 self._recurse_attach(parent_id, offspring_id, start, end)
             start = end
 
