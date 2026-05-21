@@ -275,7 +275,7 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   without further plumbing. The `extra` dict is preserved through
   `SampleMeta.subset`, `with_generation`, and meiosis, so labels survive
   multi-generation simulations.
-- **tests/integration/test_grg_founders.py and test_grg_founders_stdpopsim.py**:
+- **tests/pipeline/test_grg_founders.py and test_grg_founders_stdpopsim.py**:
   Integration tests for the two GRG founder helpers (msprime and stdpopsim
   paths). Both files were brought into line with the repo's integration-test
   conventions: module-level `pytest.importorskip` guards for `pygrgl` /
@@ -295,6 +295,15 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   of `xftsim/founders.py` for the GRG-based founder helpers and were
   previously only available transitively. Install with
   `pip install xftsim[grg]`.
+- **tests/manuscript/test_figure2.py**: Reproduces Figure 2 — 6 psychiatric
+  traits under empirical cross-mate correlations (one bootstrap seed from
+  `psych_cors.csv` bundled inline so the test is self-contained). Asserts that
+  HE-estimated rg grows generation by generation despite orthogonal genetic
+  effects.
+- **tests/manuscript/test_figure3.py**: Reproduces Figure 3 — four scenarios
+  (RM, RM+VT, 5xAM, 5xAM+VT) at 5 traits with h²=0.5 and orthogonal effects.
+  Verifies gen-5 HE estimates approximately match Table S6 and that xAM
+  inflates rg relative to random mating.
 
 ---
 
