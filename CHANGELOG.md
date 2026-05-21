@@ -304,6 +304,18 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   (RM, RM+VT, 5xAM, 5xAM+VT) at 5 traits with h²=0.5 and orthogonal effects.
   Verifies gen-5 HE estimates approximately match Table S6 and that xAM
   inflates rg relative to random mating.
+- **docs/userguide_v0.9/**: User guide rewritten against the v0.9 refactor.
+  Replaces the legacy `ArchitectureComponent` hierarchy with the
+  lavaan-style formula DSL throughout (`genetic`, `noise`, `cnoise`,
+  `threshold`, `mother`/`father`/`parent`, `sibling_*`, plus arithmetic
+  aggregation expressions for sums and GxE products). Covers the new
+  `DenseHaplotypeArray` / `PhenotypeArray` / `SampleMeta` / `VariantMeta`
+  data structures, the renamed mating regimes (`RandomMating`,
+  `LinearAssortativeMating`, `GeneralAssortativeMating`, `BatchedMating`),
+  the GRM-based `HasemanElstonEstimator`, the new `ParentOffspringRegression`,
+  the filter system (`TrioFilter`, etc.), and the
+  `retain_haplotypes` / `retain_phenotypes` Simulation kwargs that
+  replace the removed `xftsim.proc.LimitMemory` post-processor.
 
 ---
 
