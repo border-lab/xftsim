@@ -4,7 +4,7 @@ Unit tests for GRG-aware checkpointing.
 Verifies that ``save_simulation_checkpoint`` persists GRG-backed founder
 haplotypes natively (as a ``.grg`` file plus metadata sidecar) instead of
 materializing to dense, and that ``load_simulation_checkpoint`` /
-``NSimulation.from_checkpoint`` round-trip them back into a
+``Simulation.from_checkpoint`` round-trip them back into a
 ``GraphHaplotypeOperator``.
 
 Skipped entirely when any of pygrgl / msprime / the ``grg`` CLI binary are
@@ -24,12 +24,12 @@ if shutil.which("grg") is None:
 
 from xftsim.founders import founder_haplotypes_from_msprime_grg
 from xftsim.io import save_simulation_checkpoint, load_simulation_checkpoint
-from xftsim.narch import (
+from xftsim.arch import (
     Architecture, GeneticComponent, NoiseComponent, AggregationComponent,
 )
-from xftsim.neffect import AdditiveEffects
-from xftsim.nmate import RandomMating
-from xftsim.nsim import NSimulation
+from xftsim.effect import AdditiveEffects
+from xftsim.mate import RandomMating
+from xftsim.sim import Simulation
 from xftsim.reproduce import RecombinationMap
 from xftsim.struct import GraphHaplotypeOperator, DenseHaplotypeArray
 
@@ -53,7 +53,7 @@ def _make_sim_with_grg_founder(seed=42):
     rmap = RecombinationMap.constant_map(m=m, p=0.5)
     # retain_haplotypes=10 keeps the gen-0 GRG in history through several
     # offspring generations so we actually exercise the GRG-save path.
-    sim = NSimulation(hap, arch, mate, rmap, seed=seed,
+    sim = Simulation(hap, arch, mate, rmap, seed=seed,
                       retain_haplotypes=10)
     return sim
 
@@ -108,7 +108,7 @@ class TestGRGCheckpoint:
         ckpt = str(tmp_path / 'ckpt')
         save_simulation_checkpoint(sim, ckpt)
 
-        restored = NSimulation.from_checkpoint(ckpt)
+        restored = Simulation.from_checkpoint(ckpt)
         # Founder should still be GRG, not materialized dense.
         assert isinstance(restored.haplotype_history[0], GraphHaplotypeOperator)
         restored.continue_run(2)

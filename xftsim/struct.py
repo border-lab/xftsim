@@ -500,7 +500,7 @@ class HaplotypeOperator(ABC):
         ...
 
     @abstractmethod
-    def meiosis(self, assignment, recombination_map) -> "HaplotypeOperator":
+    def meiosis(self, assignment, recombination_map, rng=None) -> "HaplotypeOperator":
         """Perform meiosis to produce offspring haplotypes.
 
         Parameters
@@ -509,6 +509,11 @@ class HaplotypeOperator(ABC):
             Mate assignment with maternal/paternal indices and offspring metadata.
         recombination_map : RecombinationMap
             Recombination probabilities between loci.
+        rng : numpy.random.RandomState, optional
+            Master RNG used to derive per-offspring crossover seeds. Pass
+            ``self.rng`` from the simulation loop to keep crossover sampling
+            tied to the simulation's seed; ``None`` falls back to a fresh
+            ``RandomState`` (non-deterministic).
 
         Returns
         -------
@@ -952,7 +957,7 @@ class DenseHaplotypeArray(HaplotypeOperator):
         """Return self (already dense)."""
         return self
 
-    def meiosis(self, assignment, recombination_map) -> "DenseHaplotypeArray":
+    def meiosis(self, assignment, recombination_map, rng=None) -> "DenseHaplotypeArray":
         """
         Perform meiosis to produce offspring haplotypes.
 
@@ -964,6 +969,10 @@ class DenseHaplotypeArray(HaplotypeOperator):
             Mate assignment with maternal/paternal indices and offspring metadata.
         recombination_map : RecombinationMap
             Recombination probabilities between loci.
+        rng : numpy.random.RandomState, optional
+            Master RNG; forwarded to ``reproduce.meiosis`` for per-offspring
+            crossover seeding. ``None`` preserves the prior non-deterministic
+            behavior.
 
         Returns
         -------
@@ -977,6 +986,7 @@ class DenseHaplotypeArray(HaplotypeOperator):
             recombination_map,
             assignment.maternal_idx,
             assignment.paternal_idx,
+            rng=rng,
         )
 
         return DenseHaplotypeArray(
@@ -1235,7 +1245,7 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             variants=self.variants,
         )
 
-    def meiosis(self, assignment, recombination_map) -> "GraphHaplotypeOperator":
+    def meiosis(self, assignment, recombination_map, rng=None) -> "GraphHaplotypeOperator":
         """Perform meiosis natively on the GRG via the bubble-insertion algorithm.
 
         The underlying ``pygrgl.MutableGRG`` is mutated in place: offspring
@@ -1256,6 +1266,14 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             ``SampleMeta``.
         recombination_map : RecombinationMap
             Per-locus recombination probabilities.
+        rng : numpy.random.RandomState, optional
+            Master RNG. Used to derive one independent seed per offspring
+            via ``SeedSequence.spawn``; each seed is applied via
+            ``np.random.seed`` immediately before that offspring's two
+            ``_meiosis_i`` phase draws, so crossover sampling is
+            deterministic given ``rng``'s state. Matches the seed-derivation
+            strategy used by the dense kernel — both paths consume one
+            ``rng.randint`` draw before spawning.
 
         Returns
         -------
@@ -1266,7 +1284,7 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             NonDuplicationRecombination,
             _phase_to_segments,
         )
-        from xftsim.reproduce import _meiosis_i
+        from xftsim.reproduce import _meiosis_pair_seeded, _spawn_meiosis_seeds
 
         # Use GRG-internal mutation positions, not self.variants.pos_bp.
         # The recombination algorithm filters mutations via mut.position, so
@@ -1303,6 +1321,12 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         maternal_idx = assignment.maternal_idx
         paternal_idx = assignment.paternal_idx
 
+        # One seed per offspring; both mat and pat phase draws for offspring i
+        # come from the stream seeded by seeds[i]. Matches the dense kernel's
+        # convention exactly, so given the same `rng` and the same parent
+        # genotypes both paths sample the same phase vectors.
+        seeds = _spawn_meiosis_seeds(rng, n_off)
+
         for i in range(n_off):
             mat_i = int(maternal_idx[i])
             pat_i = int(paternal_idx[i])
@@ -1311,8 +1335,14 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             pat_haps = (parent_sample_nodes[2 * pat_i],
                         parent_sample_nodes[2 * pat_i + 1])
 
-            for parent_haps in (mat_haps, pat_haps):
-                phase = _meiosis_i(recomb_p)
+            # Seed numba's RNG and draw both phase vectors inside one JIT
+            # call. A Python-level `np.random.seed()` does NOT seed numba's
+            # internal RNG state, so the seeding must live inside `_meiosis_pair_seeded`
+            # alongside the draws themselves. Returns (mat_phase, pat_phase),
+            # matching the dense kernel's seed-once-draw-twice pattern.
+            mat_phase, pat_phase = _meiosis_pair_seeded(recomb_p, seeds[i])
+            for parent_haps, phase in ((mat_haps, mat_phase),
+                                       (pat_haps, pat_phase)):
                 segments = _phase_to_segments(phase, pos_bp, parent_haps, genome_length)
                 neg_id = recomb.recombine_multi(segments)
                 raw_id = recomb.NEGATIVE_NODE_IDS[abs(neg_id) - 1]
@@ -1482,8 +1512,8 @@ class StandardizedHaplotypeOperator(HaplotypeOperator):
     def to_dense(self) -> "DenseHaplotypeArray":
         return self._H.to_dense()
 
-    def meiosis(self, assignment, recombination_map) -> "HaplotypeOperator":
-        return self._H.meiosis(assignment, recombination_map)
+    def meiosis(self, assignment, recombination_map, rng=None) -> "HaplotypeOperator":
+        return self._H.meiosis(assignment, recombination_map, rng=rng)
 
     def __getitem__(self, key) -> "HaplotypeOperator":
         return self._H[key]

@@ -499,7 +499,7 @@ def save_architecture(arch: "xft.arch.Architecture", dir_path: str) -> None:
     # behind. Effect files are accumulated as (path_suffix, EffectSpec) pairs
     # and written only after the full walk succeeds.
     node_specs = []
-    effects_to_write: list[tuple[str, "xft.neffect.EffectSpec"]] = []
+    effects_to_write: list[tuple[str, "xft.effect.EffectSpec"]] = []
     effect_idx = 0
 
     for node in arch._nodes:
@@ -544,7 +544,7 @@ def save_architecture(arch: "xft.arch.Architecture", dir_path: str) -> None:
                 f"Cannot serialize component of type "
                 f"{type(comp).__name__!r} (output(s)={node.outputs}); "
                 "save_architecture supports the built-in components listed "
-                "in xftsim.narch.BUILTINS plus AggregationComponent. "
+                "in xftsim.arch.BUILTINS plus AggregationComponent. "
                 "Adding support requires extending save_architecture / "
                 "load_architecture in xftsim/io.py."
             )
@@ -714,7 +714,7 @@ def _serialize_mating_regime(regime: object) -> dict[str, object]:
         regime's parameters; the failure surfaced only at load time. We now
         fail loud at save time so the gap is obvious.
     """
-    from xftsim.nmate import (
+    from xftsim.mate import (
         RandomMating, LinearAssortativeMating,
         GeneralAssortativeMating, BatchedMating,
     )
@@ -767,7 +767,7 @@ def _deserialize_mating_regime(config: dict[str, object]) -> object:
     a checkpoint was saved with it but the resuming environment lacks
     hexaly, deserialization will raise ``ImportError`` at construction.
     """
-    from xftsim.nmate import (
+    from xftsim.mate import (
         RandomMating, LinearAssortativeMating,
         GeneralAssortativeMating, BatchedMating,
     )
@@ -822,7 +822,7 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
       arbitrary user code and may not be pickleable. The *outputs* they
       produced are saved (in ``sim.results``) but to keep collecting new
       results after resume you must re-pass ``statistics=...`` to
-      ``NSimulation.from_checkpoint``.
+      ``Simulation.from_checkpoint``.
     - ``sim.filters`` and ``sim.callbacks`` — same reasoning. Re-pass them
       to ``from_checkpoint`` if you want them active on the resumed run.
 

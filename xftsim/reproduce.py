@@ -115,6 +115,31 @@ class RecombinationMap:
         return df.__repr__()
 
 
+@nb.njit
+def _meiosis_pair_seeded(p, seed):
+    """
+    Seed numba's RNG and draw (maternal, paternal) phase vectors.
+
+    Exists because ``np.random.seed()`` at the Python level does NOT
+    propagate to numba's internal RNG state — JIT'd functions like
+    ``_meiosis_i`` read a separate thread-local numba RNG. To make Python
+    callers (e.g. the GRG-native meiosis path) deterministic, the seed
+    and both draws must happen inside a single JIT call.
+
+    Matches the dense ``_meiosis_3d`` kernel's per-offspring behavior
+    exactly: one seed, then two consecutive ``_meiosis_i`` draws against
+    that just-seeded stream. So given the same per-offspring seed both
+    the dense and GRG meiosis paths sample the same phase vectors,
+    guaranteeing cross-path determinism on top of within-path
+    determinism. No explicit numba signature — let JIT specialize on
+    first call.
+    """
+    np.random.seed(seed)
+    mat = _meiosis_i(p)
+    pat = _meiosis_i(p)
+    return mat, pat
+
+
 @nb.njit("int64[:](float64[:])")
 def _meiosis_i(p):
     """
@@ -138,7 +163,7 @@ def _meiosis_i(p):
     return output
 
 
-@nb.njit("int8[:,:,:](int8[:,:,:], int8[:,:,:], int64, int64, float64[:], int64[:], int64[:])", parallel=True)
+@nb.njit("int8[:,:,:](int8[:,:,:], int8[:,:,:], int64, int64, float64[:], int64[:], int64[:], uint32[:])", parallel=True)
 def _meiosis_3d(parental_genotypes,
                 offspring_genotypes,
                 n_offspring,
@@ -146,6 +171,7 @@ def _meiosis_3d(parental_genotypes,
                 recombination_p,
                 maternal_inds,
                 paternal_inds,
+                seeds,
                 ):
     """
     Performs meiosis on 3D genotype arrays.
@@ -166,6 +192,12 @@ def _meiosis_3d(parental_genotypes,
         An array of maternal parent indices.
     paternal_inds : numpy.ndarray[int64]
         An array of paternal parent indices.
+    seeds : numpy.ndarray[uint32]
+        Per-offspring RNG seeds. ``seeds[i]`` is applied to numba's
+        thread-local RNG before drawing offspring i's maternal/paternal
+        phase vectors, so the resulting genotypes are deterministic given
+        the seed array — independent of how ``nb.prange`` distributes
+        offspring across threads. Length must equal ``n_offspring``.
 
     Returns
     -------
@@ -173,6 +205,12 @@ def _meiosis_3d(parental_genotypes,
         3D array of offspring genotypes.
     """
     for i in nb.prange(n_offspring):
+        # Re-seed the current thread's RNG with this offspring's seed.
+        # Numba's `np.random.seed()` is per-thread inside `prange`, so this
+        # localizes randomness to the offspring rather than the thread —
+        # which is what makes the output independent of scheduling.
+        np.random.seed(seeds[i])
+
         # Maternal meiosis: select which haplotype (0 or 1) at each locus
         mat_hap_select = _meiosis_i(recombination_p)
         # Paternal meiosis: select which haplotype (0 or 1) at each locus
@@ -190,10 +228,32 @@ def _meiosis_3d(parental_genotypes,
     return offspring_genotypes
 
 
+def _spawn_meiosis_seeds(rng: np.random.RandomState, n: int) -> np.ndarray:
+    """Derive ``n`` independent uint32 seeds from ``rng`` via SeedSequence.
+
+    Centralized so the dense and GRG meiosis paths agree on how seeds are
+    derived from the simulation's master RNG. Both consume exactly one
+    ``rng.randint`` draw before delegating to ``SeedSequence.spawn`` —
+    keeping the master rng state advance the same regardless of which
+    path runs.
+    """
+    if rng is None:
+        rng = np.random.RandomState()
+    entropy = int(rng.randint(0, 2 ** 31 - 1))
+    ss = np.random.SeedSequence(entropy)
+    children = ss.spawn(n)
+    return np.fromiter(
+        (c.generate_state(1)[0] for c in children),
+        dtype=np.uint32,
+        count=n,
+    )
+
+
 def meiosis(parental_haplotypes: xft.struct.DenseHaplotypeArray,
             recombination_map: RecombinationMap,
             maternal_inds: NDArray[Shape["*"], Int64],
             paternal_inds: NDArray[Shape["*"], Int64],
+            rng: np.random.RandomState = None,
             ) -> NDArray[Shape["*, *, *"], Int8]:
     """
     Performs meiosis on parental haplotypes.
@@ -208,6 +268,13 @@ def meiosis(parental_haplotypes: xft.struct.DenseHaplotypeArray,
         An array of maternal parent indices.
     paternal_inds : numpy.ndarray[int64]
         An array of paternal parent indices.
+    rng : numpy.random.RandomState, optional
+        Master RNG. Used to derive per-offspring seeds via
+        ``SeedSequence.spawn`` so that crossover sampling is deterministic
+        given the master state (independent of how ``nb.prange`` schedules
+        offspring across threads). If ``None`` (the default), a fresh
+        ``RandomState`` is constructed, preserving the historical
+        non-deterministic behavior for callers that don't pass an rng.
 
     Returns
     -------
@@ -228,6 +295,7 @@ def meiosis(parental_haplotypes: xft.struct.DenseHaplotypeArray,
 
     n_offspring = maternal_inds.shape[0]
     offspring_genotypes = np.empty((n_offspring, m, 2), dtype=np.int8)
+    seeds = _spawn_meiosis_seeds(rng, n_offspring)
 
     return _meiosis_3d(parental_genotypes,
                        offspring_genotypes,
@@ -235,5 +303,6 @@ def meiosis(parental_haplotypes: xft.struct.DenseHaplotypeArray,
                        m,
                        recombination_p,
                        maternal_inds,
-                       paternal_inds)
+                       paternal_inds,
+                       seeds)
 

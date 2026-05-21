@@ -11,6 +11,46 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Added
 
+- **Meiosis crossover sampling is now tied to `sim.rng`**: Previously the
+  meiosis kernels in `xftsim/reproduce.py` drew per-locus crossover
+  indicators via `np.random.binomial` against numba's internal RNG, with
+  no connection to the `Simulation`'s seeded `self.rng`. Two
+  `Simulation(seed=42).run(N)` calls therefore produced **different**
+  haplotypes — the simulation seed only controlled noise / mate
+  assignment, not transmission. This is the bug discussed at the end of
+  the prior checkpointing session: `save → from_checkpoint → continue_run`
+  was rng-state deterministic but not haplotype deterministic.
+
+  Fix uses `np.random.SeedSequence.spawn(n_offspring)` to derive one
+  independent uint32 seed per offspring from `self.rng`. The dense kernel
+  (`_meiosis_3d`) re-seeds numba's thread-local RNG via
+  `np.random.seed(seeds[i])` at the top of each `nb.prange` iteration, so
+  the result is invariant to thread scheduling — the same per-offspring
+  draws happen regardless of which thread picks up which `i`. `nb.prange`
+  is preserved (no parallelism lost). Memory cost is `4 * n_offspring`
+  bytes for the seed array (negligible).
+
+  For the GRG-native meiosis path the same seed derivation feeds a new
+  JIT'd helper `_meiosis_pair_seeded(p, seed)` that seeds and draws both
+  maternal and paternal phase vectors inside a single JIT call. This was
+  needed because Python-level `np.random.seed()` does **not** propagate
+  to numba's internal RNG (despite what older numba docs suggest);
+  seeding and drawing have to live in the same JIT function. The pair
+  helper matches the dense kernel's per-offspring behavior exactly
+  (one seed, two consecutive draws against the same numba stream), so
+  given the same `rng` both meiosis paths sample the same phases.
+
+  API surface: `HaplotypeOperator.meiosis(assignment, recombination_map,
+  rng=None)` — `rng` is a new optional keyword. `Simulation.run` and
+  `Simulation.continue_run` pass `self.rng`; direct callers that omit
+  `rng` get the historical non-deterministic behavior (preserves
+  back-compat).
+
+  Test suite in `tests/unit/test_meiosis_determinism.py` (11 tests):
+  per-offspring seed determinism, `_meiosis_pair_seeded` round-trip,
+  `meiosis()` function determinism, end-to-end `Simulation` two-run
+  haplotype equality, GRG path two-run dense-equality.
+
 - **GRG-native meiosis via the bubble-insertion (node-insertion) algorithm**:
   `GraphHaplotypeOperator.meiosis()` now performs recombination directly on
   the GRG instead of materializing to dense and delegating to the numba

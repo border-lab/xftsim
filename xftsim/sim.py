@@ -198,6 +198,7 @@ class Simulation:
         sim.pedigree_history = checkpoint['pedigree_history']
         sim.rng = checkpoint['rng']
         sim.generation = checkpoint['generation']
+        sim.results = checkpoint.get('results', [])
 
         return sim
 
@@ -268,9 +269,12 @@ class Simulation:
             prev_assignment = self._mate_assignments[gen - 1]
             prev_hap = self.haplotype_history[gen - 1]
 
-            # Meiosis: produce offspring haplotypes
+            # Meiosis: produce offspring haplotypes. Pass self.rng so that
+            # crossover sampling is driven by the simulation's seeded RNG
+            # rather than numba's per-thread state (which is non-deterministic
+            # across runs and not affected by sim seed).
             offspring_hap = prev_hap.meiosis(
-                prev_assignment, self.recombination_map
+                prev_assignment, self.recombination_map, rng=self.rng,
             )
             self.haplotype_history[gen] = offspring_hap
             self.generation = gen
@@ -338,7 +342,7 @@ class Simulation:
             prev_hap = self.haplotype_history[gen - 1]
 
             offspring_hap = prev_hap.meiosis(
-                prev_assignment, self.recombination_map
+                prev_assignment, self.recombination_map, rng=self.rng,
             )
             self.haplotype_history[gen] = offspring_hap
             self.generation = gen

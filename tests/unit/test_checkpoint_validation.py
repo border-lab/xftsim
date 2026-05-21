@@ -238,7 +238,7 @@ class TestArchitectureRoundtripComplex:
         survives save/load with source and threshold preserved.
         """
         from xftsim.io import save_architecture, load_architecture
-        from xftsim.narch import ThresholdComponent
+        from xftsim.arch import ThresholdComponent
         m = 10
         arch = Architecture()
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=42)
@@ -260,7 +260,7 @@ class TestArchitectureRoundtripComplex:
         time, and must not leave a partial architecture directory behind.
         """
         from xftsim.io import save_architecture
-        from xftsim.narch import ArchComponent
+        from xftsim.arch import ArchComponent
 
         class FakeUnregisteredComponent(ArchComponent):
             name = "fake_unregistered"
@@ -346,7 +346,7 @@ class TestSimulationCheckpointFull:
     def test_checkpoint_preserves_results(self, tmp_path):
         """Per-generation Statistic results round-trip through save/load."""
         from xftsim.io import save_simulation_checkpoint
-        from xftsim.nstats import SampleStatistics, GenerationResult
+        from xftsim.stats import SampleStatistics, GenerationResult
         n, m = 40, 10
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=42)
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=42)
@@ -356,13 +356,13 @@ class TestSimulationCheckpointFull:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42,
+        sim = Simulation(hap, arch, mate, rmap, seed=42,
                           statistics=[SampleStatistics()])
         sim.run(3)
         # Sanity: original sim accumulated one result per generation
         assert len(sim.results) == 3
         save_simulation_checkpoint(sim, str(tmp_path / 'ckpt'))
-        restored = NSimulation.from_checkpoint(str(tmp_path / 'ckpt'),
+        restored = Simulation.from_checkpoint(str(tmp_path / 'ckpt'),
                                                statistics=[SampleStatistics()])
         assert len(restored.results) == len(sim.results)
         for orig, got in zip(sim.results, restored.results):
@@ -377,7 +377,7 @@ class TestSimulationCheckpointFull:
     def test_checkpoint_continue_run_appends_results(self, tmp_path):
         """After resume, new generations append to the loaded results list."""
         from xftsim.io import save_simulation_checkpoint
-        from xftsim.nstats import SampleStatistics
+        from xftsim.stats import SampleStatistics
         n, m = 40, 10
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=42)
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=42)
@@ -387,11 +387,11 @@ class TestSimulationCheckpointFull:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42,
+        sim = Simulation(hap, arch, mate, rmap, seed=42,
                           statistics=[SampleStatistics()])
         sim.run(2)
         save_simulation_checkpoint(sim, str(tmp_path / 'ckpt'))
-        restored = NSimulation.from_checkpoint(str(tmp_path / 'ckpt'),
+        restored = Simulation.from_checkpoint(str(tmp_path / 'ckpt'),
                                                statistics=[SampleStatistics()])
         restored.continue_run(3)
         # 2 from before + 3 added on resume
@@ -421,7 +421,7 @@ class TestSimulationCheckpointFull:
         arch.add('Y.E', NoiseComponent(variance=0.5))
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, FakeUnregisteredMating(), rmap, seed=42)
+        sim = Simulation(hap, arch, FakeUnregisteredMating(), rmap, seed=42)
         # No sim.run() — the regime's mate() is never called; we're testing
         # only that save refuses unsupported types loudly and atomically.
         ckpt = str(tmp_path / 'ckpt')
@@ -435,7 +435,7 @@ class TestSimulationCheckpointFull:
         Exercises the recursive serialization path for nested regimes.
         """
         from xftsim.io import save_simulation_checkpoint
-        from xftsim.nmate import BatchedMating
+        from xftsim.mate import BatchedMating
         n, m = 40, 10
         hap = TestSimulation.founder_haplotypes(n=n, m=m, seed=42)
         eff = AdditiveEffects.from_h2(h2=0.5, m=m, seed=42)
@@ -446,10 +446,10 @@ class TestSimulationCheckpointFull:
         mate = BatchedMating(regime=RandomMating(offspring_per_pair=2),
                              max_batch_size=20)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
         save_simulation_checkpoint(sim, str(tmp_path / 'ckpt'))
-        restored = NSimulation.from_checkpoint(str(tmp_path / 'ckpt'))
+        restored = Simulation.from_checkpoint(str(tmp_path / 'ckpt'))
         assert isinstance(restored.mating_regime, BatchedMating)
         assert restored.mating_regime.max_batch_size == 20
         assert isinstance(restored.mating_regime.regime, RandomMating)
@@ -471,7 +471,7 @@ class TestSimulationCheckpointFull:
         from xftsim.io import (
             _serialize_mating_regime, _deserialize_mating_regime,
         )
-        from xftsim.nmate import GeneralAssortativeMating
+        from xftsim.mate import GeneralAssortativeMating
 
         regime = GeneralAssortativeMating.__new__(GeneralAssortativeMating)
         regime.component_names = ['Y1', 'Y2']
@@ -514,7 +514,7 @@ class TestSimulationCheckpointFull:
         round-trips recursively through the JSON-friendly dict.
         """
         from xftsim.io import _serialize_mating_regime
-        from xftsim.nmate import BatchedMating, GeneralAssortativeMating
+        from xftsim.mate import BatchedMating, GeneralAssortativeMating
 
         inner = GeneralAssortativeMating.__new__(GeneralAssortativeMating)
         inner.component_names = ['A', 'B', 'C']
@@ -559,7 +559,7 @@ class TestSimulationCheckpointFull:
         deterministic-meiosis fix) survives the round-trip.
         """
         from xftsim.io import save_simulation_checkpoint
-        from xftsim.nstats import SampleStatistics
+        from xftsim.stats import SampleStatistics
 
         N, K = 5, 2
 
@@ -574,7 +574,7 @@ class TestSimulationCheckpointFull:
             mate = LinearAssortativeMating(component_names=['Y'], r=0.3,
                                            offspring_per_pair=2)
             rmap = RecombinationMap.constant_map(m=m, p=0.5)
-            return NSimulation(hap, arch, mate, rmap, seed=seed,
+            return Simulation(hap, arch, mate, rmap, seed=seed,
                                statistics=[SampleStatistics()])
 
         # Path A: straight run(N).
@@ -585,7 +585,7 @@ class TestSimulationCheckpointFull:
         sim_b = _build(seed=42)
         sim_b.run(K)
         save_simulation_checkpoint(sim_b, str(tmp_path / 'ckpt'))
-        sim_b = NSimulation.from_checkpoint(str(tmp_path / 'ckpt'),
+        sim_b = Simulation.from_checkpoint(str(tmp_path / 'ckpt'),
                                             statistics=[SampleStatistics()])
         sim_b.continue_run(N - K)
 
@@ -614,11 +614,11 @@ class TestSimulationCheckpointFull:
         arch.add('Y', AggregationComponent('Y.G + Y.E'))
         mate = RandomMating(offspring_per_pair=2)
         rmap = RecombinationMap.constant_map(m=m, p=0.5)
-        sim = NSimulation(hap, arch, mate, rmap, seed=42)
+        sim = Simulation(hap, arch, mate, rmap, seed=42)
         sim.run(2)
         ckpt = str(tmp_path / 'ckpt')
         save_simulation_checkpoint(sim, ckpt)
         # Simulate an older checkpoint by removing the new file.
         os.remove(os.path.join(ckpt, 'results.pkl'))
-        restored = NSimulation.from_checkpoint(ckpt)
+        restored = Simulation.from_checkpoint(ckpt)
         assert restored.results == []
