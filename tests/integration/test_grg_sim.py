@@ -48,13 +48,13 @@ class TestGRGSimulation:
         pheno = sim.phenotype_history[0]
         assert np.all(np.isfinite(pheno['Y']))
 
-    def test_multi_gen_uses_dense_after_meiosis(self):
-        """After meiosis, offspring haplotypes should be DenseHaplotypeArray."""
+    def test_multi_gen_stays_graph_after_meiosis(self):
+        """After GRG-native meiosis, offspring haplotypes stay as a GraphHaplotypeOperator."""
         grg_op = TestGRG.tiny_grg()
         sim = _make_sim(grg_op)
         sim.run(2)
         assert isinstance(sim.haplotype_history[0], GraphHaplotypeOperator)
-        assert isinstance(sim.haplotype_history[1], DenseHaplotypeArray)
+        assert isinstance(sim.haplotype_history[1], GraphHaplotypeOperator)
 
     def test_gen0_phenotypes_match_dense(self):
         """Gen-0 Y.G from GRG founders should match dense equivalent."""

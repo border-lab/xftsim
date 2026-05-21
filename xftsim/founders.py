@@ -236,8 +236,8 @@ def founder_haplotypes_from_msprime_grg(
         # Run GRGL to create the GRG file
         subprocess.check_call(cmd)
 
-        # Load the GRG back into Python
-        grg = pygrgl.load_immutable_grg(grg_path)
+        # Load the GRG back into Python (mutable so GRG-native meiosis works)
+        grg = pygrgl.load_mutable_grg(grg_path)
 
     # Step 4: Extract and Build Metadata
     iids = np.array([f"ind_{i}" for i in range(ts.num_individuals)], dtype=str)
@@ -407,7 +407,7 @@ def founder_haplotypes_from_stdpopsim_grg(
 
         subprocess.check_call(cmd)
 
-        grg = pygrgl.load_immutable_grg(grg_path)
+        grg = pygrgl.load_mutable_grg(grg_path)
 
     # Step 4: Build sample metadata (population labels + prefixed iids)
     pop_names = np.array(

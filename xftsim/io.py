@@ -333,7 +333,10 @@ def load_grg(path: str, generation: int = 0,
     xft.struct.GraphHaplotypeOperator
     """
     import pygrgl
-    grg = pygrgl.load_immutable_grg(path)
+    # Load mutable so downstream code can run GRG-native meiosis via
+    # GraphHaplotypeOperator.meiosis() (which calls make_node/connect on
+    # the GRG). Mutable GRGs expose the full read API immutable does.
+    grg = pygrgl.load_mutable_grg(path)
 
     # Extract sample metadata from GRG
     n = grg.num_individuals
@@ -670,7 +673,7 @@ def _load_graph_haplotypes_from_checkpoint(
 ) -> "xft.struct.GraphHaplotypeOperator":
     """Inverse of ``_save_graph_haplotypes_to_checkpoint``."""
     import pygrgl
-    grg = pygrgl.load_immutable_grg(os.path.join(hap_dir, f'gen_{gen}.grg'))
+    grg = pygrgl.load_mutable_grg(os.path.join(hap_dir, f'gen_{gen}.grg'))
 
     data = np.load(
         os.path.join(hap_dir, f'gen_{gen}.grg.meta.npz'), allow_pickle=True,

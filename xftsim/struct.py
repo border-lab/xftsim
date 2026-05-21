@@ -1197,9 +1197,101 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             variants=self.variants,
         )
 
-    def meiosis(self, assignment, recombination_map) -> DenseHaplotypeArray:
-        """Materialize to dense, then perform meiosis."""
-        return self.to_dense().meiosis(assignment, recombination_map)
+    def meiosis(self, assignment, recombination_map) -> "GraphHaplotypeOperator":
+        """Perform meiosis natively on the GRG via the bubble-insertion algorithm.
+
+        The underlying ``pygrgl.MutableGRG`` is mutated in place: offspring
+        sample nodes and bubble nodes are added, then ``set_samples`` demotes
+        the parent generation's samples to internal nodes. The returned
+        operator wraps the same GRG with the offspring ``SampleMeta``; the
+        original parent operator becomes stale.
+
+        Crossover positions are sampled per locus from
+        ``recombination_map._probabilities`` (matching the dense
+        ``_meiosis_3d`` kernel's distribution), then translated into bp-space
+        segments using ``self.variants.pos_bp``.
+
+        Parameters
+        ----------
+        assignment : MateAssignment
+            Maternal/paternal indices into the parent generation and offspring
+            ``SampleMeta``.
+        recombination_map : RecombinationMap
+            Per-locus recombination probabilities.
+
+        Returns
+        -------
+        GraphHaplotypeOperator
+            Offspring operator wrapping the (mutated) same GRG.
+        """
+        from xftsim.grg_recombination import (
+            NonDuplicationRecombination,
+            _phase_to_segments,
+        )
+        from xftsim.reproduce import _meiosis_i
+
+        # Use GRG-internal mutation positions, not self.variants.pos_bp.
+        # The recombination algorithm filters mutations via mut.position, so
+        # segments must reference the same coordinate system. (xftsim's
+        # variants.pos_bp may be a sequential-index placeholder -- e.g.,
+        # founders.founder_haplotypes_from_msprime_grg sets it to
+        # np.arange(m) -- which would not align with the GRG's true
+        # bp-space mutations.)
+        pos_bp = np.fromiter(
+            (self._grg.get_mutation_by_id(i).position for i in range(self.m)),
+            dtype=np.int64,
+            count=self.m,
+        )
+        if pos_bp.size > 1 and np.any(np.diff(pos_bp) < 0):
+            raise ValueError(
+                "GRG-native meiosis requires mutation positions to be "
+                "monotonically non-decreasing along mutation-id order."
+            )
+
+        recomb_p = np.ascontiguousarray(recombination_map._probabilities, dtype=np.float64)
+
+        recomb = NonDuplicationRecombination(self._grg)
+        recomb.defer_sample_updates = True
+
+        # Convention: get_sample_nodes() returns 2*n_ind haploid IDs in
+        # individual-interleaved order -- samples[2i] = ind i maternal,
+        # samples[2i+1] = ind i paternal. This matches matvec_maternal /
+        # matvec_paternal above (out[:, 0::2] even = maternal).
+        parent_sample_nodes = list(self._grg.get_sample_nodes())
+        genome_length = int(self._grg.bp_range[1])
+
+        new_offspring_grg_ids = []
+        n_off = assignment.offspring_samples.n
+        maternal_idx = assignment.maternal_idx
+        paternal_idx = assignment.paternal_idx
+
+        for i in range(n_off):
+            mat_i = int(maternal_idx[i])
+            pat_i = int(paternal_idx[i])
+            mat_haps = (parent_sample_nodes[2 * mat_i],
+                        parent_sample_nodes[2 * mat_i + 1])
+            pat_haps = (parent_sample_nodes[2 * pat_i],
+                        parent_sample_nodes[2 * pat_i + 1])
+
+            for parent_haps in (mat_haps, pat_haps):
+                phase = _meiosis_i(recomb_p)
+                segments = _phase_to_segments(phase, pos_bp, parent_haps, genome_length)
+                neg_id = recomb.recombine_multi(segments)
+                raw_id = recomb.NEGATIVE_NODE_IDS[abs(neg_id) - 1]
+                new_offspring_grg_ids.append(raw_id)
+
+        # One wholesale sample swap (parents -> offspring), then compact.
+        new_offspring_grg_ids.sort()
+        self._grg.set_samples(new_offspring_grg_ids)
+        recomb._pending_sample_removals.clear()
+        self._grg.sort_mutations()
+
+        return GraphHaplotypeOperator(
+            grg=self._grg,
+            generation=assignment.offspring_samples.generation,
+            samples=assignment.offspring_samples,
+            variants=self.variants,
+        )
 
     def __getitem__(self, key) -> DenseHaplotypeArray:
         """Materialize to dense and subset."""
