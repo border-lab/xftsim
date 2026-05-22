@@ -14,7 +14,6 @@
 | {ref}`io <xftsim:xftsim.io module>`               | Routines for reading and writing data to disk                                     |           |
 | {ref}`mate <xftsim:xftsim.mate module>`           | Mating regimes and the `MateAssignment` class                           |           |
 | {ref}`ped <xftsim:xftsim.ped module>`             | Pedigree data stuctures                                                           |           |
-| {ref}`proc <xftsim:xftsim.proc module>`           | Data post-processors (saving intermediate simulation data, limiting memory, etc.) |           |
 | {ref}`reproduce <xftsim:xftsim.reproduce module>` | Reproduction and transmission of genetic and phenotypic data                      |           |
 | {ref}`sim <xftsim:xftsim.sim module>`             | Simulation class for setting up and running experiments                           |           |
 | {ref}`stats <xftsim:xftsim.stats module>`         | Statistical estimators                                                            |           |

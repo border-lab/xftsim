@@ -80,9 +80,23 @@ autosectionlabel_prefix_document = True
 autosummary_generate = True
 
 # -- Mock imports for autodoc ------------------------------------------------
-# nptyping is incompatible with newer numpy (removed np.bool8); mock it so
-# autodoc can import the xftsim modules without the nptyping dependency.
-autodoc_mock_imports = ['nptyping']
+# Submodules import heavy/optional third-party deps at module level (the
+# [legacy] and [grg] extras, plus matplotlib/dask). These are NOT installed in
+# the docs build (RTD runs a bare `pip install .`), so without mocking them
+# autodoc cannot import xftsim at all and every API reference page renders
+# empty. nptyping is also incompatible with newer numpy (removed np.bool8).
+autodoc_mock_imports = [
+    'nptyping',
+    'dask',
+    'funcy',
+    'matplotlib',
+    'msprime',
+    'networkx',
+    'pandas_plink',
+    'pygrgl',
+    'stdpopsim',
+    'tskit',
+]
 
 # -- Autodoc settings --------------------------------------------------------
 autodoc_default_options = {

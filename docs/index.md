@@ -80,7 +80,6 @@ index module <api_ref/index>
 io module <api_ref/io>
 mate module <api_ref/mate>
 ped module <api_ref/ped>
-proc module <api_ref/proc>
 reproduce module <api_ref/reproduce>
 sim module <api_ref/sim>
 stats module <api_ref/stats>
