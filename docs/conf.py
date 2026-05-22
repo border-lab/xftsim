@@ -11,7 +11,7 @@ import os
 project = 'xftsim'
 copyright = '2024-2026, Richard Border'
 author = 'Richard Border'
-release = '0.3.0'
+release = '0.9a'
 
 # -- Path setup --------------------------------------------------------------
 # Add the project root so autodoc can import xftsim

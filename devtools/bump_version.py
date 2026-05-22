@@ -58,16 +58,35 @@ def parse_version(version: str) -> tuple:
     return major, minor, patch, dev_num
 
 
+def split_dev(version: str) -> tuple:
+    """
+    Split a version into (base, dev_num or None).
+
+    Unlike parse_version, this accepts any base version (including PEP 440
+    pre-release forms like "0.9a"), so it works on alpha/beta branches.
+
+    Examples:
+        "0.2.0"      -> ("0.2.0", None)
+        "0.2.0.dev3" -> ("0.2.0", 3)
+        "0.9a"       -> ("0.9a", None)
+        "0.9a.dev7"  -> ("0.9a", 7)
+    """
+    match = re.match(r'^(?P<base>.+?)\.dev(?P<dev>\d+)$', version)
+    if match:
+        return match.group("base"), int(match.group("dev"))
+    return version, None
+
+
 def bump_dev(version: str) -> str:
-    """Increment dev version: 0.2.0 -> 0.2.0.dev1, 0.2.0.dev1 -> 0.2.0.dev2"""
-    major, minor, patch, dev_num = parse_version(version)
+    """
+    Increment the dev counter, preserving the base version.
 
-    if dev_num is None:
-        new_dev = 1
-    else:
-        new_dev = dev_num + 1
-
-    return f"{major}.{minor}.{patch}.dev{new_dev}"
+    Works for numeric bases ("0.2.0" -> "0.2.0.dev1") and PEP 440 pre-release
+    bases ("0.9a" -> "0.9a.dev1", "0.9a.dev1" -> "0.9a.dev2").
+    """
+    base, dev_num = split_dev(version)
+    new_dev = 1 if dev_num is None else dev_num + 1
+    return f"{base}.dev{new_dev}"
 
 
 def bump_patch(version: str) -> str:

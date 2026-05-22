@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='xftsim',
 
-    version='0.3.0.dev90',
+    version='0.9a.dev109',
 
     description='Forward-time genetics simulator',
     long_description=open('README.md').read(),
