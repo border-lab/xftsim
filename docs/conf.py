@@ -78,11 +78,8 @@ html_theme = 'sphinx_rtd_theme'
 #html_theme = 'sphinxawesome_theme'
 html_static_path = ['_static']
 html_theme_options = {
-        'logo_only':True,
-            "show_navbar_depth": 2,
-    "repository_url": "https://github.com/rborder/xftsim/docs",
-    "use_repository_button": True,
-        }
+    'logo_only': True,
+}
 html_css_files = ['custom.css']
 
 # Add "Edit on GitHub" links to the sphinx_rtd_theme sidebar.
