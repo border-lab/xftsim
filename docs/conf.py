@@ -54,19 +54,6 @@ autosectionlabel_prefix_document = True
 autosummary_generate = True
 autodoc_typehints = "none"
 
-# -- Mock imports for autodoc ------------------------------------------------
-# Submodules import optional [legacy] deps at module level. These are NOT
-# installed in the docs build (RTD runs a bare `pip install .`), so without
-# mocking them autodoc cannot import xftsim and every API reference page
-# renders empty.
-autodoc_mock_imports = [
-    'dask',
-    'funcy',
-    'networkx',
-    'nptyping',
-    'pandas_plink',
-]
-
 
 # Napoleon configurations
 
