@@ -1,5 +1,6 @@
+import importlib.resources
+
 import pandas as pd
-import pkg_resources
 
 
 def get_ceu_map():
@@ -12,6 +13,6 @@ def get_ceu_map():
         A DataFrame with the CEU haplotype map.
 
     """
-    stream = pkg_resources.resource_stream(__name__, 'maps/ceu.hg19.map')
-
-    return pd.read_csv(stream)
+    resource = importlib.resources.files(__package__).joinpath('maps/ceu.hg19.map')
+    with resource.open('rb') as stream:
+        return pd.read_csv(stream)
