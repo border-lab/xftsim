@@ -9,7 +9,7 @@ import os
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'xftsim'
-copyright = '2024, Richard Border'
+copyright = '2024-2026, Richard Border'
 author = 'Richard Border'
 release = '0.2.0'
 
@@ -84,3 +84,15 @@ html_theme_options = {
     "use_repository_button": True,
         }
 html_css_files = ['custom.css']
+
+# Add "Edit on GitHub" links to the sphinx_rtd_theme sidebar.
+# Read the Docs builds multiple branches (main, dev, v0.9alpha); use the branch
+# it is currently building so edit links point at the right ref. Falls back to
+# 'main' for local builds.
+html_context = {
+    'display_github': True,
+    'github_user': 'border-lab',
+    'github_repo': 'xftsim',
+    'github_version': os.environ.get('READTHEDOCS_GIT_IDENTIFIER', 'main'),
+    'conf_py_path': '/docs/',
+}
