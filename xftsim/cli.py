@@ -297,13 +297,22 @@ def build_simulation_from_config(config: dict):
         raise ValueError(f"Unknown mating type: {mating_type}")
 
     # --- Recombination ---
+    # Thread pos_bp through when the founders carry it, so RecombinationMap
+    # can suppress crossovers between same-position variants (see
+    # RecombinationMap docstring).
     recom_cfg = config.get("recombination", {})
     recom_type = recom_cfg.get("type", "constant")
     recom_p = recom_cfg.get("p", 0.5)
+    founder_pos_bp = None
+    founder_variants = getattr(founder_hap, "variants", None)
+    if founder_variants is not None:
+        founder_pos_bp = getattr(founder_variants, "pos_bp", None)
     if recom_type == "constant":
-        recombination_map = RecombinationMap.constant_map(m=m, p=recom_p)
+        recombination_map = RecombinationMap.constant_map(
+            m=m, p=recom_p, pos_bp=founder_pos_bp)
     else:
-        recombination_map = RecombinationMap.constant_map(m=m, p=recom_p)
+        recombination_map = RecombinationMap.constant_map(
+            m=m, p=recom_p, pos_bp=founder_pos_bp)
 
     # --- Statistics ---
     stats_cfg = config.get("statistics", [])

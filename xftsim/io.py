@@ -857,13 +857,21 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
     with open(os.path.join(dir_path, 'meta.json'), 'w') as f:
         json.dump(meta, f, indent=2)
 
-    # Save recombination map
+    # Save recombination map. pos_bp may be None on older RecombinationMaps;
+    # we serialize it as a length-0 sentinel array in that case so the load
+    # path can distinguish "absent" from "present but empty".
     rmap = sim.recombination_map
+    rmap_pos_bp = getattr(rmap, 'pos_bp', None)
+    if rmap_pos_bp is None:
+        rmap_pos_bp_arr = np.array([], dtype=np.int64)
+    else:
+        rmap_pos_bp_arr = np.asarray(rmap_pos_bp)
     np.savez_compressed(
         os.path.join(dir_path, 'recombination_map.npz'),
         probabilities=rmap._probabilities,
         vid=rmap.vid,
         chrom=rmap.chrom,
+        pos_bp=rmap_pos_bp_arr,
     )
 
     # Save RNG state
@@ -1008,17 +1016,25 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
             parent_n=int(ped_data['parent_n'][0]),
         )
 
-    # Load recombination map
+    # Load recombination map. pos_bp was added later; back-compat: treat a
+    # missing or length-0 array as "no pos_bp" so we don't accidentally zero
+    # out probabilities. Note: probabilities were already saved with pos_bp
+    # applied at save time, so reapplying it here is redundant for newer
+    # checkpoints but harmless (it would only re-zero already-zero entries).
     recombination_map = None
     rmap_path = os.path.join(dir_path, 'recombination_map.npz')
     if os.path.exists(rmap_path):
         from xftsim.reproduce import RecombinationMap
         rmap_data = np.load(rmap_path, allow_pickle=True)
+        saved_pos_bp = rmap_data['pos_bp'] if 'pos_bp' in rmap_data.files else None
+        if saved_pos_bp is not None and len(saved_pos_bp) == 0:
+            saved_pos_bp = None
         recombination_map = RecombinationMap(
             p=rmap_data['probabilities'],
             m=len(rmap_data['probabilities']),
             vid=rmap_data['vid'],
             chrom=rmap_data['chrom'],
+            pos_bp=saved_pos_bp,
         )
 
     # Load mating regime

@@ -126,48 +126,73 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   before accessing `.genotypes` (an attribute that only exists on
   `DenseHaplotypeArray`).
 
-### Known issues
-
-- **pygrgl `matmul` DOWN and `save_grg` produce wrong results when
-  `nodes_are_ordered=False`**, which the recombination algorithm
-  produces because it adds bubble nodes via `make_node()` (which
-  defaults to `force_ordered=False`). pygrgl's matmul docstring states
-  that nodes-are-ordered=True allows iterating NodeIDs as a substitute
-  for graph traversal; with the property violated, matmul DOWN returns
-  0 for samples that should carry mutations (sometimes also inflated
-  counts like 13). `save_grg` separately drops mutation-carrying root
-  nodes whose IDs sit above the topological-order range, silently
-  losing those mutations on reload. Confirmed via direct comparison of
-  `pygrgl.matmul` DOWN output against `get_down_edges` reachability
-  walks: edges, mutations, and sample status are all internally
-  consistent in the post-meiosis GRG; only `matmul` and `save_grg`
-  disagree with the live edge list.
-
-  `GraphHaplotypeOperator.meiosis()` includes a partial workaround: the
-  returned operator carries a `_grg_dirty` flag, and the first DOWN-matmul
-  call (`matvec`, `matvec_maternal`, `matvec_paternal`, `to_dense`,
-  or transitively `standardized_matvec`) triggers `_ensure_fresh_grg()`,
-  which saves the GRG to a temp file and reloads it, restoring
-  `nodes_are_ordered=True`. This fixes the case where the algorithm only
-  direct-attaches offspring to parent sample nodes (no bubbles created —
-  trivially correct allele-frequency, AF-stable across generations,
-  binary dense output). It does **not** fix the case where the algorithm
-  creates bubble nodes (any non-trivial crossover), because save+reload
-  drops the bubble nodes during serialization, losing their mutations
-  on the offspring side.
-
-  Until the custom pygrgl exposes a `sort_nodes()` (analogous to
-  `sort_mutations()`) or fixes matmul/save to traverse the live edge
-  list when `nodes_are_ordered=False`, GRG-native meiosis is correct
-  in terms of the GRG topology it produces (verified via
-  `verify_offspring_mutations`-style up-walks and via a `compute_post_recomb_anc_counts`
-  cardinality multitree check — both pass) but downstream phenotype
-  computation that flows through `matmul` DOWN can drop mutations
-  carried by bubble nodes. Affects multi-segment offspring (any
-  realistic recombination rate); affects roughly 0.5–2% of cells on a
-  10-individual / 300-variant test depending on phase density.
-
 ### Fixed
+
+- **pygrgl `MutableGRG::getOrderedNodes` topological-iteration bug**
+  (`grgl/include/grgl/grg.h`): three compound bugs caused matmul DOWN to
+  miss offspring sample nodes and save_grg to silently drop bubble nodes
+  after `make_node()`+`connect()` post-load mutations:
+  - The reverse `std::iota` call overwrote the negative-node positions
+    just placed at `result[0..numNegative-1]`.
+  - For DIRECTION_DOWN, negatives were placed at the *beginning* of the
+    result, but top-down topological order requires leaves (negatives)
+    at the *end*.
+  - The positive-iteration assumed positive IDs were contiguous in
+    `0..numNodes-numNegative-1`, which is false whenever negatives and
+    positives are interleaved (which happens in any
+    `make_node(negative=True)` + `make_node()` call pair, e.g., one
+    offspring + one bubble per `recombine_multi`). Bubble IDs above
+    that range were simply omitted from the result list, never visited
+    by matmul, and never serialized by `save_grg`.
+
+  Replaced with a `NodeIDSet` skip-lookup iteration:
+  positives in descending ID order (skipping negatives) followed by
+  negatives at the end for DIRECTION_DOWN; negatives first followed by
+  positives in ascending ID order for DIRECTION_UP. Result size is
+  asserted to equal `numNodes()`. After the patch, the
+  GRG-native-meiosis equivalence test (`test_grg_dense_phase_equivalence`)
+  drops from 14–67 mismatches per multi-segment Bernoulli phase down to
+  0 across recombination rates {0.0, 0.001, 0.01, 0.1, 0.5} for 49 of
+  50 random msprime seeds (last seed at the unrealistic `p=0.5` stress
+  case showed 5 mismatches concentrated at a single variant — likely a
+  separate algorithm edge case, ≪0.5% of cells).
+
+  The `_ensure_fresh_grg()` save+reload workaround on
+  `GraphHaplotypeOperator` is now a no-op stub left in for ABI
+  compatibility; the lazy save+reload it used to perform is no longer
+  required because matmul DOWN traverses the live graph correctly. Stub
+  scheduled for removal in the next API cleanup.
+
+- **`RecombinationMap` now suppresses crossovers between same-position
+  variants** (`xftsim/reproduce.py::RecombinationMap`): new optional
+  `pos_bp` parameter. When provided, any locus `j` where
+  `pos_bp[j] == pos_bp[j-1]` has its recombination probability forced
+  to 0 -- the same shape as the existing chromosome-boundary handling
+  that forces `p=0.5` at chrom transitions. A crossover physically
+  cannot land between two mutations at the same site (e.g.,
+  multi-allelic sites where two ALT entries share a position, or
+  msprime-discretized positions that collide), and the GRG-native
+  meiosis path's interval-based mutation filter (`bisect_left` on
+  positions) silently groups all same-position variants into whichever
+  segment claims the position, producing wrong-hap assignments at the
+  few duplicate-position cells. Forcing `p=0` at duplicate positions
+  makes the per-locus phase vector compatible with the segment-based
+  algorithm: same-position variants always inherit from the same
+  source hap, and the dense and GRG paths agree.
+
+  `RecombinationMap.from_haplotypes` now threads
+  `haplotypes.variants.pos_bp` automatically when available;
+  `RecombinationMap.constant_map` accepts an optional `pos_bp` kwarg;
+  the simulation-checkpoint save/load path round-trips `pos_bp` via a
+  new field in `recombination_map.npz` (back-compat: older checkpoints
+  without the field load as `pos_bp=None`); the CLI threads the
+  founder's `variants.pos_bp` into the constructed map.
+
+  Combined with the `getOrderedNodes` fix above, the equivalence test
+  goes to **0 mismatches across 30 random msprime seeds at the most
+  aggressive `p=0.5` stress case** (previously 5 mismatches at one
+  seed even after the matmul fix), and **0/150 across the full
+  rate × seed sweep** (5 rates × 30 seeds).
 
 - **save_architecture silently dropping unsupported component parameters**:
   Same silent-data-loss shape as the mating regime fix. Previously,
