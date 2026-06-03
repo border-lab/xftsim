@@ -147,15 +147,32 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
   Replaced with a `NodeIDSet` skip-lookup iteration:
   positives in descending ID order (skipping negatives) followed by
-  negatives at the end for DIRECTION_DOWN; negatives first followed by
+  negatives at the end for DIRECTION_DOWN; negatives first (in
+  *reverse* creation order — see multi-gen note below) followed by
   positives in ascending ID order for DIRECTION_UP. Result size is
   asserted to equal `numNodes()`. After the patch, the
   GRG-native-meiosis equivalence test (`test_grg_dense_phase_equivalence`)
   drops from 14–67 mismatches per multi-segment Bernoulli phase down to
   0 across recombination rates {0.0, 0.001, 0.01, 0.1, 0.5} for 49 of
   50 random msprime seeds (last seed at the unrealistic `p=0.5` stress
-  case showed 5 mismatches concentrated at a single variant — likely a
-  separate algorithm edge case, ≪0.5% of cells).
+  case showed 5 mismatches concentrated at a single variant — fixed
+  separately by the `RecombinationMap pos_bp` change below).
+
+  *Multi-generation correctness note.* In multi-generation simulations
+  the `NonDuplicationRecombination` algorithm can fire its path-
+  compression early-attach on an older negative offspring (now a
+  non-leaf ancestor), producing `older_negative → newer_negative`
+  DOWN edges across generations. So "negatives are leaves" only holds
+  within a single `recombine_multi` call; across generations negatives
+  form intra-negative chains. Within `m_negativeNodes` the edges
+  always go older→younger (parents older than children), since the
+  algorithm only ever attaches newer offspring to older nodes.
+  Creation order in `m_negativeNodes` is older-first, so DOWN
+  (parents-before-children) is correct with forward iteration but UP
+  (children-before-parents) requires REVERSE iteration. Verified by a
+  10-generation simulation cross-checking `recompute_af` (matmul UP)
+  against `to_dense()`-derived AF (matmul DOWN) at every generation:
+  the two agree to 1e-9 at all 10 gens.
 
   The `_ensure_fresh_grg()` save+reload workaround on
   `GraphHaplotypeOperator` is now a no-op stub left in for ABI
