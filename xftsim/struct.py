@@ -1267,10 +1267,11 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         GraphHaplotypeOperator
             Offspring operator wrapping the (mutated) same GRG.
         """
-        from xftsim.grg_recombination import (
-            NonDuplicationRecombination,
-            _phase_to_segments,
-        )
+        from xftsim.grg_recombination import _phase_to_segments
+        try:
+            from xftsim.grg_recombination_native import NonDuplicationRecombination
+        except ImportError:
+            from xftsim.grg_recombination import NonDuplicationRecombination
         from xftsim.reproduce import _meiosis_pair_seeded, _spawn_meiosis_seeds
 
         # Use GRG-internal mutation positions, not self.variants.pos_bp.
