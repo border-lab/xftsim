@@ -869,8 +869,16 @@ class LinearAssortativeMatingRegime(MatingRegime):
         within_cov2 = np.cov(male_components, rowvar=False)
         cross_cov = self.K**2 * self.r
         R = np.sum(cross_cov)/ np.sqrt(np.sum(within_cov1)*(np.sum(within_cov2)))
-        mating_score1 = sum_scaled_mate1 * np.sqrt(R) + np.sqrt(np.abs(1-R))*np.random.normal(0,np.std(sum_scaled_mate1),n)#sum_scaled_mate1.shape[0])
-        mating_score2 = sum_scaled_mate2 * np.sqrt(R) + np.sqrt(np.abs(1-R))*np.random.normal(0,np.std(sum_scaled_mate2),n)#sum_scaled_mate2.shape[0])
+        # R carries the sign of r. Taking sqrt(R) directly yields NaN for
+        # disassortative mating, which silently degrades to random mating
+        # because np.argsort of an all-NaN array returns the identity
+        # permutation. Scale by sqrt(|R|) and put the sign on exactly one
+        # side, so that high pairs with low when R < 0. See issue #18.
+        signal_scale = np.sqrt(np.abs(R))
+        noise_scale = np.sqrt(max(0.0, 1 - np.abs(R)))
+        sign = 1.0 if R >= 0 else -1.0
+        mating_score1 = sum_scaled_mate1 * signal_scale + noise_scale*np.random.normal(0,np.std(sum_scaled_mate1),n)
+        mating_score2 = sign * sum_scaled_mate2 * signal_scale + noise_scale*np.random.normal(0,np.std(sum_scaled_mate2),n)
 
         return self.enumerate_assignment(female_indices=female_indices[np.argsort(mating_score1)[:n_new]],
                                          male_indices=male_indices[np.argsort(mating_score2)[:n_new]],
