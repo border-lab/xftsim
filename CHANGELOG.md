@@ -100,6 +100,41 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   genotypes cell-by-cell against a reference computed by directly
   indexing parent genotypes with the same phases.
 
+- **C++ native GRG recombination backend** (`xftsim/native/`): Optional
+  high-performance pybind11 extension (`grg_recomb_native`) that reimplements
+  the `NonDuplicationRecombination` algorithm in C++. The C++ recombiner is a
+  direct port of the Python implementation, preserving identical node-insertion
+  / bubble-extraction semantics so parity tests can drive correctness
+  verification. `GraphHaplotypeOperator.meiosis()` now tries the native
+  backend first and falls back to the Python implementation if the extension is
+  not installed — no API change for callers.
+
+  New files:
+  - `xftsim/native/src/recombination.cpp` — full C++ implementation
+    (~1100 lines) including `recombine`, `recombine_multi`, batched
+    sample-update deferral, pre-pruning, and generation bookkeeping
+  - `xftsim/native/include/grgl/recombination.h` — header with audit
+    counters and stats structs
+  - `xftsim/native/src/bindings.cpp` — pybind11 bindings exposing the
+    `NonDuplicationRecombiner` class to Python
+  - `xftsim/native/CMakeLists.txt` — build system linking against the
+    grgl source tree (auto-detects `../../grgl` or `../grgl`, overrideable
+    via `-DGRGL_ROOT`); uses grgl's bundled pybind11 to match the `pygrgl`
+    ABI
+  - `xftsim/grg_recombination_native.py` — thin Python adapter wrapping
+    the C++ class with the same interface as
+    `grg_recombination.NonDuplicationRecombination` (drop-in swap)
+
+- **`tests/unit/test_grg_oracle.py`**: Mutation-level correctness test suite
+  (25 tests) for GRG recombination. For each offspring haplotype, walks the
+  GRG upward from the offspring node to collect inherited mutation positions,
+  then verifies they match *exactly* the mutations expected from splicing the
+  source parent haplotypes at the recorded breakpoints. Tests cover single-gen,
+  multi-gen (5 generations), single-offspring, edge cases (empty segments,
+  zero-length GRG, single-variant), and cross-backend parity (Python vs C++
+  backends produce identical offspring genotypes). Both backends are tested
+  when available; C++ tests skip cleanly via `pytest.importorskip`.
+
 ### Changed
 
 - **All four GRG loaders switched from `pygrgl.load_immutable_grg` to

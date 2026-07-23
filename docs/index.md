@@ -30,15 +30,16 @@ Quickstart <gettingstarted/quickstart>
 :maxdepth: 4
 :caption: User guide
 
-Nuts and bolts <userguide/nutsandbolts>
-Anatomy of a simulation <userguide/simulation>
-Founder data <userguide/founder>
-Recombination maps <userguide/rmaps>
-Phenogenetic architectures <userguide/arch>
-Mating regimes <userguide/mate>
-Statistics <userguide/stats>
-Post-processing <userguide/proc>
-Advanced genetic architectures <userguide/advgen>
+Nuts and bolts <userguide_v0.9/nutsandbolts>
+Anatomy of a simulation <userguide_v0.9/simulation>
+Founder data <userguide_v0.9/founder>
+Recombination maps <userguide_v0.9/rmaps>
+Phenogenetic architectures <userguide_v0.9/arch>
+Mating regimes <userguide_v0.9/mate>
+Statistics <userguide_v0.9/stats>
+Data structures <userguide_v0.9/struct>
+Indexing <userguide_v0.9/indexing>
+Advanced genetic architectures <userguide_v0.9/advgen>
 ```
 
 ```{toctree}

@@ -4,6 +4,20 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### C++ Native Extension Build System (2026-06-27)
+
+- Added `xftsim/native/` — CMake + pybind11 build system for the C++
+  `NonDuplicationRecombiner`. Links against the grgl source tree as a CMake
+  subproject (auto-detects relative paths, overrideable via `-DGRGL_ROOT`).
+  Uses grgl's bundled pybind11 to ensure ABI compatibility with `pygrgl`.
+- Added `tests/unit/test_grg_oracle.py` — 25 mutation-level correctness
+  tests using a GRG-walk oracle to verify both the Python and C++ backends
+  produce exactly the right inherited mutations per offspring. Cross-backend
+  parity tests confirm the two implementations agree cell-by-cell.
+- Added `xftsim/native/test_parity.py` — standalone parity harness for
+  development-time testing of the C++ backend against the Python reference
+  outside of pytest.
+
 ### Test Suite Split: Unit vs Notebook Integration (2026-05-26)
 
 - Renamed `tests/integration/` → `tests/pipeline/`. The 35 hand-coded
