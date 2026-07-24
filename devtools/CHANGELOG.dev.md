@@ -4,6 +4,50 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### C++ Native Extension Build System (2026-06-27)
+
+- Added `xftsim/native/` — CMake + pybind11 build system for the C++
+  `NonDuplicationRecombiner`. Links against the grgl source tree as a CMake
+  subproject (auto-detects relative paths, overrideable via `-DGRGL_ROOT`).
+  Uses grgl's bundled pybind11 to ensure ABI compatibility with `pygrgl`.
+- Added `tests/unit/test_grg_oracle.py` — 25 mutation-level correctness
+  tests using a GRG-walk oracle to verify both the Python and C++ backends
+  produce exactly the right inherited mutations per offspring. Cross-backend
+  parity tests confirm the two implementations agree cell-by-cell.
+- Added `xftsim/native/test_parity.py` — standalone parity harness for
+  development-time testing of the C++ backend against the Python reference
+  outside of pytest.
+
+### Test Suite Split: Unit vs Notebook Integration (2026-05-26)
+
+- Renamed `tests/integration/` → `tests/pipeline/`. The 35 hand-coded
+  simulation-pipeline tests were not actually executing the example
+  notebooks; this rename surfaces what they actually do (Python-coded
+  end-to-end Simulation runs).
+- Added a new `tests/integration/` populated exclusively with
+  notebook-execution tests: one module per `docs/examples/0N_*.ipynb`,
+  each loading the notebook, executing its code cells in a fresh
+  namespace, and asserting that the resulting scientific quantities
+  (variances, correlations, regression coefficients, etc.) are within
+  tolerance of their expected values.
+- The notebook runner lives in `tests/integration/conftest.py` as
+  `run_notebook(path) -> dict`. It does not spin up a Jupyter kernel —
+  the example notebooks are plain numpy / pandas without magics, so a
+  direct `exec` is faster and gives us the post-execution globals for
+  assertions.
+- Per-notebook test modules:
+  - 01-05: fast, run by default
+  - 06: `xfail` (documents the stale
+    `HasemanElstonEstimator(filter_name='sibpair')` call in the notebook
+    that the repo owner has chosen not to patch)
+  - 07: `skipif` on missing `pygrgl` + glink fixture files
+  - 08: `skipif` behind `XFTSIM_RUN_SLOW_EXAMPLES=1` (notebook §5 runs
+    n=10k, m=2k OLS regression)
+- New layout reflects the project testing philosophy: **unit** = function
+  I/O verification; **integration** = run example notebooks and verify
+  results within tolerance. `tests/numerical/` and `tests/manuscript/`
+  remain as specialised middle layers.
+
 ### Adversarial Review Workflow (2026-03-16)
 
 - Added `devtools/math_spec.md` — mathematical specification extracted from manuscript

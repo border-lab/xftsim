@@ -29,6 +29,17 @@ class RecombinationMap:
         Variant IDs, default is None.
     chrom : numpy.ndarray, optional
         Chromosomes, default is None.
+    pos_bp : numpy.ndarray, optional
+        Per-variant base-pair positions, default is None. When provided,
+        any locus j where ``pos_bp[j] == pos_bp[j-1]`` has its
+        recombination probability forced to 0: crossover cannot occur
+        between two mutations at the same physical site (e.g.,
+        multi-allelic sites where two ALT entries share a position, or
+        msprime-discretized positions that collide). Without this guard,
+        the GRG-native meiosis path's interval-based mutation filter
+        (``bisect_left`` on positions) silently groups all same-position
+        variants into whichever segment claims the position, producing
+        wrong-hap assignments at the few duplicate-position cells.
     """
 
     def __init__(self,
@@ -36,6 +47,7 @@ class RecombinationMap:
                  m: int = None,
                  vid: NDArray[Shape["*"], Any] = None,
                  chrom: NDArray[Shape["*"], Int64] = None,
+                 pos_bp: NDArray[Shape["*"], Int64] = None,
                  ):
         if m is not None:
             self.m = m
@@ -51,6 +63,7 @@ class RecombinationMap:
 
         self.vid = vid
         self.chrom = chrom
+        self.pos_bp = pos_bp
 
         # Chromosome boundaries (where recombination probability is 0.5)
         self._chrom_boundary = np.concatenate(
@@ -69,8 +82,24 @@ class RecombinationMap:
         # Force chromosome boundaries to have 0.5 probability
         self._probabilities[self._chrom_boundary] = 0.5
 
+        # Force p=0 wherever consecutive variants share a bp position.
+        # A crossover physically cannot land between two mutations at the
+        # same site, and the GRG-native meiosis path cannot represent it
+        # via interval-based segments (bisect_left collapses duplicates).
+        # Forcing p=0 here makes the per-locus phase vector compatible
+        # with the segment-based algorithm: same-position variants always
+        # inherit from the same source hap.
+        if pos_bp is not None:
+            pos_bp_arr = np.asarray(pos_bp)
+            assert pos_bp_arr.shape[0] == self.m, "pos_bp must have length m"
+            same_pos_with_prev = np.concatenate(
+                [[False], pos_bp_arr[1:] == pos_bp_arr[:-1]])
+            self._probabilities[same_pos_with_prev] = 0.0
+
     @staticmethod
-    def constant_map(m: int, p: float = 0.5) -> "RecombinationMap":
+    def constant_map(m: int, p: float = 0.5,
+                     pos_bp: NDArray[Shape["*"], Int64] = None,
+                     ) -> "RecombinationMap":
         """
         Create a constant recombination map.
 
@@ -80,24 +109,35 @@ class RecombinationMap:
             Number of variants.
         p : float, optional
             Recombination probability, default is 0.5.
+        pos_bp : numpy.ndarray, optional
+            Per-variant base-pair positions; forwarded to
+            ``RecombinationMap.__init__`` to suppress crossovers between
+            same-position variants. See class docstring.
 
         Returns
         -------
         RecombinationMap
             A constant recombination map.
         """
-        return RecombinationMap(p=p, m=m)
+        return RecombinationMap(p=p, m=m, pos_bp=pos_bp)
 
     @staticmethod
-    def from_haplotypes(haplotypes: xft.struct.DenseHaplotypeArray,
+    def from_haplotypes(haplotypes,
                         p: float = 0.5) -> "RecombinationMap":
         """
         Create a constant recombination map from haplotypes.
 
+        Threads ``haplotypes.variants.pos_bp`` into the constructor when
+        available so that same-position variants are properly handled
+        (see class docstring). Falls back to None when the haplotype
+        object lacks position metadata, which preserves the historical
+        behavior.
+
         Parameters
         ----------
-        haplotypes : DenseHaplotypeArray
-            Haplotypes data.
+        haplotypes : DenseHaplotypeArray or GraphHaplotypeOperator
+            Haplotypes data. Any object with ``.m`` and ``.vid``; if it
+            also exposes ``.variants.pos_bp``, that's used.
         p : float, optional
             Probability, default is 0.5.
 
@@ -106,7 +146,12 @@ class RecombinationMap:
         RecombinationMap
             A constant recombination map.
         """
-        return RecombinationMap(p=p, m=haplotypes.m, vid=haplotypes.vid)
+        pos_bp = None
+        variants = getattr(haplotypes, "variants", None)
+        if variants is not None:
+            pos_bp = getattr(variants, "pos_bp", None)
+        return RecombinationMap(p=p, m=haplotypes.m, vid=haplotypes.vid,
+                                pos_bp=pos_bp)
 
     def __repr__(self):
         df = pd.DataFrame.from_dict(dict(vid=self.vid,

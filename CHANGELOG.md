@@ -170,6 +170,41 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   genotypes cell-by-cell against a reference computed by directly
   indexing parent genotypes with the same phases.
 
+- **C++ native GRG recombination backend** (`xftsim/native/`): Optional
+  high-performance pybind11 extension (`grg_recomb_native`) that reimplements
+  the `NonDuplicationRecombination` algorithm in C++. The C++ recombiner is a
+  direct port of the Python implementation, preserving identical node-insertion
+  / bubble-extraction semantics so parity tests can drive correctness
+  verification. `GraphHaplotypeOperator.meiosis()` now tries the native
+  backend first and falls back to the Python implementation if the extension is
+  not installed — no API change for callers.
+
+  New files:
+  - `xftsim/native/src/recombination.cpp` — full C++ implementation
+    (~1100 lines) including `recombine`, `recombine_multi`, batched
+    sample-update deferral, pre-pruning, and generation bookkeeping
+  - `xftsim/native/include/grgl/recombination.h` — header with audit
+    counters and stats structs
+  - `xftsim/native/src/bindings.cpp` — pybind11 bindings exposing the
+    `NonDuplicationRecombiner` class to Python
+  - `xftsim/native/CMakeLists.txt` — build system linking against the
+    grgl source tree (auto-detects `../../grgl` or `../grgl`, overrideable
+    via `-DGRGL_ROOT`); uses grgl's bundled pybind11 to match the `pygrgl`
+    ABI
+  - `xftsim/grg_recombination_native.py` — thin Python adapter wrapping
+    the C++ class with the same interface as
+    `grg_recombination.NonDuplicationRecombination` (drop-in swap)
+
+- **`tests/unit/test_grg_oracle.py`**: Mutation-level correctness test suite
+  (25 tests) for GRG recombination. For each offspring haplotype, walks the
+  GRG upward from the offspring node to collect inherited mutation positions,
+  then verifies they match *exactly* the mutations expected from splicing the
+  source parent haplotypes at the recorded breakpoints. Tests cover single-gen,
+  multi-gen (5 generations), single-offspring, edge cases (empty segments,
+  zero-length GRG, single-variant), and cross-backend parity (Python vs C++
+  backends produce identical offspring genotypes). Both backends are tested
+  when available; C++ tests skip cleanly via `pytest.importorskip`.
+
 ### Changed
 
 - **All four GRG loaders switched from `pygrgl.load_immutable_grg` to
@@ -196,48 +231,90 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   before accessing `.genotypes` (an attribute that only exists on
   `DenseHaplotypeArray`).
 
-### Known issues
-
-- **pygrgl `matmul` DOWN and `save_grg` produce wrong results when
-  `nodes_are_ordered=False`**, which the recombination algorithm
-  produces because it adds bubble nodes via `make_node()` (which
-  defaults to `force_ordered=False`). pygrgl's matmul docstring states
-  that nodes-are-ordered=True allows iterating NodeIDs as a substitute
-  for graph traversal; with the property violated, matmul DOWN returns
-  0 for samples that should carry mutations (sometimes also inflated
-  counts like 13). `save_grg` separately drops mutation-carrying root
-  nodes whose IDs sit above the topological-order range, silently
-  losing those mutations on reload. Confirmed via direct comparison of
-  `pygrgl.matmul` DOWN output against `get_down_edges` reachability
-  walks: edges, mutations, and sample status are all internally
-  consistent in the post-meiosis GRG; only `matmul` and `save_grg`
-  disagree with the live edge list.
-
-  `GraphHaplotypeOperator.meiosis()` includes a partial workaround: the
-  returned operator carries a `_grg_dirty` flag, and the first DOWN-matmul
-  call (`matvec`, `matvec_maternal`, `matvec_paternal`, `to_dense`,
-  or transitively `standardized_matvec`) triggers `_ensure_fresh_grg()`,
-  which saves the GRG to a temp file and reloads it, restoring
-  `nodes_are_ordered=True`. This fixes the case where the algorithm only
-  direct-attaches offspring to parent sample nodes (no bubbles created —
-  trivially correct allele-frequency, AF-stable across generations,
-  binary dense output). It does **not** fix the case where the algorithm
-  creates bubble nodes (any non-trivial crossover), because save+reload
-  drops the bubble nodes during serialization, losing their mutations
-  on the offspring side.
-
-  Until the custom pygrgl exposes a `sort_nodes()` (analogous to
-  `sort_mutations()`) or fixes matmul/save to traverse the live edge
-  list when `nodes_are_ordered=False`, GRG-native meiosis is correct
-  in terms of the GRG topology it produces (verified via
-  `verify_offspring_mutations`-style up-walks and via a `compute_post_recomb_anc_counts`
-  cardinality multitree check — both pass) but downstream phenotype
-  computation that flows through `matmul` DOWN can drop mutations
-  carried by bubble nodes. Affects multi-segment offspring (any
-  realistic recombination rate); affects roughly 0.5–2% of cells on a
-  10-individual / 300-variant test depending on phase density.
-
 ### Fixed
+
+- **pygrgl `MutableGRG::getOrderedNodes` topological-iteration bug**
+  (`grgl/include/grgl/grg.h`): three compound bugs caused matmul DOWN to
+  miss offspring sample nodes and save_grg to silently drop bubble nodes
+  after `make_node()`+`connect()` post-load mutations:
+  - The reverse `std::iota` call overwrote the negative-node positions
+    just placed at `result[0..numNegative-1]`.
+  - For DIRECTION_DOWN, negatives were placed at the *beginning* of the
+    result, but top-down topological order requires leaves (negatives)
+    at the *end*.
+  - The positive-iteration assumed positive IDs were contiguous in
+    `0..numNodes-numNegative-1`, which is false whenever negatives and
+    positives are interleaved (which happens in any
+    `make_node(negative=True)` + `make_node()` call pair, e.g., one
+    offspring + one bubble per `recombine_multi`). Bubble IDs above
+    that range were simply omitted from the result list, never visited
+    by matmul, and never serialized by `save_grg`.
+
+  Replaced with a `NodeIDSet` skip-lookup iteration:
+  positives in descending ID order (skipping negatives) followed by
+  negatives at the end for DIRECTION_DOWN; negatives first (in
+  *reverse* creation order — see multi-gen note below) followed by
+  positives in ascending ID order for DIRECTION_UP. Result size is
+  asserted to equal `numNodes()`. After the patch, the
+  GRG-native-meiosis equivalence test (`test_grg_dense_phase_equivalence`)
+  drops from 14–67 mismatches per multi-segment Bernoulli phase down to
+  0 across recombination rates {0.0, 0.001, 0.01, 0.1, 0.5} for 49 of
+  50 random msprime seeds (last seed at the unrealistic `p=0.5` stress
+  case showed 5 mismatches concentrated at a single variant — fixed
+  separately by the `RecombinationMap pos_bp` change below).
+
+  *Multi-generation correctness note.* In multi-generation simulations
+  the `NonDuplicationRecombination` algorithm can fire its path-
+  compression early-attach on an older negative offspring (now a
+  non-leaf ancestor), producing `older_negative → newer_negative`
+  DOWN edges across generations. So "negatives are leaves" only holds
+  within a single `recombine_multi` call; across generations negatives
+  form intra-negative chains. Within `m_negativeNodes` the edges
+  always go older→younger (parents older than children), since the
+  algorithm only ever attaches newer offspring to older nodes.
+  Creation order in `m_negativeNodes` is older-first, so DOWN
+  (parents-before-children) is correct with forward iteration but UP
+  (children-before-parents) requires REVERSE iteration. Verified by a
+  10-generation simulation cross-checking `recompute_af` (matmul UP)
+  against `to_dense()`-derived AF (matmul DOWN) at every generation:
+  the two agree to 1e-9 at all 10 gens.
+
+  The `_ensure_fresh_grg()` save+reload workaround on
+  `GraphHaplotypeOperator` is now a no-op stub left in for ABI
+  compatibility; the lazy save+reload it used to perform is no longer
+  required because matmul DOWN traverses the live graph correctly. Stub
+  scheduled for removal in the next API cleanup.
+
+- **`RecombinationMap` now suppresses crossovers between same-position
+  variants** (`xftsim/reproduce.py::RecombinationMap`): new optional
+  `pos_bp` parameter. When provided, any locus `j` where
+  `pos_bp[j] == pos_bp[j-1]` has its recombination probability forced
+  to 0 -- the same shape as the existing chromosome-boundary handling
+  that forces `p=0.5` at chrom transitions. A crossover physically
+  cannot land between two mutations at the same site (e.g.,
+  multi-allelic sites where two ALT entries share a position, or
+  msprime-discretized positions that collide), and the GRG-native
+  meiosis path's interval-based mutation filter (`bisect_left` on
+  positions) silently groups all same-position variants into whichever
+  segment claims the position, producing wrong-hap assignments at the
+  few duplicate-position cells. Forcing `p=0` at duplicate positions
+  makes the per-locus phase vector compatible with the segment-based
+  algorithm: same-position variants always inherit from the same
+  source hap, and the dense and GRG paths agree.
+
+  `RecombinationMap.from_haplotypes` now threads
+  `haplotypes.variants.pos_bp` automatically when available;
+  `RecombinationMap.constant_map` accepts an optional `pos_bp` kwarg;
+  the simulation-checkpoint save/load path round-trips `pos_bp` via a
+  new field in `recombination_map.npz` (back-compat: older checkpoints
+  without the field load as `pos_bp=None`); the CLI threads the
+  founder's `variants.pos_bp` into the constructed map.
+
+  Combined with the `getOrderedNodes` fix above, the equivalence test
+  goes to **0 mismatches across 30 random msprime seeds at the most
+  aggressive `p=0.5` stress case** (previously 5 mismatches at one
+  seed even after the matmul fix), and **0/150 across the full
+  rate × seed sweep** (5 rates × 30 seeds).
 
 - **save_architecture silently dropping unsupported component parameters**:
   Same silent-data-loss shape as the mating regime fix. Previously,
@@ -345,7 +422,7 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   without further plumbing. The `extra` dict is preserved through
   `SampleMeta.subset`, `with_generation`, and meiosis, so labels survive
   multi-generation simulations.
-- **tests/integration/test_grg_founders.py and test_grg_founders_stdpopsim.py**:
+- **tests/pipeline/test_grg_founders.py and test_grg_founders_stdpopsim.py**:
   Integration tests for the two GRG founder helpers (msprime and stdpopsim
   paths). Both files were brought into line with the repo's integration-test
   conventions: module-level `pytest.importorskip` guards for `pygrgl` /
@@ -365,6 +442,27 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   of `xftsim/founders.py` for the GRG-based founder helpers and were
   previously only available transitively. Install with
   `pip install xftsim[grg]`.
+- **tests/manuscript/test_figure2.py**: Reproduces Figure 2 — 6 psychiatric
+  traits under empirical cross-mate correlations (one bootstrap seed from
+  `psych_cors.csv` bundled inline so the test is self-contained). Asserts that
+  HE-estimated rg grows generation by generation despite orthogonal genetic
+  effects.
+- **tests/manuscript/test_figure3.py**: Reproduces Figure 3 — four scenarios
+  (RM, RM+VT, 5xAM, 5xAM+VT) at 5 traits with h²=0.5 and orthogonal effects.
+  Verifies gen-5 HE estimates approximately match Table S6 and that xAM
+  inflates rg relative to random mating.
+- **docs/userguide_v0.9/**: User guide rewritten against the v0.9 refactor.
+  Replaces the legacy `ArchitectureComponent` hierarchy with the
+  lavaan-style formula DSL throughout (`genetic`, `noise`, `cnoise`,
+  `threshold`, `mother`/`father`/`parent`, `sibling_*`, plus arithmetic
+  aggregation expressions for sums and GxE products). Covers the new
+  `DenseHaplotypeArray` / `PhenotypeArray` / `SampleMeta` / `VariantMeta`
+  data structures, the renamed mating regimes (`RandomMating`,
+  `LinearAssortativeMating`, `GeneralAssortativeMating`, `BatchedMating`),
+  the GRM-based `HasemanElstonEstimator`, the new `ParentOffspringRegression`,
+  the filter system (`TrioFilter`, etc.), and the
+  `retain_haplotypes` / `retain_phenotypes` Simulation kwargs that
+  replace the removed `xftsim.proc.LimitMemory` post-processor.
 
 ---
 

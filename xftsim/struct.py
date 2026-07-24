@@ -1114,32 +1114,19 @@ class GraphHaplotypeOperator(HaplotypeOperator):
     def generation(self, value: int):
         self._generation = value
 
-    # --- matmul-staleness workaround --------------------------------------
-    # pygrgl.matmul with TraversalDirection.DOWN reads a per-node
-    # "is-sample" flag that gets baked in at GRG load time. After
-    # set_samples (called inside meiosis()) the flag is stale on every
-    # node that was a sample at load time but no longer is. The simplest
-    # robust fix from outside pygrgl is to save and reload the GRG --
-    # the load path regenerates the flag from the current sample list.
-    # Mutation IDs and positions are preserved across save+reload (only
-    # node IDs renumber), so self.variants stays valid.
-
     def _ensure_fresh_grg(self):
-        """If the GRG has been mutated since the last reload, save it,
-        reload it, and swap ``self._grg`` to the reloaded copy. No-op
-        otherwise. Call this at the top of any method that invokes
-        ``pygrgl.matmul`` with ``TraversalDirection.DOWN``."""
-        if not self._grg_dirty:
-            return
-        import os
-        import tempfile
-        import pygrgl
-        with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "reload.grg")
-            pygrgl.save_grg(self._grg, path)
-            self._grg = pygrgl.load_mutable_grg(path)
-        self._cached_af = None  # stale: depended on old GRG topology
-        self._grg_dirty = False
+        """Historical hook for a save+reload workaround that used to be needed
+        because pygrgl's matmul DOWN and save_grg both relied on
+        ``getOrderedNodes`` returning a complete and correctly-ordered node
+        list, and the pre-patch implementation dropped both bubble nodes
+        (created via ``make_node()`` post-load) and offspring negative nodes
+        from that list. With the patched ``getOrderedNodes`` in grgl
+        (see grgl/include/grgl/grg.h ``MutableGRG::getOrderedNodes``),
+        matmul DOWN traverses the live graph correctly and no reload is
+        needed. This stub is kept so call sites in ``matvec`` /
+        ``matvec_maternal`` / ``matvec_paternal`` / ``to_dense`` remain
+        unchanged; remove with the next API cleanup."""
+        return
 
     # --- matrix-vector operations ---
 
@@ -1280,10 +1267,11 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         GraphHaplotypeOperator
             Offspring operator wrapping the (mutated) same GRG.
         """
-        from xftsim.grg_recombination import (
-            NonDuplicationRecombination,
-            _phase_to_segments,
-        )
+        from xftsim.grg_recombination import _phase_to_segments
+        try:
+            from xftsim.grg_recombination_native import NonDuplicationRecombination
+        except ImportError:
+            from xftsim.grg_recombination import NonDuplicationRecombination
         from xftsim.reproduce import _meiosis_pair_seeded, _spawn_meiosis_seeds
 
         # Use GRG-internal mutation positions, not self.variants.pos_bp.

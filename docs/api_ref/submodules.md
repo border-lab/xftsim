@@ -15,6 +15,8 @@
 | {ref}`mate <xftsim:xftsim.mate module>`           | Mating regimes and the `MateAssignment` class                           |           |
 | {ref}`ped <xftsim:xftsim.ped module>`             | Pedigree data stuctures                                                           |           |
 | {ref}`reproduce <xftsim:xftsim.reproduce module>` | Reproduction and transmission of genetic and phenotypic data                      |           |
+| `grg_recombination`                               | GRG-native recombination via the bubble-insertion (node-insertion) algorithm      |           |
+| `grg_recombination_native`                        | Optional C++ backend for GRG recombination (pybind11 adapter)                    |           |
 | {ref}`sim <xftsim:xftsim.sim module>`             | Simulation class for setting up and running experiments                           |           |
 | {ref}`stats <xftsim:xftsim.stats module>`         | Statistical estimators                                                            |           |
 | {ref}`struct <xftsim:xftsim.struct module>`       | Basic data structures for working with genotype and phenotype data                |           |
