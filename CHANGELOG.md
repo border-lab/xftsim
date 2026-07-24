@@ -38,16 +38,28 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   the rest of the solve is single-threaded. Smaller K is much cheaper
   (K = 5 at n = 20,000 takes under a second) and larger K much dearer
   (K = 15 does not reach 0.005 at n = 20,000 within the default budget).
-  Wrapping in `BatchedMating` is close to free — the cross-correlation
-  statistic is additive over individuals, so the combined value is the
-  size-weighted average of per-batch values — and it keeps the solver's
-  working set cache-resident, which speeds it up substantially at large n.
+  Wrapping in `BatchedMating` speeds large solves up but is not accuracy-free.
+  The merged cross-correlation is the size-weighted average of the per-batch
+  values, and because every batch chases the same target on similarly
+  distributed phenotypes the per-batch residuals share a direction and do not
+  cancel: the merged error stays at roughly the per-batch floor rather than
+  averaging below it. A batch must therefore be large enough to hit the target
+  on its own, so `BatchedMating` now defaults to `max_batch_size='auto'`,
+  sizing batches to the smallest that attains the inner regime's tolerance
+  (see `xftsim.matchsolver.min_pairs_for_tol`) and warning when the whole
+  sample is too small to reach it. The previous fixed default of 1000
+  individuals was below the floor for K >= 5 at `tol = 0.005` and silently
+  produced batches that each missed the target.
 
-  The attainable error has a floor of roughly `0.5/sqrt(n)`, so small mate
-  groups cannot meet a tight target no matter the budget: at K = 10 the
-  default `tol` of 0.005 needs on the order of 5,000 mating pairs, while
-  n = 1,000 floors near 0.016 and n = 2,000 near 0.011. The solver detects
-  this stall and returns early instead of exhausting `max_evals`, and the
+  The attainable error grows with the number of components K and shrinks with
+  the pairs per batch: measured minimum pairs to reach `tol = 0.005` were
+  about 250 at K = 3, 500 at K = 5, 2,000 at K = 8, and 8,000 at K = 10. For
+  K up to about 6 the target is reachable essentially exactly; above that the
+  binding limit is how far the local search drives the residual within the
+  evaluation budget, and above K = 10 the batch-sizing estimate is
+  extrapolated and warns. A target below the reachable floor for the given
+  sample and K can never be met: the solver detects this stall and returns
+  early instead of exhausting `max_evals`, and the
   warning it raises names the floor and suggests loosening `tol` or
   simulating more individuals rather than simply spending more compute.
 

@@ -29,6 +29,7 @@ is O(nK), so n in the hundreds of thousands is routine.
 """
 from __future__ import annotations
 
+import math
 import warnings
 from dataclasses import dataclass
 
@@ -399,3 +400,71 @@ def solve_cross_correlation(Y, Z, R, tol=0.005, max_evals=None,
     return MatchResult(perm=perm, residual=resid, max_abs_residual=max_abs,
                        frobenius_residual=float(np.linalg.norm(resid)),
                        evals=int(evals), converged=bool(max_abs < tol))
+
+
+# --- Accuracy floor model --------------------------------------------------
+#
+# The reachable cross-correlation error has a practical floor that grows with
+# the number of components K and falls with the number of matched pairs. It is
+# not a clean sampling-noise floor: for K up to about 6 the target is reachable
+# to ~0 cheaply, while for larger K the binding limit is how far the local
+# search can drive the residual within a fixed evaluation budget. The floor is
+# therefore calibrated operationally, as the smallest pair count that reliably
+# reaches a target tolerance across seeds, and summarized as a constant
+# ``c(K)`` in ``floor ~= c(K) / sqrt(pairs)``, i.e. ``pairs ~= (c(K) / tol)^2``.
+#
+# Measured on jointly-normal instances (K, c): (3, 0.08), (5, 0.11), (8, 0.22),
+# (10, 0.45), with a small-K anchor at (1, 0.03). These are approximate and
+# machine- and data-dependent — real phenotypes with strong collinearity shift
+# them — so callers should treat the estimate as a batch-sizing guide and rely
+# on the per-solve ``converged`` flag for ground truth.
+_FLOOR_CALIB = ((1, 0.03), (3, 0.08), (5, 0.11), (8, 0.22), (10, 0.45))
+_FLOOR_CALIBRATED_KMAX = _FLOOR_CALIB[-1][0]
+
+
+def _floor_c(K):
+    """Floor constant ``c(K)`` for ``floor ~= c(K) / sqrt(pairs)``.
+
+    Linear interpolation within the calibrated range; log-linear
+    extrapolation above it (the true growth is faster than linear once the
+    search, rather than sampling, sets the limit).
+    """
+    if K <= _FLOOR_CALIB[0][0]:
+        return _FLOOR_CALIB[0][1]
+    for (k0, c0), (k1, c1) in zip(_FLOOR_CALIB, _FLOOR_CALIB[1:]):
+        if K <= k1:
+            return c0 + (c1 - c0) * (K - k0) / (k1 - k0)
+    # K > calibrated max: log-linear extrapolation from the top two points.
+    (k0, c0), (k1, c1) = _FLOOR_CALIB[-2], _FLOOR_CALIB[-1]
+    slope = (math.log(c1) - math.log(c0)) / (k1 - k0)
+    return c1 * math.exp(slope * (K - k1))
+
+
+def accuracy_floor(n_pairs, K):
+    """Approximate smallest reachable max-abs correlation error for a solve.
+
+    ``n_pairs`` matched pairs of ``K``-component phenotypes. See the module
+    notes: this is an operational estimate, not a guarantee.
+    """
+    if n_pairs < 1:
+        return float("inf")
+    return _floor_c(K) / math.sqrt(n_pairs)
+
+
+def min_pairs_for_tol(tol, K, warn_extrapolated=True):
+    """Approximate matched pairs needed to reach ``tol`` at ``K`` components.
+
+    Inverts :func:`accuracy_floor`. Warns when ``K`` is past the calibrated
+    range, where the estimate is unreliable and the target may in practice
+    need a larger per-solve evaluation budget than the default.
+    """
+    if tol <= 0:
+        raise ValueError("tol must be positive")
+    if warn_extrapolated and K > _FLOOR_CALIBRATED_KMAX:
+        warnings.warn(
+            f"accuracy floor is calibrated only to K={_FLOOR_CALIBRATED_KMAX}; "
+            f"the estimate for K={K} is extrapolated and may understate the "
+            "pairs required. Confirm convergence from the solver's reported "
+            "residual and raise the per-solve evaluation budget if needed.",
+            stacklevel=2)
+    return int(math.ceil((_floor_c(K) / tol) ** 2))

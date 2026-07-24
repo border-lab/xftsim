@@ -664,22 +664,98 @@ class BatchedMating:
     ``max_batch_size`` individuals, runs the inner regime on each batch
     independently, then merges the resulting mate assignments.
 
-    This is essential for GeneralAssortativeMating at large n, where the
-    QAP solver scales quadratically. For example, n=8000 with
-    max_batch_size=1000 yields 8 independent QAP solves of 500 pairs
-    each, rather than one solve of 4000 pairs.
+    Batching trades accuracy for speed when the inner regime is
+    ``GeneralAssortativeMating``: the achieved cross-mate correlation of the
+    merged assignment is the size-weighted average of the per-batch values,
+    and — importantly — a batch that cannot itself reach the target does not
+    get rescued by averaging with the others. The per-batch residuals share a
+    direction (every batch chases the same target on similarly-distributed
+    phenotypes), so they do not cancel: the merged error stays at roughly the
+    per-batch floor, not below it. A batch must therefore be large enough to
+    attain the target on its own.
+
+    The reachable error grows with the number of components K and shrinks with
+    the pairs per batch, so there is a smallest batch that still meets the
+    target tolerance. ``max_batch_size='auto'`` (the default) sizes batches to
+    exactly that minimum — the most batches, hence the most speedup, that
+    still hits the target — using :func:`xftsim.matchsolver.min_pairs_for_tol`.
+    If even the whole sample is too small to reach the target, it warns and
+    runs a single best-effort batch.
 
     Parameters
     ----------
     regime
         Any mating regime with a ``.mate(samples, rng, phenotypes)`` method.
-    max_batch_size : int
-        Maximum number of *individuals* (not pairs) per batch.
+    max_batch_size : int or 'auto'
+        Maximum number of *individuals* (not pairs) per batch. ``'auto'``
+        (default) derives the smallest batch that attains the inner regime's
+        target tolerance; it applies only when the inner regime carries a
+        cross-correlation target (``GeneralAssortativeMating``), and falls
+        back to 1000 for regimes without one. An explicit integer is honored
+        as given, with a warning if it is below the attainable floor.
     """
 
-    def __init__(self, regime, max_batch_size: int = 1000) -> None:
+    _AUTO_FALLBACK = 1000  # individuals, for regimes with no accuracy target
+
+    def __init__(self, regime, max_batch_size: int | str = 'auto') -> None:
+        if max_batch_size != 'auto':
+            ok = isinstance(max_batch_size, (int, np.integer))
+            if not ok or max_batch_size < 1:
+                raise ValueError(
+                    "max_batch_size must be a positive integer or 'auto', "
+                    f"got {max_batch_size!r}")
         self.regime = regime
-        self.max_batch_size: int = max_batch_size
+        self.max_batch_size: int | str = max_batch_size
+
+    def _resolve_batch_size(self, samples: SampleMeta) -> int:
+        """Batch size in individuals, resolving ``'auto'`` and warning on
+        under-sized batches or unattainable targets."""
+        n = samples.n
+        target = getattr(self.regime, 'cross_corr', None)
+        if target is None:
+            # Regime has no cross-correlation target; accuracy floor is moot.
+            return (self._AUTO_FALLBACK if self.max_batch_size == 'auto'
+                    else int(self.max_batch_size))
+
+        from xftsim.matchsolver import min_pairs_for_tol
+        K = target.shape[0]
+        tol = float(getattr(self.regime, 'solver_params', {}).get('tol', 0.005))
+        min_pairs = min_pairs_for_tol(tol, K)
+
+        # Pairs are limited by the rarer sex; estimate the batch-to-pairs
+        # ratio from the whole-sample sex balance (the partition is random).
+        n_female = int(np.sum(samples.sex == 0))
+        n_male = int(np.sum(samples.sex == 1))
+        pairs_total = min(n_female, n_male)
+        if pairs_total == 0:
+            return n if self.max_batch_size == 'auto' else int(self.max_batch_size)
+        frac = pairs_total / n
+        min_indiv = math.ceil(min_pairs / frac)
+
+        if pairs_total < min_pairs:
+            warnings.warn(
+                f"BatchedMating cannot reach tol={tol:.3g} for K={K} at this "
+                f"sample size: about {min_pairs} mating pairs are needed but "
+                f"only {pairs_total} are available. Every batch, and the "
+                "merged result, will miss the target. Loosen the regime's "
+                "solver_params['tol'] or simulate more individuals.",
+                stacklevel=3)
+            return n if self.max_batch_size == 'auto' else int(self.max_batch_size)
+
+        if self.max_batch_size == 'auto':
+            return min(min_indiv, n)
+
+        chosen = int(self.max_batch_size)
+        chosen_pairs = math.floor(chosen * frac)
+        if chosen_pairs < min_pairs:
+            warnings.warn(
+                f"BatchedMating: max_batch_size={chosen} gives about "
+                f"{chosen_pairs} pairs per batch, below the ~{min_pairs} "
+                f"needed to reach tol={tol:.3g} at K={K}. Each batch will "
+                "miss the target and the merged result will too. Use "
+                f"max_batch_size >= {min_indiv} or 'auto'.",
+                stacklevel=3)
+        return chosen
 
     def mate(self, samples: SampleMeta,
              rng: np.random.RandomState | None = None,
@@ -688,7 +764,8 @@ class BatchedMating:
             rng = np.random.RandomState()
 
         n = samples.n
-        num_batches = math.ceil(n / self.max_batch_size)
+        batch_size = self._resolve_batch_size(samples)
+        num_batches = math.ceil(n / batch_size)
 
         # Random partition of all individuals
         perm = rng.permutation(n)
@@ -736,4 +813,4 @@ class BatchedMating:
 
     def __repr__(self) -> str:
         return (f"BatchedMating(regime={self.regime!r}, "
-                f"max_batch_size={self.max_batch_size})")
+                f"max_batch_size={self.max_batch_size!r})")

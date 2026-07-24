@@ -10,7 +10,7 @@ if sys.version_info < (3, 12):
         stacklevel=2,
     )
 
-__version__="0.9a.dev113"
+__version__="0.9a.dev114"
 
 
 class Config:

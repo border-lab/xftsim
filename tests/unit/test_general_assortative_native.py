@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 
 from xftsim.struct import SampleMeta, PhenotypeArray
-from xftsim.mate import GeneralAssortativeMating, MateAssignment
+from xftsim.mate import (BatchedMating, GeneralAssortativeMating,
+                         MateAssignment, RandomMating)
 
 
 def _make_pop(n=2000, K=3, seed=42):
@@ -147,3 +148,55 @@ class TestSerializationRoundTrip:
                             reason='legacy path constructs a hexaly regime')
         restored = _deserialize_mating_regime(legacy)
         assert restored.solver == 'hexaly'
+
+
+class TestBatchedAutoSizing:
+    """BatchedMating('auto') sizes batches to the accuracy floor and warns
+    when the target is unreachable."""
+
+    def test_auto_sizes_to_min_pairs_and_hits_tol(self):
+        from xftsim.matchsolver import min_pairs_for_tol
+        K = 5
+        names = [f"Y{k}" for k in range(K)]
+        target = 0.2 * np.eye(K)
+        samples, pheno = _make_pop(n=40000, K=K, seed=0)
+        reg = GeneralAssortativeMating(names, target, solver='native')
+        bm = BatchedMating(reg)  # default 'auto'
+        bs = bm._resolve_batch_size(samples)
+        # ~2 individuals per pair, so batch ~ 2 x min_pairs.
+        assert 1.5 * min_pairs_for_tol(0.005, K) <= bs <= 3 * min_pairs_for_tol(0.005, K)
+        asg = bm.mate(samples, rng=np.random.RandomState(1), phenotypes=pheno)
+        observed = _observed_cross_corr(pheno, asg, names)
+        assert np.max(np.abs(observed - target)) < 0.006
+
+    def test_unattainable_sample_warns(self):
+        K = 10
+        names = [f"Y{k}" for k in range(K)]
+        target = 0.2 * np.eye(K)
+        samples, _ = _make_pop(n=6000, K=K, seed=0)  # ~3000 pairs < 8000 needed
+        reg = GeneralAssortativeMating(names, target, solver='native')
+        bm = BatchedMating(reg)
+        with pytest.warns(UserWarning, match="cannot reach"):
+            bm._resolve_batch_size(samples)
+
+    def test_explicit_undersized_batch_warns(self):
+        K = 8
+        names = [f"Y{k}" for k in range(K)]
+        target = 0.15 * np.eye(K)
+        samples, _ = _make_pop(n=20000, K=K, seed=0)
+        reg = GeneralAssortativeMating(names, target, solver='native')
+        bm = BatchedMating(reg, max_batch_size=1000)  # ~500 pairs < 2000 needed
+        with pytest.warns(UserWarning, match="below the"):
+            bm._resolve_batch_size(samples)
+
+    def test_regime_without_target_uses_fallback(self):
+        samples, _ = _make_pop(n=5000, K=2, seed=0)
+        bm = BatchedMating(RandomMating(offspring_per_pair=2))
+        # No cross-correlation target: fall back to the fixed default, no warn.
+        assert bm._resolve_batch_size(samples) == BatchedMating._AUTO_FALLBACK
+
+    def test_rejects_bad_max_batch_size(self):
+        with pytest.raises(ValueError, match="positive integer or 'auto'"):
+            BatchedMating(RandomMating(), max_batch_size=0)
+        with pytest.raises(ValueError, match="positive integer or 'auto'"):
+            BatchedMating(RandomMating(), max_batch_size="big")

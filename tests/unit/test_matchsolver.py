@@ -163,3 +163,41 @@ class TestStallDetection:
         # The reported residual must match a recomputation from the permutation.
         np.testing.assert_allclose(_achieved(Y, Z, res.perm), R - res.residual,
                                    atol=1e-12)
+
+
+class TestAccuracyFloorModel:
+    """The batch-sizing model must reproduce the measured minimum pairs and
+    behave sanely outside the calibrated range."""
+
+    def test_min_pairs_matches_calibration(self):
+        from xftsim.matchsolver import min_pairs_for_tol
+        # Measured minima to reach tol=0.005: K3~250, K5~500, K8~2000, K10~8000.
+        expected = {3: 250, 5: 500, 8: 2000, 10: 8000}
+        for K, meas in expected.items():
+            est = min_pairs_for_tol(0.005, K)
+            assert 0.7 * meas <= est <= 1.4 * meas, (K, est, meas)
+
+    def test_min_pairs_scales_as_inverse_tol_squared(self):
+        from xftsim.matchsolver import min_pairs_for_tol
+        a = min_pairs_for_tol(0.01, 10)
+        b = min_pairs_for_tol(0.005, 10)
+        assert abs(b / a - 4.0) < 0.05  # halving tol quadruples pairs
+
+    def test_accuracy_floor_inverts_min_pairs(self):
+        from xftsim.matchsolver import accuracy_floor, min_pairs_for_tol
+        p = min_pairs_for_tol(0.005, 10)
+        assert abs(accuracy_floor(p, 10) - 0.005) < 5e-4
+
+    def test_high_K_warns_extrapolated(self):
+        from xftsim.matchsolver import min_pairs_for_tol
+        with pytest.warns(UserWarning, match="extrapolated"):
+            min_pairs_for_tol(0.005, 15)
+
+    def test_small_K_needs_few_pairs(self):
+        from xftsim.matchsolver import min_pairs_for_tol
+        assert min_pairs_for_tol(0.005, 2) < 200
+
+    def test_min_pairs_rejects_nonpositive_tol(self):
+        from xftsim.matchsolver import min_pairs_for_tol
+        with pytest.raises(ValueError):
+            min_pairs_for_tol(0.0, 5)
