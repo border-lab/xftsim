@@ -740,6 +740,7 @@ def _serialize_mating_regime(regime: object) -> dict[str, object]:
             'component_names': list(regime.component_names),
             'cross_corr': regime.cross_corr.tolist(),
             'offspring_per_pair': regime.offspring_per_pair,
+            'solver': getattr(regime, 'solver', 'hexaly'),
             'solver_params': dict(regime.solver_params),
         }
     elif isinstance(regime, BatchedMating):
@@ -763,9 +764,10 @@ def _deserialize_mating_regime(config: dict[str, object]) -> object:
     """Deserialize a mating regime from a dict produced by
     ``_serialize_mating_regime``.
 
-    Note: ``GeneralAssortativeMating`` requires the ``hexaly`` package — if
-    a checkpoint was saved with it but the resuming environment lacks
-    hexaly, deserialization will raise ``ImportError`` at construction.
+    Note: ``GeneralAssortativeMating`` with ``solver='hexaly'`` requires the
+    ``hexaly`` package — if such a checkpoint is resumed in an environment
+    lacking hexaly, deserialization raises ``ImportError`` at construction.
+    The default ``solver='native'`` has no such requirement.
     """
     from xftsim.mate import (
         RandomMating, LinearAssortativeMating,
@@ -781,10 +783,14 @@ def _deserialize_mating_regime(config: dict[str, object]) -> object:
             offspring_per_pair=config['offspring_per_pair'],
         )
     elif mtype == 'GeneralAssortativeMating':
+        # Checkpoints written before the native solver existed carry no
+        # 'solver' key and hexaly-keyed solver_params, so they resume on
+        # hexaly exactly as they ran.
         return GeneralAssortativeMating(
             component_names=config['component_names'],
             cross_corr=np.asarray(config['cross_corr'], dtype=np.float64),
             offspring_per_pair=config['offspring_per_pair'],
+            solver=config.get('solver', 'hexaly'),
             solver_params=config.get('solver_params'),
         )
     elif mtype == 'BatchedMating':
