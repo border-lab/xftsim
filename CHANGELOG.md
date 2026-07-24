@@ -11,6 +11,64 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Added
 
+- **Native cross-mate correlation solver (`xftsim/matchsolver.py`),
+  replacing Hexaly as the default for `GeneralAssortativeMating`**: the
+  proprietary Hexaly Optimizer is no longer required to use general
+  assortative mating. `GeneralAssortativeMating` gains a `solver`
+  parameter, `'native'` (new default) or `'hexaly'`, and the
+  `import hexaly.optimizer` in `__init__` now happens only when
+  `solver='hexaly'` is requested — previously the class could not even be
+  constructed without a Hexaly license.
+
+  The native solver exploits the fact that the objective depends on the
+  permutation only through the K x K statistic `M(P) = Z' P Y`, so the
+  search happens in K^2 dimensions rather than over n x n structures. A
+  greedy residual-tracking construction is followed by swap local search
+  in which each candidate swap changes `M` by a rank-1 matrix, giving an
+  exact O(K^2) objective delta. Both stages are numba-jitted (numba is
+  already a hard dependency) and the final residual is recomputed from the
+  permutation, so reported diagnostics carry no accumulated float drift.
+
+  Practical consequences: memory drops from the O(n^2) of the
+  Koopmans-Beckmann encoding Hexaly was given to O(nK), so mate groups of
+  10^5 are routine rather than infeasible. Measured on jointly-normal test
+  instances with K = 10, reaching 0.005 max absolute correlation error:
+  n = 20,000 in 6-7 s and n = 100,000 in 27-29 s, on a 14-core machine with
+  the JIT already warm. Neighbor-list construction is queried in parallel;
+  the rest of the solve is single-threaded. Smaller K is much cheaper
+  (K = 5 at n = 20,000 takes under a second) and larger K much dearer
+  (K = 15 does not reach 0.005 at n = 20,000 within the default budget).
+  Wrapping in `BatchedMating` is close to free — the cross-correlation
+  statistic is additive over individuals, so the combined value is the
+  size-weighted average of per-batch values — and it keeps the solver's
+  working set cache-resident, which speeds it up substantially at large n.
+
+  The attainable error has a floor of roughly `0.5/sqrt(n)`, so small mate
+  groups cannot meet a tight target no matter the budget: at K = 10 the
+  default `tol` of 0.005 needs on the order of 5,000 mating pairs, while
+  n = 1,000 floors near 0.016 and n = 2,000 near 0.011. The solver detects
+  this stall and returns early instead of exhausting `max_evals`, and the
+  warning it raises names the floor and suggests loosening `tol` or
+  simulating more individuals rather than simply spending more compute.
+
+  Convergence is now visible rather than silent: `solver_params['tol']`
+  (default 0.005, max absolute entrywise correlation error) sets the
+  target, a `UserWarning` is emitted if the solve finishes above it, and
+  `regime.last_result` exposes the achieved residual matrix, evaluation
+  count, and convergence flag (it is `None` before the first `mate()` call
+  and under `solver='hexaly'`, which reports no diagnostics). Infeasible
+  targets — those whose implied joint correlation matrix is not positive
+  definite — warn explicitly instead of quietly returning a best effort.
+  `solver_params['stall_evals']` bounds how long the solver keeps trying
+  without improving before it gives up.
+
+  Backward compatibility: checkpoints written before this change carry no
+  `solver` key and are deserialized with `solver='hexaly'`, so existing
+  runs resume on exactly the solver they were created with.
+  `solver_params` keys are validated against the selected solver, so
+  Hexaly-only keys (`nb_threads`, `time_limit`, ...) raise rather than
+  being silently ignored by the native path.
+
 - **Meiosis crossover sampling is now tied to `sim.rng`**: Previously the
   meiosis kernels in `xftsim/reproduce.py` drew per-locus crossover
   indicators via `np.random.binomial` against numba's internal RNG, with

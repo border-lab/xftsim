@@ -4,12 +4,14 @@ New mate assignment and mating regimes for the refactored simulation loop.
 MateAssignment: dataclass linking offspring to parents by index.
 RandomMating: shuffles and pairs individuals to produce offspring.
 LinearAssortativeMating: rank-order pairing on a phenotypic composite.
-GeneralAssortativeMating: arbitrary K x K cross-mate correlation via QAP (Hexaly).
+GeneralAssortativeMating: arbitrary K x K cross-mate correlation via QAP
+    (native solver by default; Hexaly optional).
 BatchedMating: wraps any mating regime, splitting individuals into batches.
 """
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 from dataclasses import dataclass
@@ -419,13 +421,39 @@ def _solve_qap_hexaly(Y: np.ndarray, Z: np.ndarray, R: np.ndarray,
         return np.array([p.value.get(i) for i in range(n)])
 
 
+_NATIVE_SOLVER_DEFAULTS: dict = dict(
+    tol=0.005,
+    max_evals=None,
+    stall_evals=None,
+    m=64,
+    n_neighbors=10,
+    p_fine=0.5,
+)
+
+_HEXALY_SOLVER_DEFAULTS: dict = dict(
+    nb_threads=4,
+    time_limit=120,
+    tolerance=1e-5,
+    verbosity=1,
+    time_between_displays=15,
+    termination_interval=15,
+)
+
+
 class GeneralAssortativeMating:
     """Assortative mating with an arbitrary K x K cross-mate correlation target.
 
-    Uses the Hexaly Optimizer to solve the Quadratic Assignment Problem:
-    find a permutation P* of one sex that minimizes
+    Finds a permutation P* of one sex minimizing
     ``||Y'[P*] Z / n  -  Omega||_F`` where Omega is the target cross-mate
     cross-trait correlation matrix.
+
+    Two solvers are available. The default ``'native'`` solver
+    (:mod:`xftsim.matchsolver`) works in the K x K statistic space, using
+    a greedy residual-tracking construction followed by swap local search
+    with exact rank-1 objective updates. It needs O(nK) memory and no
+    third-party license. The ``'hexaly'`` solver uses the proprietary Hexaly
+    Optimizer on the Koopmans-Beckmann encoding, which builds n x n matrices
+    and so is limited to small mate groups.
 
     Parameters
     ----------
@@ -438,16 +466,43 @@ class GeneralAssortativeMating:
         in females and component j in males.
     offspring_per_pair : int
         Number of offspring per mating pair.
+    solver : str
+        ``'native'`` (default) or ``'hexaly'``. ``'hexaly'`` requires the
+        ``hexaly`` package and a license; the import is deferred to
+        construction time so the native path has no such requirement.
     solver_params : dict, optional
-        Hexaly solver parameters. Keys: nb_threads, time_limit, tolerance,
-        verbosity, time_between_displays, termination_interval.
+        Solver parameters, keyed for the selected solver.
+        Native: ``tol`` (max absolute entrywise correlation error, default
+        0.005), ``max_evals``, ``stall_evals``, ``m``, ``n_neighbors``,
+        ``p_fine``. Note the attainable error has a floor near
+        ``0.5/sqrt(n_pairs)``, so small mate groups cannot meet the default
+        ``tol``: roughly 5,000 pairs are needed at K = 10.
+        Hexaly: ``nb_threads``, ``time_limit``, ``tolerance``, ``verbosity``,
+        ``time_between_displays``, ``termination_interval``.
+    warn_unconverged : bool
+        If True (default), emit a warning when the native solver finishes
+        above ``tol`` so silently-missed targets are visible.
+
+    Notes
+    -----
+    For very large mate groups, wrapping this regime in
+    :class:`BatchedMating` is close to free: the cross-correlation statistic
+    is additive over individuals, so the combined cross-correlation is the
+    size-weighted average of the per-batch values. Batching also keeps the
+    solver's working set cache-resident, which speeds it up considerably.
     """
 
     def __init__(self, component_names: list[str],
                  cross_corr: np.ndarray,
                  offspring_per_pair: int = 2,
-                 solver_params: Dict[str, int | float] | None = None) -> None:
-        import hexaly.optimizer  # noqa: F401 — hard error if not installed
+                 solver: str = 'native',
+                 solver_params: Dict[str, int | float] | None = None,
+                 warn_unconverged: bool = True) -> None:
+        if solver not in ('native', 'hexaly'):
+            raise ValueError(
+                f"solver must be 'native' or 'hexaly', got {solver!r}")
+        if solver == 'hexaly':
+            import hexaly.optimizer  # noqa: F401 — hard error if not installed
 
         if offspring_per_pair < 1:
             raise ValueError("offspring_per_pair must be >= 1")
@@ -460,15 +515,21 @@ class GeneralAssortativeMating:
                 f"cross_corr shape {self.cross_corr.shape} does not match "
                 f"{K} components — expected ({K}, {K})")
         self.offspring_per_pair: int = offspring_per_pair
+        self.solver: str = solver
+        self.warn_unconverged: bool = bool(warn_unconverged)
+        # Set by mate() on the native path; None until then, and stays None
+        # under solver='hexaly', which reports no diagnostics.
+        self.last_result = None
         self.solver_params: dict = dict(
-            nb_threads=4,
-            time_limit=120,
-            tolerance=1e-5,
-            verbosity=1,
-            time_between_displays=15,
-            termination_interval=15,
-        )
+            _NATIVE_SOLVER_DEFAULTS if solver == 'native'
+            else _HEXALY_SOLVER_DEFAULTS)
         if solver_params is not None:
+            unknown = set(solver_params) - set(self.solver_params)
+            if unknown:
+                raise ValueError(
+                    f"unknown solver_params for solver={solver!r}: "
+                    f"{sorted(unknown)}; valid keys are "
+                    f"{sorted(self.solver_params)}")
             self.solver_params.update(solver_params)
 
     def mate(self, samples: SampleMeta,
@@ -529,7 +590,40 @@ class GeneralAssortativeMating:
                     arr[:, k] = 0.0
 
         # Solve QAP — returns permutation of female indices
-        perm = _solve_qap_hexaly(Y, Z, self.cross_corr, **self.solver_params)
+        if self.solver == 'hexaly':
+            perm = _solve_qap_hexaly(Y, Z, self.cross_corr,
+                                     **self.solver_params)
+        else:
+            from xftsim.matchsolver import solve_cross_correlation
+            # Derive the solver seed from the caller's rng so whole
+            # simulations stay reproducible.
+            result = solve_cross_correlation(
+                Y, Z, self.cross_corr,
+                seed=int(rng.randint(0, 2 ** 31 - 1)),
+                **self.solver_params)
+            if self.warn_unconverged and not result.converged:
+                tol = self.solver_params['tol']
+                floor = 0.5 / np.sqrt(n_pairs)
+                if tol < floor:
+                    advice = (
+                        f"With {n_pairs} mating pairs the attainable error "
+                        f"floor is roughly {floor:.3g} (about 0.5/sqrt(n)), "
+                        f"so a tol of {tol:.3g} is below what any permutation "
+                        "of this sample can achieve. Loosen "
+                        "solver_params['tol'] or simulate more individuals.")
+                else:
+                    advice = ("Raise solver_params['max_evals'] or "
+                              "solver_params['stall_evals'], loosen tol, or "
+                              "check that the target is attainable.")
+                warnings.warn(
+                    "GeneralAssortativeMating did not reach the target "
+                    f"cross-mate correlation: max absolute error "
+                    f"{result.max_abs_residual:.3g} exceeds tol "
+                    f"{tol:.3g} after {result.evals} swap evaluations. "
+                    + advice,
+                    stacklevel=2)
+            self.last_result = result
+            perm = result.perm
 
         # Apply permutation to females; males stay in place
         mothers = female_idx[perm]
@@ -559,7 +653,7 @@ class GeneralAssortativeMating:
     def __repr__(self) -> str:
         K = len(self.component_names)
         return (f"GeneralAssortativeMating(components={self.component_names}, "
-                f"cross_corr=({K}x{K}), "
+                f"cross_corr=({K}x{K}), solver={self.solver!r}, "
                 f"offspring_per_pair={self.offspring_per_pair})")
 
 
