@@ -86,13 +86,9 @@ def build_and_run_6way(seed):
             component_names=dx,
             cross_corr=R_mate,
             offspring_per_pair=2,
-            solver_params=dict(
-                time_limit=30,
-                termination_interval=5,
-                tolerance=1e-3,
-            ),
+            solver_params=dict(tol=0.005),
         ),
-        max_batch_size=1000,
+        max_batch_size='auto',
     )
 
     sim = Simulation(

@@ -162,9 +162,11 @@ class TestBatchedAutoSizing:
         samples, pheno = _make_pop(n=40000, K=K, seed=0)
         reg = GeneralAssortativeMating(names, target, solver='native')
         bm = BatchedMating(reg)  # default 'auto'
-        bs = bm._resolve_batch_size(samples)
-        # ~2 individuals per pair, so batch ~ 2 x min_pairs.
-        assert 1.5 * min_pairs_for_tol(0.005, K) <= bs <= 3 * min_pairs_for_tol(0.005, K)
+        num = bm._resolve_num_batches(samples)
+        # Realized (evenly split) batches must clear the pair floor.
+        realized_pairs = (40000 // num) // 2
+        assert realized_pairs >= min_pairs_for_tol(0.005, K)
+        assert num > 1, "should still batch, not collapse to one solve"
         asg = bm.mate(samples, rng=np.random.RandomState(1), phenotypes=pheno)
         observed = _observed_cross_corr(pheno, asg, names)
         assert np.max(np.abs(observed - target)) < 0.006
@@ -177,7 +179,7 @@ class TestBatchedAutoSizing:
         reg = GeneralAssortativeMating(names, target, solver='native')
         bm = BatchedMating(reg)
         with pytest.warns(UserWarning, match="cannot reach"):
-            bm._resolve_batch_size(samples)
+            bm._resolve_num_batches(samples)
 
     def test_explicit_undersized_batch_warns(self):
         K = 8
@@ -187,13 +189,13 @@ class TestBatchedAutoSizing:
         reg = GeneralAssortativeMating(names, target, solver='native')
         bm = BatchedMating(reg, max_batch_size=1000)  # ~500 pairs < 2000 needed
         with pytest.warns(UserWarning, match="below the"):
-            bm._resolve_batch_size(samples)
+            bm._resolve_num_batches(samples)
 
     def test_regime_without_target_uses_fallback(self):
         samples, _ = _make_pop(n=5000, K=2, seed=0)
         bm = BatchedMating(RandomMating(offspring_per_pair=2))
         # No cross-correlation target: fall back to the fixed default, no warn.
-        assert bm._resolve_batch_size(samples) == BatchedMating._AUTO_FALLBACK
+        assert bm._resolve_num_batches(samples) == 5  # 5000 / 1000 fallback
 
     def test_rejects_bad_max_batch_size(self):
         with pytest.raises(ValueError, match="positive integer or 'auto'"):

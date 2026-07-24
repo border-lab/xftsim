@@ -602,15 +602,16 @@ class GeneralAssortativeMating:
                 seed=int(rng.randint(0, 2 ** 31 - 1)),
                 **self.solver_params)
             if self.warn_unconverged and not result.converged:
+                from xftsim.matchsolver import accuracy_floor
                 tol = self.solver_params['tol']
-                floor = 0.5 / np.sqrt(n_pairs)
+                floor = accuracy_floor(n_pairs, K)
                 if tol < floor:
                     advice = (
-                        f"With {n_pairs} mating pairs the attainable error "
-                        f"floor is roughly {floor:.3g} (about 0.5/sqrt(n)), "
-                        f"so a tol of {tol:.3g} is below what any permutation "
-                        "of this sample can achieve. Loosen "
-                        "solver_params['tol'] or simulate more individuals.")
+                        f"With {n_pairs} mating pairs at K={K} the attainable "
+                        f"error floor is roughly {floor:.3g}, so a tol of "
+                        f"{tol:.3g} is below what this sample can reliably "
+                        "reach. Loosen solver_params['tol'] or simulate more "
+                        "individuals.")
                 else:
                     advice = ("Raise solver_params['max_evals'] or "
                               "solver_params['stall_evals'], loosen tol, or "
@@ -707,15 +708,23 @@ class BatchedMating:
         self.regime = regime
         self.max_batch_size: int | str = max_batch_size
 
-    def _resolve_batch_size(self, samples: SampleMeta) -> int:
-        """Batch size in individuals, resolving ``'auto'`` and warning on
-        under-sized batches or unattainable targets."""
+    def _resolve_num_batches(self, samples: SampleMeta) -> int:
+        """Number of batches, resolving ``'auto'`` and warning on under-sized
+        batches or unattainable targets.
+
+        Returns a batch *count* rather than a size because the partition is an
+        even split: with ``ceil(n / size)`` batches the realized batches are
+        ``n / ceil(...)`` individuals, which can fall well below ``size``. For
+        ``'auto'`` the size is a floor to be met, not a cap, so the count is
+        rounded down to keep every realized batch at or above it.
+        """
         n = samples.n
         target = getattr(self.regime, 'cross_corr', None)
         if target is None:
             # Regime has no cross-correlation target; accuracy floor is moot.
-            return (self._AUTO_FALLBACK if self.max_batch_size == 'auto'
+            size = (self._AUTO_FALLBACK if self.max_batch_size == 'auto'
                     else int(self.max_batch_size))
+            return max(1, math.ceil(n / size))
 
         from xftsim.matchsolver import min_pairs_for_tol
         K = target.shape[0]
@@ -728,7 +737,7 @@ class BatchedMating:
         n_male = int(np.sum(samples.sex == 1))
         pairs_total = min(n_female, n_male)
         if pairs_total == 0:
-            return n if self.max_batch_size == 'auto' else int(self.max_batch_size)
+            return 1
         frac = pairs_total / n
         min_indiv = math.ceil(min_pairs / frac)
 
@@ -740,22 +749,24 @@ class BatchedMating:
                 "merged result, will miss the target. Loosen the regime's "
                 "solver_params['tol'] or simulate more individuals.",
                 stacklevel=3)
-            return n if self.max_batch_size == 'auto' else int(self.max_batch_size)
+            return 1  # single best-effort batch over the whole sample
 
         if self.max_batch_size == 'auto':
-            return min(min_indiv, n)
+            # Round the count DOWN so each realized batch is >= min_indiv.
+            return max(1, n // min_indiv)
 
         chosen = int(self.max_batch_size)
-        chosen_pairs = math.floor(chosen * frac)
-        if chosen_pairs < min_pairs:
+        num = max(1, math.ceil(n / chosen))
+        realized_pairs = math.floor((n / num) * frac)
+        if realized_pairs < min_pairs:
             warnings.warn(
-                f"BatchedMating: max_batch_size={chosen} gives about "
-                f"{chosen_pairs} pairs per batch, below the ~{min_pairs} "
+                f"BatchedMating: max_batch_size={chosen} yields {num} batches "
+                f"of about {realized_pairs} pairs, below the ~{min_pairs} "
                 f"needed to reach tol={tol:.3g} at K={K}. Each batch will "
                 "miss the target and the merged result will too. Use "
                 f"max_batch_size >= {min_indiv} or 'auto'.",
                 stacklevel=3)
-        return chosen
+        return num
 
     def mate(self, samples: SampleMeta,
              rng: np.random.RandomState | None = None,
@@ -764,8 +775,7 @@ class BatchedMating:
             rng = np.random.RandomState()
 
         n = samples.n
-        batch_size = self._resolve_batch_size(samples)
-        num_batches = math.ceil(n / batch_size)
+        num_batches = self._resolve_num_batches(samples)
 
         # Random partition of all individuals
         perm = rng.permutation(n)

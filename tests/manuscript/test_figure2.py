@@ -97,18 +97,18 @@ def build_and_run_6way(seed: int = 1,
     arch = Architecture(formula='\n'.join(formula_lines), effects=effects)
     rmap = RecombinationMap(p=0.5, m=m)
 
+    # Native solver (the default since the Hexaly dependency was dropped).
+    # 'auto' batching sizes batches to the smallest that can actually attain
+    # tol at K = 6; the previous fixed 1000 individuals was ~500 pairs, below
+    # the reachable floor, so every batch missed the target.
     mating = BatchedMating(
         regime=GeneralAssortativeMating(
             component_names=DX,
             cross_corr=R_MATE,
             offspring_per_pair=2,
-            solver_params=dict(
-                time_limit=30,
-                termination_interval=5,
-                tolerance=1e-3,
-            ),
+            solver_params=dict(tol=0.005),
         ),
-        max_batch_size=1000,
+        max_batch_size='auto',
     )
 
     sim = Simulation(

@@ -141,15 +141,9 @@ mating = BatchedMating(
         component_names=['edu', 'height', 'wealth'],
         cross_corr=cross_corr,
         offspring_per_pair=2,
-        solver_params=dict(
-            nb_threads=8,
-            time_limit=10,
-            tolerance=1e-3,
-            time_between_displays=5,
-            termination_interval=5,
-        ),
+        solver_params=dict(tol=0.005),
     ),
-    max_batch_size=250,
+    max_batch_size='auto',
 )
 
 # ── Simulation ─────────────────────────────────────────────────────────────
