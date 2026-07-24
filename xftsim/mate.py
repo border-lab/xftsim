@@ -424,6 +424,7 @@ def _solve_qap_hexaly(Y: np.ndarray, Z: np.ndarray, R: np.ndarray,
 _NATIVE_SOLVER_DEFAULTS: dict = dict(
     tol=0.005,
     max_evals=None,
+    stall_evals=None,
     m=64,
     n_neighbors=10,
     p_fine=0.5,
@@ -472,7 +473,10 @@ class GeneralAssortativeMating:
     solver_params : dict, optional
         Solver parameters, keyed for the selected solver.
         Native: ``tol`` (max absolute entrywise correlation error, default
-        0.005), ``max_evals``, ``m``, ``n_neighbors``, ``p_fine``.
+        0.005), ``max_evals``, ``stall_evals``, ``m``, ``n_neighbors``,
+        ``p_fine``. Note the attainable error has a floor near
+        ``0.5/sqrt(n_pairs)``, so small mate groups cannot meet the default
+        ``tol``: roughly 5,000 pairs are needed at K = 10.
         Hexaly: ``nb_threads``, ``time_limit``, ``tolerance``, ``verbosity``,
         ``time_between_displays``, ``termination_interval``.
     warn_unconverged : bool
@@ -513,6 +517,9 @@ class GeneralAssortativeMating:
         self.offspring_per_pair: int = offspring_per_pair
         self.solver: str = solver
         self.warn_unconverged: bool = bool(warn_unconverged)
+        # Set by mate() on the native path; None until then, and stays None
+        # under solver='hexaly', which reports no diagnostics.
+        self.last_result = None
         self.solver_params: dict = dict(
             _NATIVE_SOLVER_DEFAULTS if solver == 'native'
             else _HEXALY_SOLVER_DEFAULTS)
@@ -595,13 +602,25 @@ class GeneralAssortativeMating:
                 seed=int(rng.randint(0, 2 ** 31 - 1)),
                 **self.solver_params)
             if self.warn_unconverged and not result.converged:
+                tol = self.solver_params['tol']
+                floor = 0.5 / np.sqrt(n_pairs)
+                if tol < floor:
+                    advice = (
+                        f"With {n_pairs} mating pairs the attainable error "
+                        f"floor is roughly {floor:.3g} (about 0.5/sqrt(n)), "
+                        f"so a tol of {tol:.3g} is below what any permutation "
+                        "of this sample can achieve. Loosen "
+                        "solver_params['tol'] or simulate more individuals.")
+                else:
+                    advice = ("Raise solver_params['max_evals'] or "
+                              "solver_params['stall_evals'], loosen tol, or "
+                              "check that the target is attainable.")
                 warnings.warn(
                     "GeneralAssortativeMating did not reach the target "
                     f"cross-mate correlation: max absolute error "
                     f"{result.max_abs_residual:.3g} exceeds tol "
-                    f"{self.solver_params['tol']:.3g} after {result.evals} "
-                    "swap evaluations. Raise solver_params['max_evals'], "
-                    "loosen tol, or check that the target is attainable.",
+                    f"{tol:.3g} after {result.evals} swap evaluations. "
+                    + advice,
                     stacklevel=2)
             self.last_result = result
             perm = result.perm

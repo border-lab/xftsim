@@ -131,3 +131,35 @@ class TestSolveCrossCorrelation:
         assert loose.max_abs_residual < 0.05
         assert tight.max_abs_residual < 0.005
         assert tight.evals >= loose.evals
+
+
+class TestStallDetection:
+    """The attainable residual has a floor near 0.5/sqrt(n) at K = 10, so a
+    target below it is unreachable and must be abandoned rather than pursued
+    until the evaluation budget runs out."""
+
+    def test_unreachable_target_gives_up_well_short_of_budget(self):
+        # n = 1000 at K = 10 floors around 0.016, far above the 0.005 default.
+        Y, Z, R = _achievable(1000, 10, seed=4)
+        res = solve_cross_correlation(Y, Z, R, max_evals=20_000_000, seed=0)
+        assert not res.converged
+        assert res.evals < 20_000_000, "stall detection did not trigger"
+
+    def test_stall_evals_bounds_the_wasted_work(self):
+        Y, Z, R = _achievable(1000, 10, seed=4)
+        short = solve_cross_correlation(Y, Z, R, max_evals=20_000_000,
+                                        stall_evals=200_000, seed=0)
+        long_ = solve_cross_correlation(Y, Z, R, max_evals=20_000_000,
+                                        stall_evals=2_000_000, seed=0)
+        assert not short.converged and not long_.converged
+        assert short.evals < long_.evals
+
+    def test_stalling_does_not_block_reachable_targets(self):
+        """Slow-but-real progress must not be mistaken for a stall."""
+        Y, Z, R = _achievable(20000, 10, seed=7)
+        res = solve_cross_correlation(Y, Z, R, seed=0)
+        assert res.converged
+        assert res.max_abs_residual < 0.005
+        # The reported residual must match a recomputation from the permutation.
+        np.testing.assert_allclose(_achieved(Y, Z, res.perm), R - res.residual,
+                                   atol=1e-12)

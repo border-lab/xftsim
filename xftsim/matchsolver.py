@@ -137,8 +137,16 @@ def _construct(Zy, Zt, C, order, m, seed):
 
 
 @njit(cache=True)
-def _polish(Zy, Zt, C, pi, R, tol, max_evals, check_every, p_fine, nbrs, seed):
-    """Swap local search with exact rank-1 delta evaluation (stage 2)."""
+def _polish(Zy, Zt, C, pi, R, tol, max_evals, check_every, p_fine, nbrs,
+            stall_evals, seed):
+    """Swap local search with exact rank-1 delta evaluation (stage 2).
+
+    Stops on ``tol``, on ``max_evals``, or after ``stall_evals`` evaluations
+    with no relative improvement in the max absolute residual. The stall exit
+    matters because the reachable residual has a floor around 0.5/sqrt(n):
+    below roughly n = 5000 at K = 10 a 0.005 target is simply unreachable,
+    and without this the solver would burn the whole budget finding out.
+    """
     np.random.seed(seed)
     n, Ky = Zy.shape
     Kt = Zt.shape[1]
@@ -157,6 +165,8 @@ def _polish(Zy, Zt, C, pi, R, tol, max_evals, check_every, p_fine, nbrs, seed):
     n_nb = nbrs.shape[1]
     use_fine = n_nb > 0
     evals = 0
+    best_max_abs = np.inf
+    evals_since_gain = 0
 
     while evals < max_evals:
         block = check_every
@@ -211,6 +221,17 @@ def _polish(Zy, Zt, C, pi, R, tol, max_evals, check_every, p_fine, nbrs, seed):
         if max_abs < tol:
             break
 
+        # Relative-gain test: greedy descent makes the objective monotone,
+        # but max_abs can tick up while f falls, so compare against the best
+        # seen rather than the previous window.
+        if max_abs < best_max_abs * (1.0 - 1.0e-3):
+            best_max_abs = max_abs
+            evals_since_gain = 0
+        else:
+            evals_since_gain += block
+            if evals_since_gain >= stall_evals:
+                break
+
     return pi, evals
 
 
@@ -230,19 +251,31 @@ def _standardize(X):
 
 
 def _neighbor_lists(Z, k):
-    """k nearest neighbors of each row of Z, self excluded."""
+    """k nearest neighbors of each row of Z, self excluded.
+
+    Queried with ``workers=-1``: at K ~ 10 the tree degrades toward a linear
+    scan, so the query dominates total solve time when run single-threaded
+    (measured 93 s of a 99 s solve at n = 1e5, versus 14 s parallel).
+
+    Exact neighbors are worth that cost. Approximate substitutes fail here:
+    neighbors taken from sorted random 1-D projections cost 0.3 s but sit a
+    mean 4.04 away from their source row, against 1.05 for exact neighbors
+    and 4.33 for a random row, i.e. barely better than random. Fine moves
+    need genuinely small ``||b||`` to overcome the swap penalty term.
+    """
     n = Z.shape[0]
     k = min(k, n - 1)
     if k <= 0:
         return np.zeros((n, 0), dtype=np.int64)
     from scipy.spatial import cKDTree
-    _, idx = cKDTree(Z).query(Z, k=k + 1)
+    _, idx = cKDTree(Z).query(Z, k=k + 1, workers=-1)
     return np.ascontiguousarray(idx[:, 1:], dtype=np.int64)
 
 
-def solve_cross_correlation(Y, Z, R, tol=0.005, max_evals=None, m=64,
-                            n_neighbors=10, p_fine=0.5, check_every=1000,
-                            seed=None, warn_infeasible=True):
+def solve_cross_correlation(Y, Z, R, tol=0.005, max_evals=None,
+                            stall_evals=None, m=64, n_neighbors=10,
+                            p_fine=0.5, check_every=1000, seed=None,
+                            warn_infeasible=True):
     """Permute the rows of ``Y`` to induce cross-correlation ``R`` with ``Z``.
 
     Finds ``perm`` minimizing ``||Y[perm]' Z / n - R||_F``, i.e. the
@@ -264,8 +297,22 @@ def solve_cross_correlation(Y, Z, R, tol=0.005, max_evals=None, m=64,
         Convergence tolerance, max absolute entrywise error on the
         correlation scale.
     max_evals : int, optional
-        Swap evaluation budget. Defaults to ``max(200 * n, 200_000)``, which
-        covers typical instances with headroom.
+        Swap evaluation budget. Defaults to ``max(100 * n, 20_000_000)``.
+        The total work needed is set by how far the residual must fall, not
+        by ``n``: measured instances reaching a 0.005 target took 6-9 million
+        evaluations whether n was 5,000 or 100,000 (so 1,600 evaluations per
+        row at the low end and 60 at the high end). A budget proportional to
+        ``n`` therefore starves small instances, which is why this is
+        effectively a constant with a floor for very large ``n``.
+    stall_evals : int, optional
+        Give up after this many consecutive evaluations without relative
+        improvement in the max absolute residual. Defaults to
+        ``max(20 * n, 1_000_000)``. The attainable residual has a floor near
+        ``0.5 / sqrt(n)`` — at K = 10 that is roughly 0.016 for n = 1,000 and
+        0.011 for n = 2,000, both above the default ``tol`` — so a target
+        below the floor can never be met, and this is what stops the solver
+        from spending the full ``max_evals`` budget rediscovering that on
+        every call.
     m : int
         Candidate sample size per greedy construction step.
     n_neighbors : int
@@ -325,7 +372,9 @@ def solve_cross_correlation(Y, Z, R, tol=0.005, max_evals=None, m=64,
                            float(np.linalg.norm(resid)), 0, False)
 
     if max_evals is None:
-        max_evals = max(200 * n, 200_000)
+        max_evals = max(100 * n, 20_000_000)
+    if stall_evals is None:
+        stall_evals = max(20 * n, 1_000_000)
     ss = np.random.SeedSequence(seed)
     rng = np.random.default_rng(ss)
     # numba's RNG is separate from numpy's, so kernels get explicit seeds
@@ -340,7 +389,7 @@ def solve_cross_correlation(Y, Z, R, tol=0.005, max_evals=None, m=64,
                 else np.zeros((n, 0), dtype=np.int64))
         perm, evals = _polish(Zy, Zt, C, perm, R_int, float(tol),
                               int(max_evals), int(check_every), float(p_fine),
-                              nbrs, int(k_seeds[1]))
+                              nbrs, int(stall_evals), int(k_seeds[1]))
     else:
         evals = 0
 

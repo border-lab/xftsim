@@ -32,21 +32,35 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   Practical consequences: memory drops from the O(n^2) of the
   Koopmans-Beckmann encoding Hexaly was given to O(nK), so mate groups of
   10^5 are routine rather than infeasible. Measured on jointly-normal test
-  instances with K = 10: n = 20,000 converges to within 0.005 max absolute
-  correlation error in about 0.5 s, n = 100,000 in about 35 s, both
-  single-threaded. Wrapping in `BatchedMating` is close to free — the
-  cross-correlation statistic is additive over individuals, so the
-  combined value is the size-weighted average of per-batch values — and it
-  keeps the solver's working set cache-resident, which speeds it up
-  substantially at large n.
+  instances with K = 10, reaching 0.005 max absolute correlation error:
+  n = 20,000 in 6-7 s and n = 100,000 in 27-29 s, on a 14-core machine with
+  the JIT already warm. Neighbor-list construction is queried in parallel;
+  the rest of the solve is single-threaded. Smaller K is much cheaper
+  (K = 5 at n = 20,000 takes under a second) and larger K much dearer
+  (K = 15 does not reach 0.005 at n = 20,000 within the default budget).
+  Wrapping in `BatchedMating` is close to free — the cross-correlation
+  statistic is additive over individuals, so the combined value is the
+  size-weighted average of per-batch values — and it keeps the solver's
+  working set cache-resident, which speeds it up substantially at large n.
+
+  The attainable error has a floor of roughly `0.5/sqrt(n)`, so small mate
+  groups cannot meet a tight target no matter the budget: at K = 10 the
+  default `tol` of 0.005 needs on the order of 5,000 mating pairs, while
+  n = 1,000 floors near 0.016 and n = 2,000 near 0.011. The solver detects
+  this stall and returns early instead of exhausting `max_evals`, and the
+  warning it raises names the floor and suggests loosening `tol` or
+  simulating more individuals rather than simply spending more compute.
 
   Convergence is now visible rather than silent: `solver_params['tol']`
   (default 0.005, max absolute entrywise correlation error) sets the
   target, a `UserWarning` is emitted if the solve finishes above it, and
   `regime.last_result` exposes the achieved residual matrix, evaluation
-  count, and convergence flag. Infeasible targets — those whose implied
-  joint correlation matrix is not positive definite — warn explicitly
-  instead of quietly returning a best effort.
+  count, and convergence flag (it is `None` before the first `mate()` call
+  and under `solver='hexaly'`, which reports no diagnostics). Infeasible
+  targets — those whose implied joint correlation matrix is not positive
+  definite — warn explicitly instead of quietly returning a best effort.
+  `solver_params['stall_evals']` bounds how long the solver keeps trying
+  without improving before it gives up.
 
   Backward compatibility: checkpoints written before this change carry no
   `solver` key and are deserialized with `solver='hexaly'`, so existing
