@@ -4,6 +4,22 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### stdpopsim + GRG Demo Script (2026-10-06)
+
+- Added `scripts/demo_stdpopsim_grg.py` — command-line walkthrough of
+  stdpopsim founders -> GRG -> forward simulation with GRG-native meiosis,
+  printing per generation the timing, GRG node and edge counts with their
+  percentage growth since the previous generation (plus total growth since
+  the founders), and var(G)/var(Y). Options: `--pops`, `--model`,
+  `--chrom`, `--left-mb`, `--length-mb`, `--genetic-map`, `--gens`, `--h2`,
+  `--causal-min-maf`, `--seed`; `--fixed-effects` freezes per-allele
+  effects at founder allele frequencies instead of re-standardizing every
+  generation (v0.9 default), to contrast the two var(G) trajectories;
+  `--check-dense` reruns the simulation on dense genotypes and reports exact
+  agreement (genotypes are extracted in variant blocks rather than via
+  `to_dense()`'s m x m identity); `--show-guard` shows meiosis refusing
+  founders that keep recurrent mutations.
+
 ### GRG + stdpopsim Regression Tests (2026-10-06)
 
 - Added `tests/pipeline/test_grg_stdpopsim_sim.py` — seeded stdpopsim
