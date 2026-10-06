@@ -21,6 +21,28 @@ from collections import deque
 import numpy as np
 
 
+def _switches_to_segments(switches, pos_bp, hap_ids, genome_length):
+    """Convert sorted switch loci to ``[(parent_id, end_bp), ...]``.
+
+    ``switches`` holds the distinct loci j at which the transmitted haplotype
+    changes parental copy (as returned by ``reproduce._draw_switches``); a
+    switch at locus 0 means it starts on ``hap_ids[1]``. A segment boundary
+    at ``pos_bp[j]`` is emitted for every other switch; the final segment
+    runs to ``genome_length``. Cost is O(number of switches).
+    """
+    switches = np.asarray(switches).tolist()
+    cur = 0
+    if switches and switches[0] == 0:
+        cur = 1
+        switches = switches[1:]
+    segments = []
+    for j in switches:
+        segments.append((hap_ids[cur], int(pos_bp[j])))
+        cur ^= 1
+    segments.append((hap_ids[cur], int(genome_length)))
+    return segments
+
+
 def _phase_to_segments(phase, pos_bp, hap_ids, genome_length):
     """Convert per-locus 0/1 phase vector to ``[(parent_id, end_bp), ...]``.
 
@@ -29,18 +51,13 @@ def _phase_to_segments(phase, pos_bp, hap_ids, genome_length):
     whenever ``phase[j] != phase[j-1]``; the final segment runs to
     ``genome_length``.
     """
-    m = len(phase)
-    if m == 0:
+    phase = np.asarray(phase)
+    if phase.shape[0] == 0:
         return [(hap_ids[0], int(genome_length))]
-    cur_phase = int(phase[0])
-    segments = []
-    for j in range(1, m):
-        pj = int(phase[j])
-        if pj != cur_phase:
-            segments.append((hap_ids[cur_phase], int(pos_bp[j])))
-            cur_phase = pj
-    segments.append((hap_ids[cur_phase], int(genome_length)))
-    return segments
+    switches = np.flatnonzero(phase[1:] != phase[:-1]) + 1
+    if phase[0]:
+        switches = np.concatenate([[0], switches])
+    return _switches_to_segments(switches, pos_bp, hap_ids, genome_length)
 
 
 class NonDuplicationRecombination:

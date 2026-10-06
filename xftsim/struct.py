@@ -1035,6 +1035,31 @@ def _extract_variant_meta_from_grg(grg) -> VariantMeta:
     )
 
 
+def _check_unique_mutations(pos_bp, mutations) -> None:
+    """Raise if two GRG mutations share (position, ref allele, alt allele).
+
+    ``pos_bp`` must be sorted; only mutations at shared positions are
+    inspected. See ``GraphHaplotypeOperator.meiosis`` for why duplicates
+    are unsafe.
+    """
+    same_as_prev = np.concatenate([[False], pos_bp[1:] == pos_bp[:-1]])
+    in_shared_site = same_as_prev | np.concatenate([same_as_prev[1:], [False]])
+    keys = [(int(pos_bp[i]), str(mutations[i].ref_allele), str(mutations[i].allele))
+            for i in np.flatnonzero(in_shared_site)]
+    n_dup = len(keys) - len(set(keys))
+    if n_dup:
+        raise ValueError(
+            f"GRG has {n_dup} mutation(s) duplicating another mutation's "
+            "(position, ref, alt), e.g. recurrent mutations from a "
+            "finite-sites coalescent simulation. GRG-native meiosis cannot "
+            "keep duplicates in a stable order, so their genotype columns "
+            "would be silently swapped. Remove sites with more than one "
+            "mutation before converting the tree sequence to a GRG "
+            "(founder_haplotypes_from_msprime_grg / "
+            "founder_haplotypes_from_stdpopsim_grg do this by default)."
+        )
+
+
 class GraphHaplotypeOperator(HaplotypeOperator):
     """GRG-backed haplotype operator using pygrgl graph traversal.
 
@@ -1241,10 +1266,18 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         operator wraps the same GRG with the offspring ``SampleMeta``; the
         original parent operator becomes stale.
 
-        Crossover positions are sampled per locus from
-        ``recombination_map._probabilities`` (matching the dense
-        ``_meiosis_3d`` kernel's distribution), then translated into bp-space
-        segments using ``self.variants.pos_bp``.
+        Switch loci are drawn from ``recombination_map._probabilities`` with
+        the same sampler (and per-offspring seeds) as the dense
+        ``_meiosis_3d`` kernel, then translated into bp-space segments using
+        the GRG's mutation positions.
+
+        Mutations must be unique by (position, ref, alt). Meiosis ends with
+        ``sort_mutations()``, which renumbers mutations by (position,
+        alleles); duplicates tie and come back in arbitrary order, which
+        would silently swap their genotype columns relative to
+        ``self.variants`` and the effect vectors. Duplicates arise from
+        recurrent mutations in finite-sites coalescent simulations; the GRG
+        founder helpers drop such sites by default.
 
         Parameters
         ----------
@@ -1257,7 +1290,7 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             Master RNG. Used to derive one independent seed per offspring
             via ``SeedSequence.spawn``; each seed is applied via
             ``np.random.seed`` immediately before that offspring's two
-            ``_meiosis_i`` phase draws, so crossover sampling is
+            ``_draw_switches`` draws, so crossover sampling is
             deterministic given ``rng``'s state. Matches the seed-derivation
             strategy used by the dense kernel — both paths consume one
             ``rng.randint`` draw before spawning.
@@ -1266,23 +1299,32 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         -------
         GraphHaplotypeOperator
             Offspring operator wrapping the (mutated) same GRG.
+
+        Raises
+        ------
+        ValueError
+            If mutation positions are out of order, the recombination map
+            length differs from ``m``, or two mutations share (position,
+            ref, alt).
         """
-        from xftsim.grg_recombination import _phase_to_segments
+        from xftsim.grg_recombination import _switches_to_segments
         try:
             from xftsim.grg_recombination_native import NonDuplicationRecombination
         except ImportError:
             from xftsim.grg_recombination import NonDuplicationRecombination
-        from xftsim.reproduce import _meiosis_pair_seeded, _spawn_meiosis_seeds
+        from xftsim.reproduce import (
+            _crossover_model, _meiosis_pair_switches_seeded, _spawn_meiosis_seeds,
+        )
 
         # Use GRG-internal mutation positions, not self.variants.pos_bp.
         # The recombination algorithm filters mutations via mut.position, so
         # segments must reference the same coordinate system. (xftsim's
-        # variants.pos_bp may be a sequential-index placeholder -- e.g.,
-        # founders.founder_haplotypes_from_msprime_grg sets it to
-        # np.arange(m) -- which would not align with the GRG's true
-        # bp-space mutations.)
+        # variants.pos_bp is user-supplied metadata and may be a
+        # sequential-index placeholder or missing, which would not align
+        # with the GRG's true bp-space mutations.)
+        mutations = [self._grg.get_mutation_by_id(i) for i in range(self.m)]
         pos_bp = np.fromiter(
-            (self._grg.get_mutation_by_id(i).position for i in range(self.m)),
+            (mut.position for mut in mutations),
             dtype=np.int64,
             count=self.m,
         )
@@ -1291,8 +1333,15 @@ class GraphHaplotypeOperator(HaplotypeOperator):
                 "GRG-native meiosis requires mutation positions to be "
                 "monotonically non-decreasing along mutation-id order."
             )
+        _check_unique_mutations(pos_bp, mutations)
 
         recomb_p = np.ascontiguousarray(recombination_map._probabilities, dtype=np.float64)
+        if recomb_p.shape[0] != self.m:
+            raise ValueError(
+                f"recombination map has {recomb_p.shape[0]} loci but the GRG "
+                f"has {self.m} mutations."
+            )
+        cumlam, special_idx, special_p = _crossover_model(recomb_p)
 
         recomb = NonDuplicationRecombination(self._grg)
         recomb.defer_sample_updates = True
@@ -1309,10 +1358,10 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         maternal_idx = assignment.maternal_idx
         paternal_idx = assignment.paternal_idx
 
-        # One seed per offspring; both mat and pat phase draws for offspring i
+        # One seed per offspring; both mat and pat switch draws for offspring i
         # come from the stream seeded by seeds[i]. Matches the dense kernel's
         # convention exactly, so given the same `rng` and the same parent
-        # genotypes both paths sample the same phase vectors.
+        # genotypes both paths sample the same crossovers.
         seeds = _spawn_meiosis_seeds(rng, n_off)
 
         for i in range(n_off):
@@ -1323,15 +1372,16 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             pat_haps = (parent_sample_nodes[2 * pat_i],
                         parent_sample_nodes[2 * pat_i + 1])
 
-            # Seed numba's RNG and draw both phase vectors inside one JIT
+            # Seed numba's RNG and draw both switch sets inside one JIT
             # call. A Python-level `np.random.seed()` does NOT seed numba's
-            # internal RNG state, so the seeding must live inside `_meiosis_pair_seeded`
-            # alongside the draws themselves. Returns (mat_phase, pat_phase),
+            # internal RNG state, so the seeding must live inside
+            # `_meiosis_pair_switches_seeded` alongside the draws themselves,
             # matching the dense kernel's seed-once-draw-twice pattern.
-            mat_phase, pat_phase = _meiosis_pair_seeded(recomb_p, seeds[i])
-            for parent_haps, phase in ((mat_haps, mat_phase),
-                                       (pat_haps, pat_phase)):
-                segments = _phase_to_segments(phase, pos_bp, parent_haps, genome_length)
+            mat_switches, pat_switches = _meiosis_pair_switches_seeded(
+                cumlam, special_idx, special_p, seeds[i])
+            for parent_haps, switches in ((mat_haps, mat_switches),
+                                          (pat_haps, pat_switches)):
+                segments = _switches_to_segments(switches, pos_bp, parent_haps, genome_length)
                 neg_id = recomb.recombine_multi(segments)
                 raw_id = recomb.NEGATIVE_NODE_IDS[abs(neg_id) - 1]
                 new_offspring_grg_ids.append(raw_id)

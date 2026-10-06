@@ -11,6 +11,26 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Added
 
+- **`RecombinationMap.from_haplotypes_with_cM(haplotypes)`**: builds a
+  variable-rate map from `variants.pos_cM` using Haldane's map function,
+  `p_j = (1 - exp(-2 d_j)) / 2` for adjacent variants `d_j` Morgans apart on
+  the same chromosome; 0.5 at each chromosome start and 0 between variants
+  sharing `pos_bp`. Restores the variable-map constructor from 0.3
+  (`variable_map_from_haplotypes_with_cM`), which v0.9 had dropped, leaving
+  only constant maps. On dense sequence data a constant `p = 0.5` map gives
+  thousands of crossovers per meiosis; on a stdpopsim chr22 window it grew
+  GRG edges 17x in two generations versus +3.5% with this map. Raises on
+  missing, non-finite, or within-chromosome-decreasing `pos_cM`.
+
+- **`seed` and `drop_multi_mutation_sites` keyword arguments for
+  `founder_haplotypes_from_msprime_grg` and
+  `founder_haplotypes_from_stdpopsim_grg`**. `seed` makes founders
+  reproducible (previously every call drew fresh randomness); the msprime
+  helper derives independent ancestry and mutation seeds from it, as
+  stdpopsim does.
+  `drop_multi_mutation_sites=True` (default) removes tree-sequence sites
+  carrying more than one mutation before GRG conversion; see Fixed.
+
 - **Native cross-mate correlation solver (`xftsim/matchsolver.py`),
   replacing Hexaly as the default for `GeneralAssortativeMating`**: the
   proprietary Hexaly Optimizer is no longer required to use general
@@ -207,6 +227,41 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Changed
 
+- **Meiosis samples crossover events instead of per-locus coin flips**
+  (`reproduce._crossover_model`, `_draw_switches`). Each locus with
+  `p < 0.5` gets a Poisson rate `-log(1 - 2p) / 2` and switches when an odd
+  number of crossovers lands on it, which reproduces the per-locus model
+  exactly in distribution (independent switches with probability `p`) at
+  O(crossovers x log m) instead of O(m) per meiosis; loci with `p >= 0.5`
+  get an explicit Bernoulli draw. When a map implies so many crossovers
+  that a per-locus pass is cheaper (e.g. constant intermediate `p`),
+  `_crossover_model` draws every locus explicitly instead; the route
+  depends only on `p`. Dense and GRG paths share the sampler and
+  per-offspring seeds, so they stay in exact agreement. The GRG path also
+  drops the pure-Python per-locus segment loop (`_phase_to_segments`, now
+  vectorized; meiosis uses `_switches_to_segments`). GRG: 2,000 stdpopsim
+  founders x 5 Mb (51k variants), 4 generations: 38.3 s -> 0.8 s; 10,000
+  founders x 10 Mb (143k variants), 5 generations: 8.6 s. Dense meiosis,
+  2,000 offspring x 20k loci: 82 -> 15 ms for a sequence-like cM map,
+  85 -> 55 ms at constant p = 0.05, 114 -> 92 ms at p = 0.25,
+  140 -> 127 ms at p = 0.5. **Seeded simulations produce different
+  (equally distributed) offspring than before.** `_meiosis_i` is removed;
+  `_meiosis_pair_seeded(p, seed)` keeps its signature and returns phase
+  vectors from the new sampler.
+
+- **`founder_haplotypes_from_msprime_grg` variant metadata uses real
+  positions and alleles from the GRG** instead of `pos_bp = arange(m)` and
+  `'0'/'1'` placeholders, so `pos_cM = pos_bp * recombination_rate * 100`
+  is a real genetic position and works with `from_haplotypes_with_cM`.
+
+- **Docs**: `docs/userguide_v0.9/rmaps.ipynb` replaces the "no v0.9 helper
+  for variable maps" note with a `from_haplotypes_with_cM` section and
+  example, and explains why GRG sims on sequence data need a cM-based map
+  and unique mutations. `docs/examples/07_grg_genotypes.ipynb` updates the
+  GRG-native recombination description (`_switches_to_segments`) and adds
+  "Choosing a recombination map" and "Recurrent mutations" notes; its toy
+  example keeps `constant_map(p=0.5)`.
+
 - **All four GRG loaders switched from `pygrgl.load_immutable_grg` to
   `pygrgl.load_mutable_grg`** ([io.py:336](xftsim/io.py),
   [io.py:673](xftsim/io.py),
@@ -232,6 +287,29 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   `DenseHaplotypeArray`).
 
 ### Fixed
+
+- **GRG meiosis silently swapped genotype columns of recurrent mutations.**
+  Finite-sites coalescent simulations (msprime / stdpopsim defaults) place
+  multiple mutations at one site; GRG conversion keeps each as its own
+  mutation, and recurrent ones share (position, ref, alt). GRG meiosis ends
+  with `sort_mutations()`, which renumbers mutations by (position, alleles)
+  and returns tied duplicates in arbitrary order, so after each generation
+  their columns could be exchanged relative to `VariantMeta` and the effect
+  vectors. On stdpopsim chr22 founders (200 x 1 Mb) this left 444 genotype
+  cells and genetic values (up to 0.18) out of agreement with the dense
+  path after three generations; every mismatch was an exact swap within a
+  duplicate pair. The GRG founder helpers now drop multi-mutation sites
+  (~0.5% of mutations), and `GraphHaplotypeOperator.meiosis()` raises
+  `ValueError` if duplicates are present. It also now raises when the
+  recombination map length differs from `m`, and dense `meiosis()` asserts
+  the same.
+
+- **`RecombinationMap`'s same-position rule could link chromosomes.** The
+  `p = 0` override for variants sharing `pos_bp` with their predecessor ran
+  after chromosome starts were set to 0.5 and ignored chromosome changes,
+  so a chromosome whose first variant had the previous chromosome's last
+  `pos_bp` (e.g. placeholder positions) was linked to it. The override now
+  applies only within a chromosome.
 
 - **pygrgl `MutableGRG::getOrderedNodes` topological-iteration bug**
   (`grgl/include/grgl/grg.h`): three compound bugs caused matmul DOWN to

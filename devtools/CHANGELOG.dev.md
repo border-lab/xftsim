@@ -4,6 +4,34 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### GRG + stdpopsim Regression Tests (2026-10-06)
+
+- Added `tests/pipeline/test_grg_stdpopsim_sim.py` — seeded stdpopsim
+  founders run four generations on GRG-backed and dense haplotypes with the
+  same seed and a `from_haplotypes_with_cM` map; genotypes and genetic
+  values must agree exactly. The existing GRG parity tests use synthetic
+  GRGs without recurrent mutations, and the oracle tests compare mutation
+  *positions*, so neither could see the duplicate-mutation column swap.
+- Added `tests/unit/test_grg_duplicate_mutations.py` — builds a
+  duplicate-free tree sequence plus one site with two identical A->T
+  mutations, checks that GRG meiosis rejects exactly that duplicate (the
+  test fails if the guard is disabled) and that
+  `_drop_multi_mutation_sites` fixes it; msprime founder seeding and
+  filtering.
+- Added `tests/unit/test_crossover_sampler.py` — per-locus switch
+  frequencies and independence for both sampler routes (Poisson events and
+  per-locus draws), route selection, input validation, and equivalence of
+  the vectorized `_phase_to_segments` / `_switches_to_segments` with the
+  original per-locus loop.
+- Extended `tests/unit/test_recombination_map.py` with
+  `from_haplotypes_with_cM` tests, including chromosome starts that share a
+  `pos_bp` with the previous chromosome.
+- The changes went through the `devtools/adversarial_review.md` protocol
+  before commit; the review's findings (chromosome-start linkage, a guard
+  test that passed without the guard, shared msprime seeds, slower
+  sampling for constant intermediate-`p` maps) are fixed in the same
+  commit.
+
 ### C++ Native Extension Build System (2026-06-27)
 
 - Added `xftsim/native/` — CMake + pybind11 build system for the C++

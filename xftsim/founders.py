@@ -141,6 +141,75 @@ def founder_haplotypes_from_plink_bfile(path: str,
     """
     return xft.io.read_plink1_as_pseudohaplotypes(path, generation=generation)
 
+def _drop_multi_mutation_sites(ts: tskit.TreeSequence) -> tskit.TreeSequence:
+    """Remove sites carrying more than one mutation from a tree sequence.
+
+    Finite-sites mutation models (msprime's default, and stdpopsim's) place
+    recurrent, back, and multi-allelic mutations at a single site. GRG
+    conversion turns each into its own mutation; recurrent ones share
+    (position, ref, alt), which GRG-native meiosis cannot keep in a stable
+    order (see ``GraphHaplotypeOperator.meiosis``). Dropping these sites
+    leaves one biallelic mutation per site.
+    """
+    counts = np.bincount(ts.tables.mutations.site, minlength=ts.num_sites)
+    multi = np.flatnonzero(counts > 1)
+    if multi.size == 0:
+        return ts
+    return ts.delete_sites(multi)
+
+
+def _tree_sequence_to_mutable_grg(ts: tskit.TreeSequence,
+                                  binary_muts: bool = False,
+                                  use_node_times: bool = False,
+                                  no_simplify: bool = False,
+                                  maintain_topo: bool = False,
+                                  ts_coals: bool = False):
+    """Convert a TreeSequence to a ``pygrgl.MutableGRG`` via ``grg convert``."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        trees_path = os.path.join(tmpdir, "founders.trees")
+        grg_path = os.path.join(tmpdir, "founders.grg")
+
+        ts.dump(trees_path)
+
+        grg_bin = which("grg")
+        if grg_bin is None:
+            raise RuntimeError(
+                "Could not find 'grg' on PATH. "
+                "Make sure pygrgl is installed and the environment is activated."
+            )
+
+        cmd = [grg_bin, "convert", trees_path, grg_path]
+        if binary_muts:
+            cmd.append("--binary-muts")
+        if use_node_times:
+            cmd.append("--ts-node-times")
+        if no_simplify:
+            cmd.append("--no-simplify")
+        if maintain_topo:
+            cmd.append("--maintain-topo")
+        if ts_coals:
+            cmd.append("--ts-coals")
+
+        subprocess.check_call(cmd)
+
+        # Load mutable so GRG-native meiosis works.
+        return pygrgl.load_mutable_grg(grg_path)
+
+
+def _grg_mutation_alleles(grg):
+    """Return (pos_bp, ref_alleles, alt_alleles) for every GRG mutation, by id."""
+    num_grg_muts = grg.num_mutations
+    pos_bp = np.empty(num_grg_muts, dtype=np.int64)
+    ref_alleles = np.empty(num_grg_muts, dtype=object)
+    alt_alleles = np.empty(num_grg_muts, dtype=object)
+    for i in range(num_grg_muts):
+        mut = grg.get_mutation_by_id(i)
+        pos_bp[i] = int(mut.position)
+        ref_alleles[i] = str(mut.ref_allele)
+        alt_alleles[i] = str(mut.allele)
+    return pos_bp, ref_alleles, alt_alleles
+
+
 def founder_haplotypes_from_msprime_grg(
     n: int,
     sequence_length: int,
@@ -149,6 +218,8 @@ def founder_haplotypes_from_msprime_grg(
     mutation_rate: float = 1e-8,
     generation: int = 0,
     *,
+    seed: Union[int, None] = None,
+    drop_multi_mutation_sites: bool = True,
     binary_muts: bool = False,
     use_node_times: bool = False,
     no_simplify: bool = False,
@@ -176,6 +247,15 @@ def founder_haplotypes_from_msprime_grg(
         Mutation rate per base pair per generation. Default is 1e-8.
     generation : int, optional
         Generation number for the founders. Default is 0.
+    seed : int or None, optional
+        Random seed; independent ancestry and mutation seeds are derived
+        from it. ``None`` (default) draws fresh seeds.
+    drop_multi_mutation_sites : bool, optional
+        Remove sites with more than one mutation (recurrent, back, or
+        multi-allelic) before conversion, leaving one biallelic mutation per
+        site. Default True. GRG-native meiosis raises on recurrent mutations
+        that share (position, ref, alt), so only disable this for founders
+        that will not go through meiosis.
     binary_muts : bool, optional
         Flag to pass --binary-muts to grgl.
     use_node_times : bool, optional
@@ -191,82 +271,54 @@ def founder_haplotypes_from_msprime_grg(
     -------
     xft.struct.GraphHaplotypeOperator
         The operator containing the simulated founder graph and metadata.
+
+    Notes
+    -----
+    Variant positions and alleles are read from the GRG; ``pos_cM`` is
+    ``pos_bp * recombination_rate * 100`` (uniform map), so
+    :meth:`xftsim.reproduce.RecombinationMap.from_haplotypes_with_cM` yields
+    the matching recombination map.
     """
     import msprime
-    import pygrgl
 
-    # Step 2: Simulate Ancestry and Mutations
+    # Simulate ancestry and mutations, with independent seeds for each
+    # (as stdpopsim does) derived from `seed`.
+    ancestry_seed = mutation_seed = None
+    if seed is not None:
+        ancestry_seed, mutation_seed = (
+            int(s) for s in np.random.RandomState(seed).randint(1, 2 ** 31, size=2))
     ts = msprime.sim_ancestry(
         samples=n,
         sequence_length=sequence_length,
         population_size=Ne,
         recombination_rate=recombination_rate,
+        random_seed=ancestry_seed,
     )
-    ts = msprime.sim_mutations(ts, rate=mutation_rate)
+    ts = msprime.sim_mutations(ts, rate=mutation_rate, random_seed=mutation_seed)
+    if drop_multi_mutation_sites:
+        ts = _drop_multi_mutation_sites(ts)
 
-    # Step 3: Convert TreeSequence to GRG (no VCF middleman)
-    with tempfile.TemporaryDirectory() as tmpdir:
-        trees_path = os.path.join(tmpdir, "founders.trees")
-        grg_path = os.path.join(tmpdir, "founders.grg")
+    # Convert TreeSequence to GRG (no VCF middleman)
+    grg = _tree_sequence_to_mutable_grg(
+        ts, binary_muts=binary_muts, use_node_times=use_node_times,
+        no_simplify=no_simplify, maintain_topo=maintain_topo, ts_coals=ts_coals,
+    )
 
-        # Dump the msprime TreeSequence to a .trees file
-        ts.dump(trees_path)
-
-        # Find the GRGL binary ("grgl") installed with pygrgl
-        grg_bin = which("grg")
-        if grg_bin is None:
-            raise RuntimeError(
-                "Could not find 'grg' on PATH. "
-                "Make sure pygrgl is installed and the environment is activated."
-            )
-
-        # Build the same command that `grg convert <trees> <grg>` uses
-        cmd = [grg_bin, "convert", trees_path, grg_path]
-        if binary_muts:
-            cmd.append("--binary-muts")
-        if use_node_times:
-            cmd.append("--ts-node-times")
-        if no_simplify:
-            cmd.append("--no-simplify")
-        if maintain_topo:
-            cmd.append("--maintain-topo")
-        if ts_coals:
-            cmd.append("--ts-coals")
-
-        # Run GRGL to create the GRG file
-        subprocess.check_call(cmd)
-
-        # Load the GRG back into Python (mutable so GRG-native meiosis works)
-        grg = pygrgl.load_mutable_grg(grg_path)
-
-    # Step 4: Extract and Build Metadata
+    # Build metadata
     iids = np.array([f"ind_{i}" for i in range(ts.num_individuals)], dtype=str)
     samples = xft.struct.SampleMeta(iid=iids, generation=generation)
 
-        # Align variants to GRG mutations (placeholder implementation)
-    num_grg_muts = grg.num_mutations  # this is an int attribute
-
-    # You can keep vid as ints:
-    vids = np.arange(num_grg_muts, dtype=int)
-
-    chroms = np.repeat("1", num_grg_muts)
-    pos_bp = np.arange(num_grg_muts, dtype=int)
-    pos_cM = pos_bp * recombination_rate * 100.0
-    zero_allele = np.repeat("0", num_grg_muts)
-    one_allele = np.repeat("1", num_grg_muts)
-
+    pos_bp, ref_alleles, alt_alleles = _grg_mutation_alleles(grg)
+    num_grg_muts = grg.num_mutations
     variants = xft.struct.VariantMeta(
-        vid=vids,
-        chrom=chroms,
+        vid=np.arange(num_grg_muts, dtype=int),
+        chrom=np.repeat("1", num_grg_muts),
         pos_bp=pos_bp,
-        pos_cM=pos_cM,
-        zero_allele=zero_allele,
-        one_allele=one_allele,
+        pos_cM=pos_bp * recombination_rate * 100.0,
+        zero_allele=ref_alleles,
+        one_allele=alt_alleles,
     )
 
-
-
-    # Step 5: Instantiate and Return
     return xft.struct.GraphHaplotypeOperator(
         grg=grg, generation=generation, samples=samples, variants=variants
     )
@@ -284,6 +336,8 @@ def founder_haplotypes_from_stdpopsim_grg(
     engine_name: str = "msprime",
     generation: int = 0,
     *,
+    seed: Union[int, None] = None,
+    drop_multi_mutation_sites: bool = True,
     binary_muts: bool = False,
     use_node_times: bool = False,
     no_simplify: bool = False,
@@ -330,6 +384,15 @@ def founder_haplotypes_from_stdpopsim_grg(
         stdpopsim simulation engine to use. Default ``"msprime"``.
     generation : int, optional
         Generation number for the founders. Default is 0.
+    seed : int or None, optional
+        Random seed passed to the stdpopsim engine. ``None`` (default) draws
+        a fresh seed.
+    drop_multi_mutation_sites : bool, optional
+        Remove sites with more than one mutation (recurrent, back, or
+        multi-allelic) before conversion, leaving one biallelic mutation per
+        site. Default True. GRG-native meiosis raises on recurrent mutations
+        that share (position, ref, alt), so only disable this for founders
+        that will not go through meiosis.
     binary_muts : bool, optional
         Flag to pass --binary-muts to grgl.
     use_node_times : bool, optional
@@ -354,8 +417,10 @@ def founder_haplotypes_from_stdpopsim_grg(
     grouping variable by :class:`xftsim.arch.GroupingComponent`.
 
     Variant positions and alleles are read directly from the GRG; ``pos_cM``
-    is computed by integrating the contig's recombination map. ``vid`` is
-    formatted as ``"{chromosome}:{pos_bp}:{ref}:{alt}"``.
+    is computed by integrating the contig's recombination map, so
+    :meth:`xftsim.reproduce.RecombinationMap.from_haplotypes_with_cM` yields
+    the matching recombination map. ``vid`` is formatted as
+    ``"{chromosome}:{pos_bp}:{ref}:{alt}"``.
     """
     # Step 1: Build the stdpopsim simulation specification
     species = stdpopsim.get_species(species_id)
@@ -377,37 +442,15 @@ def founder_haplotypes_from_stdpopsim_grg(
 
     # Step 2: Simulate a TreeSequence with the chosen engine
     engine = stdpopsim.get_engine(engine_name)
-    ts = engine.simulate(model, contig, samples)
+    ts = engine.simulate(model, contig, samples, seed=seed)
+    if drop_multi_mutation_sites:
+        ts = _drop_multi_mutation_sites(ts)
 
     # Step 3: Convert TreeSequence to GRG (no VCF middleman)
-    with tempfile.TemporaryDirectory() as tmpdir:
-        trees_path = os.path.join(tmpdir, "founders.trees")
-        grg_path = os.path.join(tmpdir, "founders.grg")
-
-        ts.dump(trees_path)
-
-        grg_bin = which("grg")
-        if grg_bin is None:
-            raise RuntimeError(
-                "Could not find 'grg' on PATH. "
-                "Make sure pygrgl is installed and the environment is activated."
-            )
-
-        cmd = [grg_bin, "convert", trees_path, grg_path]
-        if binary_muts:
-            cmd.append("--binary-muts")
-        if use_node_times:
-            cmd.append("--ts-node-times")
-        if no_simplify:
-            cmd.append("--no-simplify")
-        if maintain_topo:
-            cmd.append("--maintain-topo")
-        if ts_coals:
-            cmd.append("--ts-coals")
-
-        subprocess.check_call(cmd)
-
-        grg = pygrgl.load_mutable_grg(grg_path)
+    grg = _tree_sequence_to_mutable_grg(
+        ts, binary_muts=binary_muts, use_node_times=use_node_times,
+        no_simplify=no_simplify, maintain_topo=maintain_topo, ts_coals=ts_coals,
+    )
 
     # Step 4: Build sample metadata (population labels + prefixed iids)
     pop_names = np.array(
@@ -430,14 +473,7 @@ def founder_haplotypes_from_stdpopsim_grg(
 
     # Step 5: Build variant metadata (real positions, alleles, cumulative cM)
     num_grg_muts = grg.num_mutations
-    pos_bp = np.empty(num_grg_muts, dtype=np.int64)
-    ref_alleles = np.empty(num_grg_muts, dtype=object)
-    alt_alleles = np.empty(num_grg_muts, dtype=object)
-    for i in range(num_grg_muts):
-        mut = grg.get_mutation_by_id(i)
-        pos_bp[i] = int(mut.position)
-        ref_alleles[i] = str(mut.ref_allele)
-        alt_alleles[i] = str(mut.allele)
+    pos_bp, ref_alleles, alt_alleles = _grg_mutation_alleles(grg)
 
     chroms = np.repeat(str(chromosome), num_grg_muts)
     vids = np.array(

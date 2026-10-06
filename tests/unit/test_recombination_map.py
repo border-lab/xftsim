@@ -112,3 +112,80 @@ class TestFromHaplotypes:
         hap = TestSimulation.founder_haplotypes(n=10, m=5, seed=42)
         rmap = RecombinationMap.from_haplotypes(hap)
         np.testing.assert_array_equal(rmap.vid, hap.vid)
+
+
+def _dense_with_variants(**variant_fields):
+    """Tiny DenseHaplotypeArray carrying the given VariantMeta fields."""
+    from xftsim.struct import SampleMeta, VariantMeta, DenseHaplotypeArray
+    m = len(variant_fields['pos_cM']) if variant_fields.get('pos_cM') is not None \
+        else len(variant_fields['vid'])
+    variant_fields.setdefault('vid', np.arange(m))
+    return DenseHaplotypeArray(
+        genotypes=np.zeros((4, m, 2), dtype=np.int8),
+        samples=SampleMeta(iid=np.arange(4)),
+        variants=VariantMeta(**variant_fields),
+    )
+
+
+class TestFromHaplotypesWithCM:
+    def test_haldane_probabilities(self):
+        """p_j = (1 - exp(-2 d_j)) / 2 with d_j the adjacent gap in Morgans."""
+        pos_cM = np.array([0.0, 1.0, 1.5, 11.5, 61.5])
+        hap = _dense_with_variants(pos_cM=pos_cM)
+        rmap = RecombinationMap.from_haplotypes_with_cM(hap)
+        d = np.diff(pos_cM) / 100.0
+        expected = np.concatenate([[0.5], 0.5 * (1 - np.exp(-2 * d))])
+        np.testing.assert_allclose(rmap._probabilities, expected, rtol=1e-12)
+        assert np.all(rmap._probabilities[1:] < 0.5)
+
+    def test_zero_distance_gives_zero(self):
+        hap = _dense_with_variants(pos_cM=np.array([0.0, 0.0, 0.2]))
+        rmap = RecombinationMap.from_haplotypes_with_cM(hap)
+        assert rmap._probabilities[1] == 0.0
+
+    def test_chromosome_starts_are_half(self):
+        """Each chromosome restarts its cM coordinate; its first locus gets 0.5."""
+        hap = _dense_with_variants(
+            pos_cM=np.array([0.0, 0.1, 0.2, 0.0, 0.1]),
+            chrom=np.array(['1', '1', '1', '2', '2']),
+        )
+        rmap = RecombinationMap.from_haplotypes_with_cM(hap)
+        assert rmap._probabilities[0] == 0.5
+        assert rmap._probabilities[3] == 0.5
+        assert np.all(rmap._probabilities[[1, 2, 4]] < 0.01)
+
+    def test_same_position_variants_cannot_split(self):
+        """pos_bp is threaded through, so same-site variants get p = 0."""
+        hap = _dense_with_variants(
+            pos_cM=np.array([0.0, 0.5, 0.5, 1.0]),
+            pos_bp=np.array([100, 200, 200, 300]),
+        )
+        rmap = RecombinationMap.from_haplotypes_with_cM(hap)
+        assert rmap._probabilities[2] == 0.0
+        assert rmap._probabilities[1] > 0.0
+
+    def test_same_position_rule_respects_chromosome_starts(self):
+        """A chromosome's first variant stays unlinked from the previous
+        chromosome even if their pos_bp coincide."""
+        hap = _dense_with_variants(
+            pos_cM=np.array([0.0, 1.0, 0.0, 1.0]),
+            pos_bp=np.array([100, 5000, 5000, 6000]),
+            chrom=np.array(['1', '1', '2', '2']),
+        )
+        rmap = RecombinationMap.from_haplotypes_with_cM(hap)
+        assert rmap._probabilities[2] == 0.5
+
+    def test_missing_pos_cM_raises(self):
+        hap = _dense_with_variants(vid=np.arange(3))
+        with pytest.raises(ValueError, match="pos_cM"):
+            RecombinationMap.from_haplotypes_with_cM(hap)
+
+    def test_nan_pos_cM_raises(self):
+        hap = _dense_with_variants(pos_cM=np.array([0.0, np.nan, 1.0]))
+        with pytest.raises(ValueError, match="NaN"):
+            RecombinationMap.from_haplotypes_with_cM(hap)
+
+    def test_decreasing_within_chromosome_raises(self):
+        hap = _dense_with_variants(pos_cM=np.array([0.0, 2.0, 1.0]))
+        with pytest.raises(ValueError, match="decreases"):
+            RecombinationMap.from_haplotypes_with_cM(hap)
