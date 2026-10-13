@@ -179,7 +179,7 @@ class TestCheckpointResumeEquivalence:
             expected_keys = {
                 'architecture', 'generation', 'retain_haplotypes', 'retain_phenotypes',
                 'rng', 'haplotype_history', 'phenotype_history', 'pedigree_history',
-                'recombination_map', 'mating_regime',
+                'recombination_map', 'mating_regime', 'metadata_rules', 'results',
             }
             assert set(checkpoint.keys()) == expected_keys
 

@@ -11,6 +11,51 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Added
 
+- **Per-individual metadata carried across generations (`xftsim.inherit`,
+  `Simulation(metadata_rules=...)`)**. Metadata in `SampleMeta.extra` (e.g.
+  stdpopsim's `population` label) used to vanish at generation 1, because
+  every mating regime built offspring `SampleMeta` without it. Each field now
+  gets an inheritance rule, applied once per generation just before meiosis:
+  `Midparent`, `Maternal`, `Paternal`, `RandomParent`, `Custom`, and
+  `AncestryProportions(source='population')`, which one-hot encodes founder
+  labels into `ancestry_<POP>` columns and averages the parents' values
+  thereafter (expected global ancestry; rows sum to 1 every generation).
+  Inherited metadata reaches the haplotypes, `PedigreeArray` and
+  `PhenotypeArray` of each generation. Deterministic rules never draw from
+  the simulation RNG, so seeded runs are bit-identical with or without them;
+  `metadata_rules=None` (default) keeps the old behavior. Fields used after
+  generation 0 by grouping, `meta()`, `GroupedMating`, `MetadataFilter` or
+  `MetadataSummary` but produced by no rule raise before generation 0 runs
+  (also when no rules are given, where some of these used to fail at
+  generation 1 or silently return nothing). Parent fields with no rule are
+  dropped with one warning. Fields derived at generation 0 are added to a
+  copy of the founder operator, so the founders' `samples` is not modified
+  (GRG meiosis still mutates a GRG founder's graph in place, as before).
+  New `SampleMeta.with_extra()` and `SampleMeta.to_dataframe()`.
+- **`meta(field)` architecture builtin (`MetadataComponent`)**: copies a
+  numeric metadata field into the phenotypes, e.g. `A ~ meta(ancestry_YRI)`
+  as a covariate, or as the trait for `LinearAssortativeMating(['A'], r)`
+  (ancestry-assortative mating). Supported by `save_architecture` /
+  `load_architecture`.
+- **`GroupedMating(regime, by)`**: runs any mating regime separately within
+  groups of a categorical metadata field (demes, populations), so no
+  between-group matings occur. Groups lacking either sex skip reproduction
+  with a warning. Serialized in checkpoints.
+- **`MetadataFilter(key, values=... | predicate=...)`** returning a
+  `SubsetView`, **`MetadataSummary(keys, by)`** (per-generation mean and
+  variance of numeric fields, counts of categorical ones, optionally
+  stratified), and **`SampleStatistics(filter_name=...)`** to compute the
+  covariance on a filtered view such as one population.
+- **Metadata in saved outputs**: haplotype and phenotype npz files, GRG
+  checkpoint sidecars and checkpoint pedigrees now store `SampleMeta.extra`
+  (strings as unicode, so no pickle is needed) and the generation number;
+  older files load with empty metadata. Checkpoints record built-in rules in
+  `meta.json`; a `Custom` rule's function cannot be saved, so it must be
+  passed again via `Simulation.from_checkpoint(..., metadata_rules=...)`.
+  Earlier notes in this changelog (stdpopsim founders, below) that `extra`
+  survived meiosis and that labels feed a `GroupingComponent` were not
+  accurate: neither held until this change.
+
 - **`RecombinationMap.from_haplotypes_with_cM(haplotypes)`**: builds a
   variable-rate map from `variants.pos_cM` using Haldane's map function,
   `p_j = (1 - exp(-2 d_j)) / 2` for adjacent variants `d_j` Morgans apart on
@@ -287,6 +332,23 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   `DenseHaplotypeArray`).
 
 ### Fixed
+
+- **`BatchedMating` assumed 2 offspring per pair when merging batches.** The
+  merged family IDs and sexes came from `getattr(regime,
+  'offspring_per_pair', 2)`, which is wrong for wrapped regimes without that
+  attribute (e.g. nested `BatchedMating`/`GroupedMating`); they are now
+  taken from the inner assignments. Output is bit-identical for the existing
+  regimes. A batch lacking one sex now skips reproduction with a warning
+  instead of raising.
+- **`LinearAssortativeMating` on a constant trait paired full siblings.**
+  With zero variance all scores tied and rank-order pairing followed sample
+  order, where siblings sit next to each other with alternating sex. A
+  constant composite now falls back to random mating.
+- **Phenotype npz and checkpoint pedigrees lost the generation number on
+  load** (it reset to 0).
+- **GRG meiosis now raises if offspring nodes come back out of creation
+  order**, rather than silently misaligning offspring with the mate
+  assignment (which metadata inheritance relies on).
 
 - **GRG meiosis silently swapped genotype columns of recurrent mutations.**
   Finite-sites coalescent simulations (msprime / stdpopsim defaults) place

@@ -72,7 +72,17 @@ class SampleStatistics(Statistic):
     Compute the sample covariance matrix across all phenotype components.
 
     Returns a dict with 'cov' (k x k matrix), 'var' (diagonal), and 'keys'.
+
+    Parameters
+    ----------
+    filter_name : str, optional
+        If given, compute on the ``phenotypes`` of the filtered view with
+        this name (e.g. a ``MetadataFilter`` selecting one population)
+        instead of the whole generation.
     """
+
+    def __init__(self, filter_name: str | None = None) -> None:
+        self.filter_name = filter_name
 
     def estimate(self, phenotype_history: dict[int, PhenotypeArray],
                  filtered_views: dict[str, FilteredView],
@@ -81,7 +91,13 @@ class SampleStatistics(Statistic):
         if generation not in phenotype_history:
             return None
 
-        pheno = phenotype_history[generation]
+        if self.filter_name is None:
+            pheno = phenotype_history[generation]
+        else:
+            view = filtered_views.get(self.filter_name)
+            pheno = getattr(view, 'phenotypes', None)
+            if pheno is None:
+                return None
         keys = list(pheno.keys)
         if not keys:
             return {'cov': np.array([[]]), 'var': np.array([]), 'keys': []}
@@ -357,4 +373,110 @@ class MatingStatistics(Statistic):
             'n_mating_pairs': n_mating_pairs,
             'mean_offspring_count': mean_offspring_count,
             'spouse_correlations': spouse_correlations,
+        }
+
+
+def _py_scalar(x: Any) -> Any:
+    """numpy scalar -> Python scalar (object-array elements pass through)."""
+    return x.item() if isinstance(x, np.generic) else x
+
+
+class MetadataSummary(Statistic):
+    """
+    Summarize per-individual metadata fields (``SampleMeta.extra``) each
+    generation.
+
+    Numeric fields (e.g. ``ancestry_<POP>`` proportions) report ``mean`` and
+    ``var``; other fields (e.g. population labels) report ``counts`` per
+    value. Results are stored in ``sim.results`` every generation, so the
+    full trajectory (such as the decay of ancestry variance under random
+    mating) survives history pruning.
+
+    Parameters
+    ----------
+    keys : list[str], optional
+        Fields to summarize. Default: every field present (except ``by``).
+    by : str, optional
+        Categorical field to stratify by. The result then maps each group
+        label to its own summary.
+
+    Returns
+    -------
+    dict
+        ``{field: {'n', 'mean', 'var'} or {'n', 'counts'}}``, or
+        ``{group: {field: ...}}`` when ``by`` is set.
+    """
+
+    def __init__(self, keys: list[str] | None = None,
+                 by: str | None = None) -> None:
+        self.keys = None if keys is None else list(keys)
+        self.by = by
+
+    @property
+    def metadata_keys(self) -> tuple[str, ...]:
+        """Metadata fields this statistic reads."""
+        return tuple(self.keys or ()) + ((self.by,) if self.by else ())
+
+    @staticmethod
+    def _summarize(extra: dict[str, np.ndarray], keys: list[str],
+                   idx: np.ndarray) -> dict[str, dict[str, Any]]:
+        out: dict[str, dict[str, Any]] = {}
+        for key in keys:
+            vals = extra[key][idx]
+            if np.issubdtype(vals.dtype, np.number) or vals.dtype == bool:
+                vals = vals.astype(np.float64)
+                mean, var = vals.mean(axis=0), vals.var(axis=0)
+                out[key] = {
+                    'n': int(len(idx)),
+                    'mean': float(mean) if np.ndim(mean) == 0 else mean,
+                    'var': float(var) if np.ndim(var) == 0 else var,
+                }
+            else:
+                labels, counts = np.unique(vals, return_counts=True)
+                out[key] = {
+                    'n': int(len(idx)),
+                    'counts': {_py_scalar(lab): int(c)
+                               for lab, c in zip(labels, counts)},
+                }
+        return out
+
+    def estimate(self, phenotype_history: dict[int, PhenotypeArray],
+                 filtered_views: dict[str, FilteredView],
+                 generation: int,
+                 **kwargs: Any) -> dict[str, Any] | None:
+        if generation not in phenotype_history:
+            return None
+
+        samples = phenotype_history[generation].samples
+        extra = samples.extra
+        if self.keys is None:
+            keys = [k for k in extra if k != self.by]
+        else:
+            missing = [k for k in self.keys if k not in extra]
+            if missing:
+                raise KeyError(
+                    f"MetadataSummary: generation {generation} has no metadata "
+                    f"field(s) {missing}; available: {sorted(extra)}"
+                )
+            keys = self.keys
+
+        if self.by is None:
+            return self._summarize(extra, keys, np.arange(samples.n))
+
+        if self.by not in extra:
+            raise KeyError(
+                f"MetadataSummary: generation {generation} has no metadata "
+                f"field '{self.by}' to stratify by; available: {sorted(extra)}"
+            )
+        labels = extra[self.by]
+        try:
+            groups, group_idx = np.unique(labels, return_inverse=True)
+        except TypeError as err:
+            raise TypeError(
+                f"MetadataSummary: labels in '{self.by}' cannot be sorted "
+                f"(mixed types such as None and str?): {err}") from err
+        return {
+            _py_scalar(label): self._summarize(extra, keys,
+                                               np.flatnonzero(group_idx == g))
+            for g, label in enumerate(groups)
         }

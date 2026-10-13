@@ -65,6 +65,7 @@ from . import index       ## indexing
 from . import struct      ## data structures
 from . import reproduce   ## sexual reproduction and phenotypic transmission
 from . import founders    ## creation / import of founder haplotypes
+from . import inherit     ## metadata inheritance rules
 from . import mate        ## mate assignment
 from . import ped         ## pedigree objects
 from . import io          ## input/output

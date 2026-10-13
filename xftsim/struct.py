@@ -202,6 +202,48 @@ class SampleMeta:
             extra=self.extra,
         )
 
+    def with_extra(self, extra: dict, replace: bool = True) -> "SampleMeta":
+        """Return a new SampleMeta with different extra fields.
+
+        Parameters
+        ----------
+        extra : dict
+            Field name -> (n,) array.
+        replace : bool
+            If True (default), ``extra`` becomes the full set of fields.
+            If False, it is merged into the existing fields, overwriting
+            any with the same name.
+        """
+        merged = dict(extra) if replace else {**self.extra, **extra}
+        return SampleMeta(
+            iid=self.iid,
+            fid=self.fid,
+            sex=self.sex,
+            generation=self.generation,
+            extra=merged,
+        )
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Return iid, fid, sex, generation and all extra fields as a DataFrame.
+
+        Multi-column extra fields of shape (n, k) become ``<key>_0`` ...
+        ``<key>_{k-1}``.
+        """
+        cols = {
+            'iid': self.iid,
+            'fid': self.fid,
+            'sex': self.sex,
+            'generation': np.full(self.n, self.generation),
+        }
+        for k, v in self.extra.items():
+            if v.ndim == 1:
+                cols[k] = v
+            else:
+                flat = v.reshape(self.n, -1)
+                for j in range(flat.shape[1]):
+                    cols[f"{k}_{j}"] = flat[:, j]
+        return pd.DataFrame(cols)
+
     def to_sample_index(self) -> "xft.index.SampleIndex":
         """
         Convert to legacy SampleIndex for compatibility with PhenotypeArray.
@@ -1387,6 +1429,16 @@ class GraphHaplotypeOperator(HaplotypeOperator):
                 new_offspring_grg_ids.append(raw_id)
 
         # One wholesale sample swap (parents -> offspring), then compact.
+        # make_node() hands out increasing IDs, so the list is already in
+        # offspring order and the sort below is a no-op. Offspring row i must
+        # stay MateAssignment offspring i (metadata inheritance relies on
+        # it), so fail loudly if a backend ever stops guaranteeing this.
+        if np.any(np.diff(new_offspring_grg_ids) <= 0):
+            raise RuntimeError(
+                "GRG recombination returned offspring node IDs out of creation "
+                "order; offspring would no longer line up with the mate "
+                "assignment."
+            )
         new_offspring_grg_ids.sort()
         self._grg.set_samples(new_offspring_grg_ids)
         recomb._pending_sample_removals.clear()

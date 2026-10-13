@@ -71,7 +71,7 @@ class TestBuiltinsRegistry:
     def test_all_components_registered(self):
         expected = {
             'genetic', 'mvGenetic', 'haplotypeGenetic',
-            'noise', 'cnoise',
+            'noise', 'cnoise', 'threshold', 'meta',
             'parent', 'mother', 'father',
             'sibling_mean', 'sibling_sum', 'sibling_any',
             'sibling_count', 'sibling_eldest', 'sibling_youngest',

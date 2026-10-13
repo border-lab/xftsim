@@ -9,6 +9,7 @@ Run from the repository root with the project environment, e.g.
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --show-guard
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --causal-min-maf 0.05
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --fixed-effects
+    .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --pops YRI=200,CEU=200 --track-ancestry
 
 Steps: (1) simulate founders with a published stdpopsim demographic model and
 convert the tree sequence to a GRG; (2) build the forward recombination map
@@ -19,7 +20,9 @@ the two agree exactly; --show-guard shows meiosis refusing a GRG that still
 contains recurrent (duplicate) mutations; --fixed-effects freezes per-allele
 effects at founder allele frequencies instead of re-standardizing genotypes
 with each generation's frequencies (the v0.9 default), which keeps var(G)
-from ratcheting down as rare variants drift.
+from ratcheting down as rare variants drift; --track-ancestry carries each
+person's stdpopsim population forward as ancestry proportions (mean of the
+parents') and reports how the admixed population homogenizes.
 """
 import argparse
 import contextlib
@@ -37,9 +40,11 @@ import numpy as np
 from xftsim.arch import Architecture, GeneticComponent, NoiseComponent, AggregationComponent
 from xftsim.effect import AdditiveEffects
 from xftsim.founders import founder_haplotypes_from_stdpopsim_grg
+from xftsim.inherit import AncestryProportions, Maternal
 from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap, _crossover_model, _meiosis_pair_switches_seeded
 from xftsim.sim import Simulation
+from xftsim.stats import MetadataSummary
 from xftsim.struct import DenseHaplotypeArray
 
 
@@ -129,13 +134,37 @@ def build_simulation(founders, effects, rmap, args, callbacks=()):
     arch.add('Y.G', GeneticComponent(effects))
     arch.add('Y.E', NoiseComponent(variance=1.0 - args.h2))
     arch.add('Y', AggregationComponent('Y.G + Y.E'))
+    tracking = {}
+    if args.track_ancestry:
+        tracking = dict(
+            metadata_rules=[AncestryProportions('population'), Maternal('population')],
+            statistics=[MetadataSummary()],
+        )
     return Simulation(
         founder_haplotypes=founders, architecture=arch,
         mating_regime=RandomMating(offspring_per_pair=2),
         recombination_map=rmap, seed=args.seed,
         retain_haplotypes=0, retain_phenotypes=args.gens,
-        callbacks=list(callbacks),
+        callbacks=list(callbacks), **tracking,
     )
+
+
+def report_ancestry(sim):
+    """Per-generation mean and variance of each ancestry proportion."""
+    first = sim.results[0].statistics['MetadataSummary']
+    cols = sorted(k for k in first if k.startswith('ancestry_'))
+    names = [c[len('ancestry_'):] for c in cols]
+    print("[ancestry] expected ancestry proportions (mean of parents'), "
+          "carried forward each generation")
+    print("      gen " + " ".join(f"{'mean ' + n:>11}" for n in names)
+          + " " + " ".join(f"{'var ' + n:>10}" for n in names))
+    for result in sim.results:
+        summary = result.statistics['MetadataSummary']
+        print(f"      {result.generation:>3} "
+              + " ".join(f"{summary[c]['mean']:>11.3f}" for c in cols) + " "
+              + " ".join(f"{summary[c]['var']:>10.4f}" for c in cols))
+    print("      (means stay at the founder mix; variances shrink about 2x per "
+          "generation under random mating)")
 
 
 def main():
@@ -161,6 +190,9 @@ def main():
                     help="rerun on dense genotypes and require exact agreement")
     ap.add_argument("--show-guard", action="store_true",
                     help="show meiosis refusing founders that keep recurrent mutations")
+    ap.add_argument("--track-ancestry", action="store_true",
+                    help="carry population labels forward as ancestry proportions "
+                         "and report them per generation")
     args = ap.parse_args()
 
     # Compile the meiosis kernels up front so generation timings are honest.
@@ -244,6 +276,8 @@ def main():
     print(f"      total GRG growth since founders: nodes "
           f"{growth(final.num_nodes, start_size[0])}, edges "
           f"{growth(final.num_edges, start_size[1])}")
+    if args.track_ancestry:
+        report_ancestry(sim)
 
     # ---- optional: exact agreement with the dense path ---------------------
     if args.check_dense:
@@ -256,9 +290,18 @@ def main():
         dG = max(np.max(np.abs(sim.phenotype_history[g]['Y.G']
                                - dense_sim.phenotype_history[g]['Y.G']))
                  for g in range(args.gens))
-        verdict = "EXACT MATCH" if n_diff == 0 and dG < 1e-9 else "MISMATCH"
+        meta_same = all(
+            sim.phenotype_history[g].samples.extra.keys()
+            == dense_sim.phenotype_history[g].samples.extra.keys()
+            and all(np.array_equal(v, dense_sim.phenotype_history[g].samples.extra[k])
+                    for k, v in sim.phenotype_history[g].samples.extra.items())
+            for g in range(args.gens))
+        verdict = ("EXACT MATCH" if n_diff == 0 and dG < 1e-9 and meta_same
+                   else "MISMATCH")
         print(f"        genotype cells differing at generation {args.gens - 1}: "
               f"{n_diff:,} of {g_dense.size:,}")
+        if args.track_ancestry:
+            print(f"        per-person metadata identical in every generation: {meta_same}")
         print(f"        max |G_grg - G_dense| over all generations: {dG:.1e}  -> {verdict}")
 
     # ---- optional: duplicate-mutation guard --------------------------------

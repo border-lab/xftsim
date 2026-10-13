@@ -197,8 +197,8 @@ class TestBuiltinsRegistry:
             assert isinstance(val, type), f"{key} is not a class"
 
     def test_builtin_count(self):
-        """BUILTINS should have exactly 14 entries."""
-        assert len(BUILTINS) == 14
+        """BUILTINS should have exactly 16 entries."""
+        assert len(BUILTINS) == 16
 
 
 class TestArchitectureAdd:

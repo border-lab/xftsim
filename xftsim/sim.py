@@ -6,12 +6,17 @@ architecture DAG, and mate assignment system.
 """
 from __future__ import annotations
 
+import copy
+import dataclasses
+import warnings
 from typing import Callable
 
 import numpy as np
 
+from xftsim import inherit
+from xftsim.inherit import InheritanceRule
 from xftsim.struct import (
-    HaplotypeOperator, PhenotypeArray, PedigreeArray,
+    HaplotypeOperator, PhenotypeArray, PedigreeArray, SampleMeta,
 )
 from xftsim.arch import Architecture
 from xftsim.mate import MateAssignment, RandomMating
@@ -51,6 +56,14 @@ class Simulation:
         Statistics to compute after each generation.
     seed : int, optional
         Random seed for reproducibility.
+    metadata_rules : list[InheritanceRule], optional
+        Rules from ``xftsim.inherit`` that carry per-individual metadata
+        (``SampleMeta.extra``, e.g. population or ancestry) from parents to
+        offspring each generation. If None (default), metadata is not
+        inherited. Every metadata field used after generation 0 by the
+        architecture (``| field`` grouping, ``meta(field)``), the mating
+        regime, filters or statistics must be produced by a rule; otherwise
+        ``run()`` raises before generation 0.
 
     Attributes
     ----------
@@ -100,6 +113,7 @@ class Simulation:
         filters: dict[str, Filter] | None = None,
         statistics: list[Statistic] | None = None,
         seed: int | None = None,
+        metadata_rules: list[InheritanceRule] | None = None,
     ) -> None:
         self.architecture: Architecture = architecture
         self.mating_regime: RandomMating = mating_regime
@@ -111,6 +125,10 @@ class Simulation:
         self.statistics: list[Statistic] = statistics or []
         self.rng: np.random.RandomState = np.random.RandomState(seed)
         self.stop: bool = False
+        self.metadata_rules: list[InheritanceRule] | None = (
+            list(metadata_rules) if metadata_rules is not None else None
+        )
+        self._warned_dropped_metadata: set[str] = set()
 
         # History dicts keyed by generation
         self.haplotype_history: dict[int, HaplotypeOperator] = {
@@ -131,7 +149,9 @@ class Simulation:
                         recombination_map: RecombinationMap | None = None,
                         callbacks: list[Callable[[Simulation], None]] | None = None,
                         filters: dict[str, Filter] | None = None,
-                        statistics: list[Statistic] | None = None) -> Simulation:
+                        statistics: list[Statistic] | None = None,
+                        metadata_rules: list[InheritanceRule] | None = None,
+                        ) -> Simulation:
         """
         Reconstruct a simulation from a checkpoint directory.
 
@@ -149,6 +169,9 @@ class Simulation:
             Filters for continued execution.
         statistics : list, optional
             Statistics for continued execution.
+        metadata_rules : list[InheritanceRule], optional
+            Override the saved metadata inheritance rules. Required if the
+            checkpoint used a ``Custom`` rule.
 
         Returns
         -------
@@ -164,6 +187,16 @@ class Simulation:
             mating_regime = checkpoint['mating_regime']
         if recombination_map is None:
             recombination_map = checkpoint['recombination_map']
+        if metadata_rules is None:
+            metadata_rules = checkpoint.get('metadata_rules')
+            unrestored = [r for r in metadata_rules or []
+                          if isinstance(r, inherit.UnrestoredCustom)]
+            if unrestored:
+                raise ValueError(
+                    f"The checkpoint used Custom metadata rule(s) {unrestored}, "
+                    f"whose functions are not saved. Pass all metadata rules "
+                    f"again via from_checkpoint(..., metadata_rules=[...])."
+                )
 
         if mating_regime is None:
             raise ValueError(
@@ -190,6 +223,7 @@ class Simulation:
             callbacks=callbacks,
             filters=filters,
             statistics=statistics,
+            metadata_rules=metadata_rules,
         )
 
         # Restore state
@@ -239,7 +273,9 @@ class Simulation:
         n_generations : int
             Number of generations to simulate (including gen 0).
         """
+        self._initialize_metadata()
         self._validate()
+        self._validate_metadata(self.haplotype_history[0].samples, n_generations)
 
         # --- Generation 0: founders ---
         hap = self.haplotype_history[0]
@@ -266,8 +302,10 @@ class Simulation:
 
         # --- Generations 1..n_generations-1 ---
         for gen in range(1, n_generations):
-            prev_assignment = self._mate_assignments[gen - 1]
             prev_hap = self.haplotype_history[gen - 1]
+            prev_assignment = self._inherit_metadata(
+                self._mate_assignments[gen - 1], prev_hap.samples,
+            )
 
             # Meiosis: produce offspring haplotypes. Pass self.rng so that
             # crossover sampling is driven by the simulation's seeded RNG
@@ -327,6 +365,10 @@ class Simulation:
         """
         start_gen = self.generation
         self.stop = False
+        if n_additional > 0:
+            self._validate_metadata(
+                self.haplotype_history[start_gen].samples, n_additional + 1,
+            )
 
         # Mate assignment for current generation (needed for meiosis to next gen)
         if n_additional > 0 and start_gen not in self._mate_assignments:
@@ -338,8 +380,10 @@ class Simulation:
             self._mate_assignments[start_gen] = assignment
 
         for gen in range(start_gen + 1, start_gen + 1 + n_additional):
-            prev_assignment = self._mate_assignments[gen - 1]
             prev_hap = self.haplotype_history[gen - 1]
+            prev_assignment = self._inherit_metadata(
+                self._mate_assignments[gen - 1], prev_hap.samples,
+            )
 
             offspring_hap = prev_hap.meiosis(
                 prev_assignment, self.recombination_map, rng=self.rng,
@@ -377,6 +421,90 @@ class Simulation:
             self._run_callbacks()
             if self.stop:
                 return
+
+    def _initialize_metadata(self) -> None:
+        """Run the rules' generation-0 hooks on the founders.
+
+        Derived fields are added to a shallow copy of the founder operator,
+        so the caller's object is never modified.
+        """
+        if not self.metadata_rules:
+            return
+        hap = self.haplotype_history[0]
+        new = inherit.initialize_metadata(self.metadata_rules, hap.samples)
+        if not new:
+            return
+        hap = copy.copy(hap)
+        hap.samples = hap.samples.with_extra(new, replace=False)
+        self.haplotype_history[0] = hap
+
+    def _required_metadata_keys(self) -> dict[str, list[str]]:
+        """Metadata field -> descriptions of the components that read it."""
+        needed: dict[str, list[str]] = {}
+
+        def add(keys, who):
+            for k in keys:
+                needed.setdefault(k, []).append(who)
+
+        for node in self.architecture.nodes:
+            g = node.grouping
+            if g is not None and g not in ('FID', 'sex', 'mother', 'father'):
+                add([g], f"architecture node {node.outputs} (| {g})")
+            add(getattr(node.component, 'metadata_keys', ()),
+                f"architecture node {node.outputs}")
+        regime = self.mating_regime
+        while regime is not None:
+            add(getattr(regime, 'metadata_keys', ()),
+                f"mating regime {type(regime).__name__}")
+            regime = getattr(regime, 'regime', None)
+        for name, filt in self.filters.items():
+            add(getattr(filt, 'metadata_keys', ()), f"filter '{name}'")
+        for stat in self.statistics:
+            add(getattr(stat, 'metadata_keys', ()),
+                f"statistic {type(stat).__name__}")
+        return needed
+
+    def _validate_metadata(self, samples: SampleMeta, n_generations: int) -> None:
+        """Check that every metadata field a component reads will be inherited."""
+        if n_generations < 2:
+            return
+        rules = self.metadata_rules or []
+        inherit.check_rules(rules, samples)
+        produced = inherit.output_keys(rules, samples)
+        missing = {k: who for k, who in self._required_metadata_keys().items()
+                   if k not in produced}
+        if missing:
+            lines = [f"  '{k}': used by {', '.join(who)}"
+                     for k, who in sorted(missing.items())]
+            raise ValueError(
+                "These metadata fields are read after generation 0 but no "
+                "metadata rule produces them:\n" + "\n".join(lines)
+                + "\nAdd a rule for each to Simulation(metadata_rules=...), "
+                f"e.g. xftsim.inherit.Maternal({sorted(missing)[0]!r})."
+            )
+
+    def _inherit_metadata(self, assignment: MateAssignment,
+                          parents: SampleMeta) -> MateAssignment:
+        """Return ``assignment`` with offspring metadata filled in by the rules."""
+        if self.metadata_rules is None:
+            return assignment
+        extra = inherit.inherit_metadata(
+            self.metadata_rules, parents,
+            assignment.maternal_idx, assignment.paternal_idx, self.rng,
+        )
+        dropped = (set(parents.extra)
+                   - inherit.handled_keys(self.metadata_rules, parents)
+                   - set(extra) - self._warned_dropped_metadata)
+        if dropped:
+            self._warned_dropped_metadata |= dropped
+            warnings.warn(
+                f"Metadata field(s) {sorted(dropped)} have no inheritance rule "
+                f"and are not carried past generation {parents.generation}. "
+                f"Add a rule from xftsim.inherit to keep them.",
+                stacklevel=3,
+            )
+        offspring = assignment.offspring_samples.with_extra(extra, replace=False)
+        return dataclasses.replace(assignment, offspring_samples=offspring)
 
     def _run_filters_and_stats(self, gen: int) -> None:
         """Run filters and statistics for the given generation."""

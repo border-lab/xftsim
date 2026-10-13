@@ -231,6 +231,51 @@ def haplotypes_from_sgkit_dataset(gdat: xr.Dataset,
     )
 
 
+def _npz_safe_array(arr: np.ndarray, key: str) -> np.ndarray:
+    """Convert an object-dtype metadata array to a dtype np.load reads without pickle."""
+    if arr.dtype != object:
+        return arr
+    if all(isinstance(x, str) for x in arr.ravel()):
+        return arr.astype(str)
+    converted = np.asarray(arr.tolist())
+    if converted.dtype == object:
+        raise TypeError(
+            f"Metadata field '{key}' holds mixed or non-scalar Python objects "
+            f"and cannot be saved; convert it to a numeric or string array."
+        )
+    return converted
+
+
+def _samples_to_npz(samples: xft.struct.SampleMeta,
+                    prefix: str = 'sample_') -> dict[str, np.ndarray]:
+    """Flatten a SampleMeta (including extra fields) into npz arrays."""
+    out = {
+        f'{prefix}iid': samples.iid,
+        f'{prefix}fid': samples.fid,
+        f'{prefix}sex': samples.sex,
+        f'{prefix}generation': np.array([samples.generation]),
+        f'{prefix}extra_keys': np.array(list(samples.extra), dtype=str),
+    }
+    for k, v in samples.extra.items():
+        out[f'{prefix}extra__{k}'] = _npz_safe_array(v, k)
+    return out
+
+
+def _samples_from_npz(data, prefix: str = 'sample_',
+                      generation: int | None = None) -> xft.struct.SampleMeta:
+    """Inverse of ``_samples_to_npz``; files without extras load with none."""
+    if generation is None and f'{prefix}generation' in data:
+        generation = int(data[f'{prefix}generation'][0])
+    keys = data[f'{prefix}extra_keys'] if f'{prefix}extra_keys' in data else []
+    return xft.struct.SampleMeta(
+        iid=data[f'{prefix}iid'],
+        fid=data[f'{prefix}fid'],
+        sex=data[f'{prefix}sex'],
+        generation=generation or 0,
+        extra={str(k): data[f'{prefix}extra__{k}'] for k in keys},
+    )
+
+
 def save_haplotypes_npz(haplotypes: xft.struct.DenseHaplotypeArray,
                         path: str) -> None:
     """
@@ -247,9 +292,7 @@ def save_haplotypes_npz(haplotypes: xft.struct.DenseHaplotypeArray,
         'genotypes': haplotypes.genotypes,
         'generation': np.array([haplotypes.generation]),
         # Sample metadata
-        'sample_iid': haplotypes.samples.iid,
-        'sample_fid': haplotypes.samples.fid,
-        'sample_sex': haplotypes.samples.sex,
+        **_samples_to_npz(haplotypes.samples),
         # Variant metadata
         'variant_vid': haplotypes.variants.vid,
     }
@@ -288,11 +331,7 @@ def load_haplotypes_npz(path: str) -> xft.struct.DenseHaplotypeArray:
     data = np.load(path, allow_pickle=True)
 
     # Load sample metadata
-    samples = xft.struct.SampleMeta(
-        iid=data['sample_iid'],
-        fid=data['sample_fid'],
-        sex=data['sample_sex'],
-    )
+    samples = _samples_from_npz(data, generation=int(data['generation'][0]))
 
     # Load variant metadata
     variants = xft.struct.VariantMeta(
@@ -387,9 +426,7 @@ def save_phenotypes_npz(phenotypes: xft.struct.PhenotypeArray,
         The path to save to (will add .npz extension if not present).
     """
     save_dict = {
-        'sample_iid': phenotypes.samples.iid,
-        'sample_fid': phenotypes.samples.fid,
-        'sample_sex': phenotypes.samples.sex,
+        **_samples_to_npz(phenotypes.samples),
         'pheno_keys': np.array(list(phenotypes.keys)),
     }
     for key in phenotypes.keys:
@@ -411,11 +448,7 @@ def load_phenotypes_npz(path: str) -> xft.struct.PhenotypeArray:
     xft.struct.PhenotypeArray
     """
     data = np.load(path, allow_pickle=True)
-    samples = xft.struct.SampleMeta(
-        iid=data['sample_iid'],
-        fid=data['sample_fid'],
-        sex=data['sample_sex'],
-    )
+    samples = _samples_from_npz(data)
     values = {}
     for key in data['pheno_keys']:
         values[str(key)] = data[f'pheno_{key}']
@@ -491,7 +524,8 @@ def save_architecture(arch: "xft.arch.Architecture", dir_path: str) -> None:
     from xftsim.arch import (
         GeneticComponent, MVGeneticComponent, HaplotypeGeneticComponent,
         NoiseComponent, CNoiseComponent, ThresholdComponent,
-        AggregationComponent, _SiblingComponent, _ParentalComponent,
+        AggregationComponent, MetadataComponent, _SiblingComponent,
+        _ParentalComponent,
     )
 
     # Build the in-memory spec list first, before any disk writes, so that an
@@ -531,6 +565,8 @@ def save_architecture(arch: "xft.arch.Architecture", dir_path: str) -> None:
             spec['threshold'] = comp.threshold
         elif isinstance(comp, AggregationComponent):
             spec['expression'] = comp.expression
+        elif isinstance(comp, MetadataComponent):
+            spec['key'] = comp.key
         elif isinstance(comp, _ParentalComponent):
             spec['phenotype_name'] = comp.phenotype_name
         elif isinstance(comp, _SiblingComponent):
@@ -575,8 +611,8 @@ def load_architecture(dir_path: str) -> "xft.arch.Architecture":
     from xftsim.arch import (
         Architecture, GeneticComponent, MVGeneticComponent,
         HaplotypeGeneticComponent, NoiseComponent, CNoiseComponent,
-        ThresholdComponent, AggregationComponent, MotherComponent,
-        FatherComponent, ParentComponent, _SIBLING_COMPONENTS,
+        ThresholdComponent, AggregationComponent, MetadataComponent,
+        MotherComponent, FatherComponent, ParentComponent, _SIBLING_COMPONENTS,
     )
 
     with open(os.path.join(dir_path, 'architecture.json'), 'r') as f:
@@ -600,6 +636,7 @@ def load_architecture(dir_path: str) -> "xft.arch.Architecture":
             source=s['source'], threshold=s['threshold'],
         ),
         'AggregationComponent': lambda s: AggregationComponent(expression=s['expression']),
+        'MetadataComponent': lambda s: MetadataComponent(key=s['key']),
         'MotherComponent': lambda s: MotherComponent(phenotype_name=s['phenotype_name']),
         'FatherComponent': lambda s: FatherComponent(phenotype_name=s['phenotype_name']),
         'ParentComponent': lambda s: ParentComponent(phenotype_name=s['phenotype_name']),
@@ -645,9 +682,7 @@ def _save_graph_haplotypes_to_checkpoint(
 
     meta_dict = {
         'generation': np.array([hap.generation]),
-        'sample_iid': hap.samples.iid,
-        'sample_fid': hap.samples.fid,
-        'sample_sex': hap.samples.sex,
+        **_samples_to_npz(hap.samples),
         'variant_vid': hap.variants.vid,
     }
     if hap.variants.chrom is not None:
@@ -679,12 +714,7 @@ def _load_graph_haplotypes_from_checkpoint(
         os.path.join(hap_dir, f'gen_{gen}.grg.meta.npz'), allow_pickle=True,
     )
     generation = int(data['generation'][0])
-    samples = xft.struct.SampleMeta(
-        iid=data['sample_iid'],
-        fid=data['sample_fid'],
-        sex=data['sample_sex'],
-        generation=generation,
-    )
+    samples = _samples_from_npz(data, generation=generation)
     variants = xft.struct.VariantMeta(
         vid=data['variant_vid'],
         chrom=data['variant_chrom'] if 'variant_chrom' in data else None,
@@ -703,8 +733,8 @@ def _serialize_mating_regime(regime: object) -> dict[str, object]:
     """Serialize a mating regime to a JSON-compatible dict.
 
     Supported regime types: ``RandomMating``, ``LinearAssortativeMating``,
-    ``GeneralAssortativeMating``, and ``BatchedMating`` (which wraps any of
-    the above and is serialized recursively).
+    ``GeneralAssortativeMating``, and ``BatchedMating`` / ``GroupedMating``
+    (which wrap any of the above and are serialized recursively).
 
     Raises
     ------
@@ -716,7 +746,7 @@ def _serialize_mating_regime(regime: object) -> dict[str, object]:
     """
     from xftsim.mate import (
         RandomMating, LinearAssortativeMating,
-        GeneralAssortativeMating, BatchedMating,
+        GeneralAssortativeMating, BatchedMating, GroupedMating,
     )
     if isinstance(regime, LinearAssortativeMating):
         return {
@@ -743,6 +773,12 @@ def _serialize_mating_regime(regime: object) -> dict[str, object]:
             'solver': getattr(regime, 'solver', 'hexaly'),
             'solver_params': dict(regime.solver_params),
         }
+    elif isinstance(regime, GroupedMating):
+        return {
+            'type': 'GroupedMating',
+            'by': regime.by,
+            'regime': _serialize_mating_regime(regime.regime),
+        }
     elif isinstance(regime, BatchedMating):
         return {
             'type': 'BatchedMating',
@@ -753,8 +789,8 @@ def _serialize_mating_regime(regime: object) -> dict[str, object]:
         raise ValueError(
             f"Cannot serialize mating regime of type "
             f"{type(regime).__name__!r}; supported types are RandomMating, "
-            "LinearAssortativeMating, GeneralAssortativeMating, and "
-            "BatchedMating. Adding support requires extending "
+            "LinearAssortativeMating, GeneralAssortativeMating, "
+            "BatchedMating, and GroupedMating. Adding support requires extending "
             "_serialize_mating_regime / _deserialize_mating_regime in "
             "xftsim/io.py."
         )
@@ -771,7 +807,7 @@ def _deserialize_mating_regime(config: dict[str, object]) -> object:
     """
     from xftsim.mate import (
         RandomMating, LinearAssortativeMating,
-        GeneralAssortativeMating, BatchedMating,
+        GeneralAssortativeMating, BatchedMating, GroupedMating,
     )
     mtype = config['type']
     if mtype == 'RandomMating':
@@ -793,6 +829,11 @@ def _deserialize_mating_regime(config: dict[str, object]) -> object:
             solver=config.get('solver', 'hexaly'),
             solver_params=config.get('solver_params'),
         )
+    elif mtype == 'GroupedMating':
+        return GroupedMating(
+            regime=_deserialize_mating_regime(config['regime']),
+            by=config['by'],
+        )
     elif mtype == 'BatchedMating':
         return BatchedMating(
             regime=_deserialize_mating_regime(config['regime']),
@@ -812,8 +853,10 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
     - architecture (DAG of ArchComponent — see ``save_architecture`` for the
       list of supported component types)
     - mating regime (RandomMating, LinearAssortativeMating,
-      GeneralAssortativeMating, and BatchedMating wrapping any of the
-      above; other regimes raise at save time)
+      GeneralAssortativeMating, and BatchedMating / GroupedMating wrapping
+      any of the above; other regimes raise at save time)
+    - metadata inheritance rules (``sim.metadata_rules``; a ``Custom``
+      rule's function is not saved and must be re-passed on resume)
     - recombination map
     - generation counter and retention settings
     - RNG state (so resumed simulations stay deterministic)
@@ -847,6 +890,13 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
     # to disk, so a failure here doesn't leave a half-written checkpoint
     # directory behind.
     mating_config = _serialize_mating_regime(sim.mating_regime)
+    metadata_rules = getattr(sim, 'metadata_rules', None)
+    rules_config = (None if metadata_rules is None
+                    else [rule.to_config() for rule in metadata_rules])
+    # Same for per-individual metadata: unsupported object arrays raise here.
+    for history in (sim.haplotype_history, sim.phenotype_history):
+        for item in history.values():
+            _samples_to_npz(item.samples)
 
     os.makedirs(dir_path, exist_ok=True)
 
@@ -859,6 +909,7 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
         'retain_haplotypes': sim.retain_haplotypes,
         'retain_phenotypes': sim.retain_phenotypes,
         'mating': mating_config,
+        'metadata_rules': rules_config,
     }
     with open(os.path.join(dir_path, 'meta.json'), 'w') as f:
         json.dump(meta, f, indent=2)
@@ -920,9 +971,7 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
             maternal_idx=ped.maternal_idx,
             paternal_idx=ped.paternal_idx,
             parent_n=np.array([ped.parent_n]),
-            offspring_iid=ped.offspring_samples.iid,
-            offspring_fid=ped.offspring_samples.fid,
-            offspring_sex=ped.offspring_samples.sex,
+            **_samples_to_npz(ped.offspring_samples, prefix='offspring_'),
         )
 
     # Save generation keys for each history
@@ -956,7 +1005,7 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     dict
         Keys: architecture, generation, retain_haplotypes, retain_phenotypes,
         rng, haplotype_history, phenotype_history, pedigree_history,
-        recombination_map, mating_regime, results.
+        recombination_map, mating_regime, metadata_rules, results.
     """
     # Load metadata
     with open(os.path.join(dir_path, 'meta.json'), 'r') as f:
@@ -1009,12 +1058,11 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     ped_dir = os.path.join(dir_path, 'pedigrees')
     for gen in keys_data['pedigree_gens']:
         gen = int(gen)
-        ped_data = np.load(os.path.join(ped_dir, f'gen_{gen}.npz'))
-        samples = xft.struct.SampleMeta(
-            iid=ped_data['offspring_iid'],
-            fid=ped_data['offspring_fid'],
-            sex=ped_data['offspring_sex'],
-        )
+        ped_data = np.load(os.path.join(ped_dir, f'gen_{gen}.npz'),
+                           allow_pickle=True)
+        # Older checkpoints did not store the generation; it is the key.
+        samples = _samples_from_npz(ped_data, prefix='offspring_',
+                                    generation=gen)
         pedigree_history[gen] = xft.struct.PedigreeArray(
             offspring_samples=samples,
             maternal_idx=ped_data['maternal_idx'],
@@ -1048,6 +1096,13 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     if 'mating' in meta:
         mating_regime = _deserialize_mating_regime(meta['mating'])
 
+    # Load metadata inheritance rules (absent in older checkpoints).
+    metadata_rules = None
+    rules_config = meta.get('metadata_rules')
+    if rules_config is not None:
+        from xftsim.inherit import rule_from_config
+        metadata_rules = [rule_from_config(c) for c in rules_config]
+
     # Load per-generation statistic results. Missing file → empty list, so
     # checkpoints produced before this field was persisted still load.
     results = []
@@ -1067,6 +1122,7 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
         'pedigree_history': pedigree_history,
         'recombination_map': recombination_map,
         'mating_regime': mating_regime,
+        'metadata_rules': metadata_rules,
         'results': results,
     }
 

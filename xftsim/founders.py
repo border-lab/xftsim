@@ -413,8 +413,11 @@ def founder_haplotypes_from_stdpopsim_grg(
     -----
     Sample IIDs are prefixed with the stdpopsim population name (e.g.
     ``"YRI_0"``, ``"YRI_1"``, ...). The full per-individual population label
-    is also stored on ``samples.extra["population"]`` so it can be used as a
-    grouping variable by :class:`xftsim.arch.GroupingComponent`.
+    is also stored on ``samples.extra["population"]``. To carry it (or the
+    derived ancestry proportions) past generation 0, pass rules such as
+    ``xftsim.inherit.AncestryProportions()`` and
+    ``xftsim.inherit.Maternal("population")`` to
+    ``Simulation(metadata_rules=...)``.
 
     Variant positions and alleles are read directly from the GRG; ``pos_cM``
     is computed by integrating the contig's recombination map, so

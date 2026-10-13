@@ -203,8 +203,11 @@ def _resolve_grouping(grouping: str | None, haplotypes: HaplotypeOperator,
         if grouping in haplotypes.samples.extra:
             return haplotypes.samples.extra[grouping]
         raise ValueError(
-            f"Unknown grouping variable '{grouping}'. "
-            f"Available: FID, sex, mother, father, or extra fields."
+            f"Unknown grouping variable '{grouping}' at generation "
+            f"{generation}. Available: FID, sex, mother, father, or metadata "
+            f"fields {sorted(haplotypes.samples.extra)}. Metadata is only "
+            f"carried past generation 0 by Simulation(metadata_rules=...); "
+            f"see xftsim.inherit."
         )
 
 
@@ -319,6 +322,54 @@ class ThresholdComponent(ArchComponent):
 
     def __repr__(self) -> str:
         return f"ThresholdComponent('{self.source}', {self.threshold})"
+
+
+class MetadataComponent(ArchComponent):
+    """Copies a numeric per-individual metadata field into the phenotypes.
+
+    Reads ``haplotypes.samples.extra[key]`` (e.g. an ``ancestry_<POP>``
+    column from ``xftsim.inherit.AncestryProportions``) so it can be used
+    as a covariate in aggregations, as an assortment trait in mating
+    regimes, or by statistics. DSL form: ``Y.A ~ meta(ancestry_YRI)``.
+
+    Parameters
+    ----------
+    key : str
+        Name of the metadata field. Must be numeric and 1-D.
+    """
+    name = "meta"
+    kind = "generative"
+    accepts_grouping = False
+
+    def __init__(self, key: str):
+        self.key = key
+
+    @property
+    def metadata_keys(self) -> tuple[str, ...]:
+        """Metadata fields this component reads."""
+        return (self.key,)
+
+    def compute(self, node: "ArchNode", haplotypes: HaplotypeOperator,
+                phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
+        extra = haplotypes.samples.extra
+        if self.key not in extra:
+            raise KeyError(
+                f"meta({self.key}): no metadata field '{self.key}' at "
+                f"generation {kwargs.get('generation', 0)}; available: "
+                f"{sorted(extra)}. Metadata is only carried past generation 0 "
+                f"by Simulation(metadata_rules=...); see xftsim.inherit."
+            )
+        vals = extra[self.key]
+        if vals.ndim != 1 or not (np.issubdtype(vals.dtype, np.number)
+                                  or vals.dtype == bool):
+            raise TypeError(
+                f"meta({self.key}): field must be numeric and 1-D, got dtype "
+                f"{vals.dtype} with shape {vals.shape}."
+            )
+        return vals.astype(np.float64)
+
+    def __repr__(self) -> str:
+        return f"MetadataComponent('{self.key}')"
 
 
 class AggregationComponent(ArchComponent):
@@ -792,6 +843,7 @@ BUILTINS: dict[str, type[ArchComponent]] = {
     'noise': NoiseComponent,
     'cnoise': CNoiseComponent,
     'threshold': ThresholdComponent,
+    'meta': MetadataComponent,
     'parent': ParentComponent,
     'mother': MotherComponent,
     'father': FatherComponent,

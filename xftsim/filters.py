@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Union
+from typing import Callable, Dict, Iterable, Optional, Union
 
 from xftsim.struct import PhenotypeArray, PedigreeArray
 
@@ -405,3 +405,83 @@ class SubsampleFilter(Filter):
             phenotypes=pheno.subset(indices),
             n_subsample=n_sub,
         )
+
+
+# ---------------------------------------------------------------------------
+# Metadata filter
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SubsetView(FilteredView):
+    """
+    View of the individuals selected by a metadata filter.
+
+    Attributes
+    ----------
+    indices : np.ndarray
+        Indices into the original sample array.
+    phenotypes : PhenotypeArray
+        Subset of phenotypes (and sample metadata) for selected individuals.
+    """
+    indices: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.intp))
+    phenotypes: PhenotypeArray = None
+
+
+class MetadataFilter(Filter):
+    """
+    Select individuals by a per-individual metadata field (``SampleMeta.extra``).
+
+    Exactly one of ``values`` or ``predicate`` must be provided.
+
+    Parameters
+    ----------
+    key : str
+        Metadata field to filter on, e.g. ``'population'``.
+    values : iterable, optional
+        Keep individuals whose field value is one of these.
+    predicate : callable, optional
+        ``predicate(field_values) -> bool mask`` over the (n,) field array,
+        e.g. ``lambda a: a > 0.8`` on an ancestry proportion.
+
+    Examples
+    --------
+    >>> MetadataFilter('population', values=['YRI'])  # doctest: +SKIP
+    >>> MetadataFilter('ancestry_YRI', predicate=lambda a: a >= 0.75)  # doctest: +SKIP
+    """
+
+    def __init__(self, key: str, values: Iterable | None = None,
+                 predicate: Callable[[np.ndarray], np.ndarray] | None = None) -> None:
+        if (values is None) == (predicate is None):
+            raise ValueError("Specify exactly one of 'values' or 'predicate'")
+        self.key: str = key
+        self.values: list | None = None if values is None else list(values)
+        self.predicate = predicate
+
+    @property
+    def metadata_keys(self) -> tuple[str, ...]:
+        """Metadata fields this filter reads."""
+        return (self.key,)
+
+    def apply(self, generation: int,
+              phenotype_history: dict[int, PhenotypeArray],
+              pedigree_history: dict[int, PedigreeArray]) -> SubsetView | None:
+        if generation not in phenotype_history:
+            return None
+
+        pheno = phenotype_history[generation]
+        if self.key not in pheno.samples.extra:
+            return None
+
+        field_values = pheno.samples.extra[self.key]
+        if self.values is not None:
+            mask = np.isin(field_values, self.values)
+        else:
+            mask = np.asarray(self.predicate(field_values), dtype=bool)
+            if mask.shape != (pheno.samples.n,):
+                raise ValueError(
+                    f"MetadataFilter predicate returned shape {mask.shape}, "
+                    f"expected ({pheno.samples.n},)"
+                )
+
+        indices = np.flatnonzero(mask)
+        return SubsetView(indices=indices, phenotypes=pheno.subset(indices))

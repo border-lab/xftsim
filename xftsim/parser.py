@@ -21,7 +21,7 @@ from xftsim.arch import (
     ArchNode, ArchComponent, GeneticComponent, MVGeneticComponent,
     HaplotypeGeneticComponent,
     NoiseComponent, CNoiseComponent, ThresholdComponent, AggregationComponent,
-    MotherComponent, FatherComponent, ParentComponent,
+    MetadataComponent, MotherComponent, FatherComponent, ParentComponent,
     _SIBLING_COMPONENTS,
     BUILTINS,
 )
@@ -188,6 +188,8 @@ def _try_parse_function(outputs: list[str], rhs: str,
         return _parse_noise(outputs, args_str, lineno, grouping)
     elif func_name == 'threshold':
         return _parse_threshold(outputs, args_str, lineno)
+    elif func_name == 'meta':
+        return _parse_meta(outputs, args_str, lineno)
     elif func_name == 'cnoise':
         return _parse_cnoise(outputs, args_str, lineno, grouping)
     elif func_name in ('parent', 'mother', 'father'):
@@ -315,6 +317,19 @@ def _parse_threshold(outputs: list[str], args_str: str,
     component = ThresholdComponent(source=source, threshold=thresh_val)
     return ArchNode(outputs=outputs, component=component,
                     inputs=[source], grouping=None)
+
+
+def _parse_meta(outputs: list[str], args_str: str,
+                lineno: int) -> ArchNode:
+    """Parse meta(key) → MetadataComponent."""
+    key = args_str.strip()
+    if not re.match(r'^[A-Za-z_]\w*$', key):
+        raise ValueError(
+            f"Line {lineno}: meta() requires one metadata field name, "
+            f"got '{args_str}'"
+        )
+    return ArchNode(outputs=outputs, component=MetadataComponent(key=key),
+                    inputs=[], grouping=None)
 
 
 def _parse_cnoise(outputs: list[str], args_str: str, lineno: int,

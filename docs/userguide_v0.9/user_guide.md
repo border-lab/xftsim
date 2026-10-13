@@ -10,8 +10,8 @@ This is the user guide for the v0.9 (`ajay`/`v0.9alpha`) refactor of
   (`AdditiveGeneticComponent`, `LinearTransformationComponent`,
   `LinearVerticalComponent`, `ProductComponent`,
   `SumAllTransformation`, …) has been replaced by a small set of DSL
-  primitives (`genetic`, `noise`, `cnoise`, `threshold`, `mother`,
-  `father`, `parent`, `sibling_*`) plus free-form arithmetic
+  primitives (`genetic`, `noise`, `cnoise`, `threshold`, `meta`,
+  `mother`, `father`, `parent`, `sibling_*`) plus free-form arithmetic
   aggregation expressions.
 - **Data structures are now plain numpy under the hood.**
   `HaplotypeArray` has been split into `DenseHaplotypeArray`
@@ -21,8 +21,11 @@ This is the user guide for the v0.9 (`ajay`/`v0.9alpha`) refactor of
   of an xarray accessor.
 - **Mating regimes have new short names**: `RandomMating`,
   `LinearAssortativeMating`, `GeneralAssortativeMating`,
-  `BatchedMating`. Component selection uses `component_names=[...]`
-  instead of a `ComponentIndex`.
+  `BatchedMating`, `GroupedMating`. Component selection uses
+  `component_names=[...]` instead of a `ComponentIndex`.
+- **Per-individual metadata (population, ancestry, demes, …) is carried
+  across generations** by inheritance rules from `xftsim.inherit`; see
+  [Metadata and ancestry](metadata).
 - **`xftsim.proc.LimitMemory` is gone.** Memory retention is now
   controlled directly on `Simulation` via the `retain_haplotypes` and
   `retain_phenotypes` kwargs.
@@ -39,5 +42,6 @@ Mating regimes <mate>
 Recombination maps <rmaps>
 Phenogenetic architectures <arch>
 Statistics <stats>
+Metadata and ancestry <metadata>
 Advanced genetic architectures <advgen>
 ```

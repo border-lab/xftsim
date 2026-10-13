@@ -7,6 +7,7 @@ LinearAssortativeMating: rank-order pairing on a phenotypic composite.
 GeneralAssortativeMating: arbitrary K x K cross-mate correlation via QAP
     (native solver by default; Hexaly optional).
 BatchedMating: wraps any mating regime, splitting individuals into batches.
+GroupedMating: wraps any mating regime, mating only within metadata groups.
 """
 from __future__ import annotations
 
@@ -249,6 +250,12 @@ class LinearAssortativeMating:
 
         # Sum of standardized traits (not mean)
         trait_sum = np.sum(standardized_cols, axis=0)
+
+        # A constant composite carries no information to assort on. Without
+        # this fallback the zero-variance scores tie and rank-order pairing
+        # follows sample order, which pairs adjacent full siblings.
+        if np.ptp(trait_sum) == 0:
+            return RandomMating(self.offspring_per_pair).mate(samples, rng=rng)
 
         # Compute latent correlation R = K * |r|, matching legacy:
         #   cross_cov = K^2 * r
@@ -768,26 +775,36 @@ class BatchedMating:
                 stacklevel=3)
         return num
 
+    def _partition(self, samples: SampleMeta,
+                   rng: np.random.RandomState) -> list[np.ndarray]:
+        """Split individuals into the groups that mate independently."""
+        num_batches = self._resolve_num_batches(samples)
+        # Random partition of all individuals
+        perm = rng.permutation(samples.n)
+        return np.array_split(perm, num_batches)
+
     def mate(self, samples: SampleMeta,
              rng: np.random.RandomState | None = None,
              phenotypes: PhenotypeArray | None = None) -> MateAssignment:
         if rng is None:
             rng = np.random.RandomState()
 
-        n = samples.n
-        num_batches = self._resolve_num_batches(samples)
-
-        # Random partition of all individuals
-        perm = rng.permutation(n)
-        batch_indices = np.array_split(perm, num_batches)
-
         all_maternal = []
         all_paternal = []
-        all_n_offspring = 0
-        all_fid_offset = 0
+        all_fid = []
+        all_sex = []
+        fid_offset = 0
 
-        for bi, batch_idx in enumerate(batch_indices):
+        for batch_idx in self._partition(samples, rng):
             batch_idx = np.sort(batch_idx)
+            batch_sex = samples.sex[batch_idx]
+            if not (np.any(batch_sex == 0) and np.any(batch_sex == 1)):
+                if len(batch_idx) > 0:
+                    warnings.warn(
+                        f"{type(self).__name__}: a partition of "
+                        f"{len(batch_idx)} individual(s) lacks one sex, so "
+                        "they do not mate this generation.", stacklevel=2)
+                continue
 
             batch_samples = samples.subset(batch_idx)
             batch_pheno = phenotypes.subset(batch_idx) if phenotypes is not None else None
@@ -798,21 +815,32 @@ class BatchedMating:
             # Map batch-local parent indices back to global indices
             all_maternal.append(batch_idx[assignment.maternal_idx])
             all_paternal.append(batch_idx[assignment.paternal_idx])
-            all_n_offspring += assignment.n_offspring
+
+            # Keep the inner regime's families and sexes, renumbering
+            # families so they stay unique across batches.
+            _, fam = np.unique(assignment.offspring_samples.fid,
+                               return_inverse=True)
+            all_fid.append(fam.astype(np.int64) + fid_offset)
+            all_sex.append(np.asarray(assignment.offspring_samples.sex,
+                                      dtype=np.int64))
+            fid_offset += int(fam.max()) + 1 if len(fam) else 0
+
+        if not all_maternal:
+            raise ValueError(
+                f"{type(self).__name__}: no partition contains both sexes, "
+                "so no individuals can mate.")
 
         maternal_idx = np.concatenate(all_maternal)
         paternal_idx = np.concatenate(all_paternal)
 
         # Build offspring metadata
-        opp = getattr(self.regime, 'offspring_per_pair', 2)
-        n_pairs = all_n_offspring // opp
-        iid = np.arange(all_n_offspring, dtype=np.int64)
-        fid = np.repeat(np.arange(n_pairs, dtype=np.int64), opp)
-        sex_pattern = np.tile(np.arange(opp, dtype=np.int64) % 2, n_pairs)
+        fid = np.concatenate(all_fid)
+        sex = np.concatenate(all_sex)
+        iid = np.arange(len(fid), dtype=np.int64)
         generation = samples.generation + 1
 
         offspring_samples = SampleMeta(
-            iid=iid, fid=fid, sex=sex_pattern, generation=generation,
+            iid=iid, fid=fid, sex=sex, generation=generation,
         )
 
         return MateAssignment(
@@ -824,3 +852,62 @@ class BatchedMating:
     def __repr__(self) -> str:
         return (f"BatchedMating(regime={self.regime!r}, "
                 f"max_batch_size={self.max_batch_size!r})")
+
+
+class GroupedMating(BatchedMating):
+    """Wraps any mating regime, mating individuals only within groups.
+
+    Groups are the distinct values of a categorical per-individual metadata
+    field (``SampleMeta.extra[by]``), e.g. a deme or population label. The
+    inner regime runs independently in each group and the assignments are
+    merged, so there are no between-group matings. Groups that lack either
+    sex do not reproduce (with a warning).
+
+    To keep the field defined after generation 0, give the simulation an
+    inheritance rule for it, e.g. ``xftsim.inherit.Maternal(by)``.
+
+    Parameters
+    ----------
+    regime
+        Any mating regime with a ``.mate(samples, rng, phenotypes)`` method.
+    by : str
+        Name of the metadata field defining the groups. Must hold labels
+        (strings, integers or booleans), not floating-point values.
+
+    Examples
+    --------
+    >>> mating = GroupedMating(RandomMating(), by='deme')  # doctest: +SKIP
+    """
+
+    def __init__(self, regime, by: str) -> None:
+        super().__init__(regime)
+        self.by: str = by
+
+    @property
+    def metadata_keys(self) -> tuple[str, ...]:
+        """Metadata fields this regime reads."""
+        return (self.by,)
+
+    def _partition(self, samples: SampleMeta,
+                   rng: np.random.RandomState) -> list[np.ndarray]:
+        if self.by not in samples.extra:
+            raise KeyError(
+                f"GroupedMating: no metadata field '{self.by}' at generation "
+                f"{samples.generation}; available: {sorted(samples.extra)}. "
+                "Metadata is only carried past generation 0 by "
+                "Simulation(metadata_rules=...); see xftsim.inherit.")
+        labels = samples.extra[self.by]
+        if np.issubdtype(labels.dtype, np.floating):
+            raise TypeError(
+                f"GroupedMating: field '{self.by}' is floating point "
+                f"({labels.dtype}); group on a categorical label instead.")
+        try:
+            _, group = np.unique(labels, return_inverse=True)
+        except TypeError as err:
+            raise TypeError(
+                f"GroupedMating: labels in '{self.by}' cannot be sorted (mixed "
+                f"types such as None and str?): {err}") from err
+        return [np.flatnonzero(group == g) for g in range(group.max() + 1)]
+
+    def __repr__(self) -> str:
+        return f"GroupedMating(regime={self.regime!r}, by={self.by!r})"

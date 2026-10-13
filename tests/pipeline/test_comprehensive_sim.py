@@ -6,7 +6,7 @@ Tests:
 2. HaplotypeGenetic with sibling components + trio filter
 3. Multi-gen simulation with all feature types exercised simultaneously
 4. Retention pruning with filters still working
-5. SampleMeta extra fields propagated through simulation
+5. (SampleMeta extra propagation is covered in test_metadata_sim.py)
 6. Architecture from_formula with DSL equivalent to programmatic
 7. Deterministic reproduction (same seed = same result)
 8. Large family size (5 offspring per pair) with sibling stats
