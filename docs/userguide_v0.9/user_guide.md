@@ -23,6 +23,13 @@ This is the user guide for the v0.9 (`ajay`/`v0.9alpha`) refactor of
   `LinearAssortativeMating`, `GeneralAssortativeMating`,
   `BatchedMating`, `GroupedMating`. Component selection uses
   `component_names=[...]` instead of a `ComponentIndex`.
+- **Allele effects are fixed across generations.** Effects drawn on the
+  standardized scale (e.g. `AdditiveEffects.from_h2`) are calibrated
+  against the founders' allele frequencies, and every generation is
+  standardized with those same frequencies, so genetic values change only
+  through genotypes (as in 0.3). Pass
+  `Simulation(..., standardize_with='current')` to re-standardize with each
+  generation's own frequencies instead.
 - **Per-individual metadata (population, ancestry, demes, …) is carried
   across generations** by inheritance rules from `xftsim.inherit`; see
   [Metadata and ancestry](metadata).

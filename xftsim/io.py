@@ -857,6 +857,8 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
       any of the above; other regimes raise at save time)
     - metadata inheritance rules (``sim.metadata_rules``; a ``Custom``
       rule's function is not saved and must be re-passed on resume)
+    - genotype standardization mode (``sim.standardize_with``) and the
+      founders' allele frequencies (``sim.founder_af``)
     - recombination map
     - generation counter and retention settings
     - RNG state (so resumed simulations stay deterministic)
@@ -910,6 +912,7 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
         'retain_phenotypes': sim.retain_phenotypes,
         'mating': mating_config,
         'metadata_rules': rules_config,
+        'standardize_with': getattr(sim, 'standardize_with', None),
     }
     with open(os.path.join(dir_path, 'meta.json'), 'w') as f:
         json.dump(meta, f, indent=2)
@@ -930,6 +933,12 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
         chrom=rmap.chrom,
         pos_bp=rmap_pos_bp_arr,
     )
+
+    # Save the founders' allele frequencies (the standardization reference
+    # for standardize_with='founders'); generation 0 is usually pruned.
+    founder_af = getattr(sim, 'founder_af', None)
+    if founder_af is not None:
+        np.savez(os.path.join(dir_path, 'founder_af.npz'), founder_af=founder_af)
 
     # Save RNG state
     rng_state = sim.rng.get_state()
@@ -1005,7 +1014,9 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     dict
         Keys: architecture, generation, retain_haplotypes, retain_phenotypes,
         rng, haplotype_history, phenotype_history, pedigree_history,
-        recombination_map, mating_regime, metadata_rules, results.
+        recombination_map, mating_regime, metadata_rules, standardize_with,
+        founder_af, results. ``standardize_with`` and ``founder_af`` are None
+        for checkpoints written before they existed.
     """
     # Load metadata
     with open(os.path.join(dir_path, 'meta.json'), 'r') as f:
@@ -1096,6 +1107,12 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
     if 'mating' in meta:
         mating_regime = _deserialize_mating_regime(meta['mating'])
 
+    # Load the standardization reference (absent in older checkpoints).
+    founder_af = None
+    founder_af_path = os.path.join(dir_path, 'founder_af.npz')
+    if os.path.exists(founder_af_path):
+        founder_af = np.load(founder_af_path)['founder_af']
+
     # Load metadata inheritance rules (absent in older checkpoints).
     metadata_rules = None
     rules_config = meta.get('metadata_rules')
@@ -1123,6 +1140,8 @@ def load_simulation_checkpoint(dir_path: str) -> dict[str, object]:
         'recombination_map': recombination_map,
         'mating_regime': mating_regime,
         'metadata_rules': metadata_rules,
+        'standardize_with': meta.get('standardize_with'),
+        'founder_af': founder_af,
         'results': results,
     }
 

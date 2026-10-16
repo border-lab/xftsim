@@ -8,7 +8,7 @@ Run from the repository root with the project environment, e.g.
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --pops CEU=10000 --length-mb 10
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --show-guard
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --causal-min-maf 0.05
-    .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --fixed-effects
+    .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --restandardize
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --pops YRI=200,CEU=200 --track-ancestry
 
 Steps: (1) simulate founders with a published stdpopsim demographic model and
@@ -17,10 +17,11 @@ from the same genetic map stdpopsim used; (3) define a phenotype and mating
 model; (4) run generations, each one doing GRG-native meiosis. Optional:
 --check-dense reruns the identical simulation on dense genotypes and checks
 the two agree exactly; --show-guard shows meiosis refusing a GRG that still
-contains recurrent (duplicate) mutations; --fixed-effects freezes per-allele
-effects at founder allele frequencies instead of re-standardizing genotypes
-with each generation's frequencies (the v0.9 default), which keeps var(G)
-from ratcheting down as rare variants drift; --track-ancestry carries each
+contains recurrent (duplicate) mutations; --restandardize standardizes
+genotypes with each generation's own allele frequencies instead of the
+founders' (standardize_with='current'), which rescales allele effects as they
+drift and makes var(G) ratchet down as rare variants are lost; compare it with
+the default to see the difference; --track-ancestry carries each
 person's stdpopsim population forward as ancestry proportions (mean of the
 parents') and reports how the admixed population homogenizes.
 """
@@ -112,21 +113,17 @@ def make_effects(founders, args):
     """beta ~ N(0, h2/m) on standardized genotypes; optionally only variants
     with founder MAF >= --causal-min-maf are causal (rescaled so sum beta^2 = h2).
 
-    By default the effects stay on the standardized scale, so every generation
-    standardizes genotypes with its own allele frequencies. With
-    --fixed-effects they become per-allele effects a = beta / sqrt(2 p0 (1 - p0))
-    using founder frequencies p0, applied to raw allele counts thereafter.
+    The simulation standardizes genotypes with the founders' allele
+    frequencies p0, so each allele's effect beta / sqrt(2 p0 (1 - p0)) is
+    fixed across generations (--restandardize uses each generation's own
+    frequencies instead).
     """
     af = founders.recompute_af()
     beta = AdditiveEffects.from_h2(h2=args.h2, m=founders.m, seed=args.seed).effects.copy()
     if args.causal_min_maf > 0:
         beta[np.minimum(af, 1 - af) < args.causal_min_maf] = 0.0
         beta *= np.sqrt(args.h2 / np.sum(beta ** 2))
-    if not args.fixed_effects:
-        return AdditiveEffects.from_array(beta)
-    sd = np.sqrt(2 * af * (1 - af))
-    per_allele = np.divide(beta, sd, out=np.zeros_like(beta), where=sd > 0)
-    return AdditiveEffects.from_array(per_allele, standardized=False)
+    return AdditiveEffects.from_array(beta)
 
 
 def build_simulation(founders, effects, rmap, args, callbacks=()):
@@ -145,6 +142,7 @@ def build_simulation(founders, effects, rmap, args, callbacks=()):
         mating_regime=RandomMating(offspring_per_pair=2),
         recombination_map=rmap, seed=args.seed,
         retain_haplotypes=0, retain_phenotypes=args.gens,
+        standardize_with='current' if args.restandardize else 'founders',
         callbacks=list(callbacks), **tracking,
     )
 
@@ -182,9 +180,10 @@ def main():
     ap.add_argument("--h2", type=float, default=0.5)
     ap.add_argument("--causal-min-maf", type=float, default=0.0,
                     help="only variants with founder MAF >= this are causal (default: all)")
-    ap.add_argument("--fixed-effects", action="store_true",
-                    help="freeze per-allele effects at founder allele frequencies "
-                         "(default: re-standardize every generation, as v0.9 does)")
+    ap.add_argument("--restandardize", action="store_true",
+                    help="standardize genotypes with each generation's allele "
+                         "frequencies (default: the founders', so allele effects "
+                         "stay fixed)")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--check-dense", action="store_true",
                     help="rerun on dense genotypes and require exact agreement")
@@ -227,8 +226,8 @@ def main():
     n_causal = int(np.count_nonzero(effects.effects))
     causal = (f"all {n_causal:,} variants causal" if args.causal_min_maf <= 0 else
               f"{n_causal:,} variants with MAF >= {args.causal_min_maf:g} causal")
-    scaling = ("per-allele effects fixed at founder frequencies" if args.fixed_effects
-               else "re-standardized with each generation's frequencies")
+    scaling = ("re-standardized with each generation's frequencies" if args.restandardize
+               else "allele effects fixed at founder frequencies")
     print(f"[3/4] model: Y = G + E, h2 = {args.h2} ({causal}; {scaling}); "
           f"random mating, 2 offspring per pair (constant N = {founders.n:,})")
 

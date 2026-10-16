@@ -344,6 +344,7 @@ def build_simulation_from_config(config: dict):
     # --- Simulation params ---
     retain_haplotypes = sim_cfg.get("retain_haplotypes", 1)
     retain_phenotypes = sim_cfg.get("retain_phenotypes", 2)
+    standardize_with = sim_cfg.get("standardize_with", "founders")
 
     sim = Simulation(
         founder_haplotypes=founder_hap,
@@ -355,6 +356,7 @@ def build_simulation_from_config(config: dict):
         statistics=statistics,
         filters=filters,
         seed=seed,
+        standardize_with=standardize_with,
     )
 
     # --- Output settings ---

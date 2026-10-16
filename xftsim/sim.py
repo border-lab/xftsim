@@ -16,13 +16,17 @@ import numpy as np
 from xftsim import inherit
 from xftsim.inherit import InheritanceRule
 from xftsim.struct import (
-    HaplotypeOperator, PhenotypeArray, PedigreeArray, SampleMeta,
+    DenseHaplotypeArray, HaplotypeOperator, PhenotypeArray, PedigreeArray,
+    SampleMeta,
 )
 from xftsim.arch import Architecture
 from xftsim.mate import MateAssignment, RandomMating
 from xftsim.reproduce import RecombinationMap
 from xftsim.filters import Filter, FilteredView
 from xftsim.stats import GenerationResult, Statistic
+
+
+_STANDARDIZE_WITH = ('founders', 'current')
 
 
 class Simulation:
@@ -64,6 +68,16 @@ class Simulation:
         architecture (``| field`` grouping, ``meta(field)``), the mating
         regime, filters or statistics must be produced by a rule; otherwise
         ``run()`` raises before generation 0.
+    standardize_with : {'founders', 'current'}
+        Allele frequencies used to standardize genotypes for genetic effects
+        on the standardized scale. ``'founders'`` (default) uses the
+        founders' empirical frequencies in every generation, so each
+        allele's effect stays fixed and genetic values change only through
+        genotypes, as in xftsim 0.3. ``'current'`` re-standardizes with each
+        generation's own frequencies, which rescales every allele's effect
+        as its frequency drifts (the v0.9 behavior before this option).
+        Generation 0 is identical either way. Estimators such as HE always
+        standardize with the current sample.
 
     Attributes
     ----------
@@ -79,6 +93,8 @@ class Simulation:
         Statistics results for each completed generation.
     stop : bool
         Set to True inside a callback to halt the simulation.
+    founder_af : np.ndarray or None
+        Empirical allele frequencies of generation 0, set by ``run()``.
 
     Examples
     --------
@@ -114,7 +130,13 @@ class Simulation:
         statistics: list[Statistic] | None = None,
         seed: int | None = None,
         metadata_rules: list[InheritanceRule] | None = None,
+        standardize_with: str = 'founders',
     ) -> None:
+        if standardize_with not in _STANDARDIZE_WITH:
+            raise ValueError(
+                f"standardize_with must be one of {_STANDARDIZE_WITH}, "
+                f"got {standardize_with!r}"
+            )
         self.architecture: Architecture = architecture
         self.mating_regime: RandomMating = mating_regime
         self.recombination_map: RecombinationMap = recombination_map
@@ -129,6 +151,8 @@ class Simulation:
             list(metadata_rules) if metadata_rules is not None else None
         )
         self._warned_dropped_metadata: set[str] = set()
+        self.standardize_with: str = standardize_with
+        self.founder_af: np.ndarray | None = None
 
         # History dicts keyed by generation
         self.haplotype_history: dict[int, HaplotypeOperator] = {
@@ -151,6 +175,7 @@ class Simulation:
                         filters: dict[str, Filter] | None = None,
                         statistics: list[Statistic] | None = None,
                         metadata_rules: list[InheritanceRule] | None = None,
+                        standardize_with: str | None = None,
                         ) -> Simulation:
         """
         Reconstruct a simulation from a checkpoint directory.
@@ -172,6 +197,10 @@ class Simulation:
         metadata_rules : list[InheritanceRule], optional
             Override the saved metadata inheritance rules. Required if the
             checkpoint used a ``Custom`` rule.
+        standardize_with : {'founders', 'current'}, optional
+            Override the saved standardization mode. Checkpoints written
+            before this option existed were simulated with ``'current'`` and
+            resume that way (with a warning) unless overridden.
 
         Returns
         -------
@@ -197,6 +226,19 @@ class Simulation:
                     f"whose functions are not saved. Pass all metadata rules "
                     f"again via from_checkpoint(..., metadata_rules=[...])."
                 )
+
+        if standardize_with is None:
+            standardize_with = checkpoint.get('standardize_with')
+            if standardize_with is None:
+                warnings.warn(
+                    "This checkpoint predates the standardize_with option and "
+                    "was simulated by re-standardizing genotypes every "
+                    "generation; resuming with standardize_with='current' to "
+                    "match. Pass standardize_with='founders' to fix allele "
+                    "effects at the founders' frequencies instead.",
+                    stacklevel=2,
+                )
+                standardize_with = 'current'
 
         if mating_regime is None:
             raise ValueError(
@@ -224,6 +266,7 @@ class Simulation:
             filters=filters,
             statistics=statistics,
             metadata_rules=metadata_rules,
+            standardize_with=standardize_with,
         )
 
         # Restore state
@@ -233,6 +276,30 @@ class Simulation:
         sim.rng = checkpoint['rng']
         sim.generation = checkpoint['generation']
         sim.results = checkpoint.get('results', [])
+
+        founder_af = checkpoint.get('founder_af')
+        hap0 = sim.haplotype_history.get(0)
+        # A retained generation-0 GraphHaplotypeOperator is stale once meiosis
+        # has run (it shares the mutated graph), so only dense generation-0
+        # haplotypes, or a checkpoint taken at generation 0, can stand in.
+        if founder_af is None and hap0 is not None and (
+                sim.generation == 0 or isinstance(hap0, DenseHaplotypeArray)):
+            founder_af = hap0.recompute_af()
+        if founder_af is not None:
+            founder_af = np.array(founder_af, dtype=np.float64)
+            if founder_af.shape != (founder.m,):
+                raise ValueError(
+                    f"Checkpoint founder allele frequencies have shape "
+                    f"{founder_af.shape}, expected ({founder.m},)."
+                )
+        elif standardize_with == 'founders':
+            raise ValueError(
+                "standardize_with='founders' needs the founders' allele "
+                "frequencies, but this checkpoint has neither saved "
+                "frequencies nor usable generation-0 haplotypes. Resume with "
+                "standardize_with='current'."
+            )
+        sim.founder_af = founder_af
 
         return sim
 
@@ -276,6 +343,8 @@ class Simulation:
         self._initialize_metadata()
         self._validate()
         self._validate_metadata(self.haplotype_history[0].samples, n_generations)
+        self.founder_af = np.array(self.haplotype_history[0].recompute_af(),
+                                   dtype=np.float64)
 
         # --- Generation 0: founders ---
         hap = self.haplotype_history[0]
@@ -284,6 +353,7 @@ class Simulation:
             phenotype_history=self.phenotype_history,
             pedigree_history=self.pedigree_history,
             generation=0,
+            reference_af=self._reference_af(),
         )
         self.phenotype_history[0] = pheno
 
@@ -332,6 +402,7 @@ class Simulation:
                 phenotype_history=self.phenotype_history,
                 pedigree_history=self.pedigree_history,
                 generation=gen,
+                reference_af=self._reference_af(),
             )
             self.phenotype_history[gen] = pheno
 
@@ -404,6 +475,7 @@ class Simulation:
                 phenotype_history=self.phenotype_history,
                 pedigree_history=self.pedigree_history,
                 generation=gen,
+                reference_af=self._reference_af(),
             )
             self.phenotype_history[gen] = pheno
 
@@ -421,6 +493,18 @@ class Simulation:
             self._run_callbacks()
             if self.stop:
                 return
+
+    def _reference_af(self) -> np.ndarray | None:
+        """Allele frequencies genetic components standardize with (None = current)."""
+        if self.standardize_with == 'current':
+            return None
+        if self.founder_af is None:
+            raise RuntimeError(
+                "standardize_with='founders' but the founders' allele "
+                "frequencies are unknown: start with run(), or resume with "
+                "Simulation.from_checkpoint()."
+            )
+        return self.founder_af
 
     def _initialize_metadata(self) -> None:
         """Run the rules' generation-0 hooks on the founders.

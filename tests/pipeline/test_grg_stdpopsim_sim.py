@@ -26,15 +26,19 @@ N_GEN = 4
 SEED = 3
 
 
-@pytest.fixture(scope="module")
-def founders():
+def _make_founders():
     return founder_haplotypes_from_stdpopsim_grg(
         samples={"YRI": 60, "CEU": 60}, chromosome="chr22",
         left=20_000_000, right=21_000_000, seed=SEED,
     )
 
 
-def _sim(founder, rmap):
+@pytest.fixture(scope="module")
+def founders():
+    return _make_founders()
+
+
+def _sim(founder, rmap, standardize_with='founders'):
     arch = Architecture()
     arch.add('Y.G', GeneticComponent(AdditiveEffects.from_h2(h2=0.5, m=founder.m, seed=SEED)))
     arch.add('Y.E', NoiseComponent(variance=0.5))
@@ -42,7 +46,7 @@ def _sim(founder, rmap):
     return Simulation(founder_haplotypes=founder, architecture=arch,
                       mating_regime=RandomMating(offspring_per_pair=2),
                       recombination_map=rmap, seed=SEED, retain_haplotypes=0,
-                      retain_phenotypes=N_GEN)
+                      retain_phenotypes=N_GEN, standardize_with=standardize_with)
 
 
 class TestStdpopsimGRGSimulation:
@@ -58,16 +62,41 @@ class TestStdpopsimGRGSimulation:
         # 1 Mb of chr22 is ~1-2 cM: a few hundredths of a crossover per meiosis.
         assert 0.001 < p[1:].sum() < 0.1
 
-    def test_grg_matches_dense_across_generations(self, founders):
+    def test_old_grg_checkpoint_cannot_switch_to_founders(self, tmp_path):
+        """A retained generation-0 GRG shares the graph meiosis mutated."""
+        import json
+        import os
+        import xftsim as xft
+        founders = _make_founders()
+        rmap = RecombinationMap.from_haplotypes_with_cM(founders)
+        sim = _sim(founders, rmap, 'current')
+        sim.retain_haplotypes = N_GEN
+        sim.run(3)
+        assert 0 in sim.haplotype_history
+        xft.io.save_simulation_checkpoint(sim, str(tmp_path))
+        os.remove(os.path.join(str(tmp_path), 'founder_af.npz'))
+        meta_path = os.path.join(str(tmp_path), 'meta.json')
+        meta = json.load(open(meta_path))
+        del meta['standardize_with']
+        json.dump(meta, open(meta_path, 'w'))
+        with pytest.raises(ValueError, match="founders' allele"):
+            Simulation.from_checkpoint(str(tmp_path), standardize_with='founders')
+
+    @pytest.mark.parametrize("standardize_with", ["founders", "current"])
+    def test_grg_matches_dense_across_generations(self, standardize_with):
+        # GRG meiosis mutates the founders' graph in place, so each run
+        # needs its own founders.
+        founders = _make_founders()
         rmap = RecombinationMap.from_haplotypes_with_cM(founders)
         dense = founders.to_dense()
         dense_founders = DenseHaplotypeArray(genotypes=dense.genotypes.copy(),
                                              samples=founders.samples,
                                              variants=founders.variants)
-        sim_dense = _sim(dense_founders, rmap)
+        sim_dense = _sim(dense_founders, rmap, standardize_with)
         sim_dense.run(N_GEN)
-        sim_grg = _sim(founders, rmap)
+        sim_grg = _sim(founders, rmap, standardize_with)
         sim_grg.run(N_GEN)
+        np.testing.assert_allclose(sim_grg.founder_af, sim_dense.founder_af, atol=1e-12)
 
         last = sim_grg.haplotypes
         assert isinstance(last, GraphHaplotypeOperator)

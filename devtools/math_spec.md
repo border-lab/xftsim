@@ -96,6 +96,38 @@ Tolerance: |h²_realized - h²_design| < 0.10 for n ≥ 1000, m ≥ 500.
 
 **If this fails, there is a standardization or effect-size bug.**
 
+### Across generations (allele effects are fixed)
+
+Effects drawn on the standardized scale are calibrated once, against the
+founders' empirical allele frequencies p₀ (generation 0). Every later
+generation is standardized with the same p₀:
+
+```
+G_t = ((X_t - 2p₀) / sqrt(2p₀q₀)) β      # X_t: generation-t dosages
+a_j = β_j / sqrt(2 p₀_j q₀_j)              # per-allele effect, constant in t
+```
+
+Genetic values therefore change only through genotypes. Under random mating
+with unlinked loci and no selection, the genic variance follows heterozygosity:
+
+```
+E[Var(G_t)] ≈ Σ a_j² · E[2p_t q_t] = Var(G_0) · (1 - 1/(2N_e))^t
+```
+
+where N_e is the effective population size: N_e ≈ N for Wright-Fisher
+sampling, and N_e ≈ 2N for `RandomMating(offspring_per_pair=2)`, where every
+individual has exactly two offspring (no variance in family size).
+
+and mean(G_t) is no longer 0 after generation 0 (it moves with Σ a_j (2p_t - 2p₀)).
+
+Re-standardizing with generation t's own frequencies p_t
+(`standardize_with='current'`) instead makes the per-allele effect
+β_j / sqrt(2p_t q_t) change as alleles drift: each segregating variant keeps
+contributing β_j², and variants lost to drift drop out, so Var(G_t) ratchets
+down to about Σ_{segregating} β_j². That is not the generative model; it is
+kept only as an option. Estimators (HE, GWAS) standardize with the current
+sample's frequencies, which is correct for estimation.
+
 ---
 
 ## 4. Phenotypic Generative Model
@@ -228,3 +260,6 @@ T_k = sqrt(θ / (2K)) × Σ_j (Y*_j + Y**_j)
 8. [ ] Division-by-zero protection when p=0 or p=1
 9. [ ] AF computation: mean(diploid) / 2, shape (m,), range [0,1]
 10. [ ] VT formula uses sqrt(θ/(2K)) scaling
+11. [ ] Genetic values after generation 0 are standardized with the founders'
+        generation-0 empirical allele frequencies (default
+        `standardize_with='founders'`), so per-allele effects are constant

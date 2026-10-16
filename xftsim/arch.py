@@ -69,7 +69,10 @@ class GeneticComponent(ArchComponent):
     """Univariate genetic component: computes diploid G @ effects.
 
     Uses ``standardized_matvec`` when ``effects.standardized`` is True,
-    otherwise plain ``matvec``.
+    otherwise plain ``matvec``. Standardization uses the ``reference_af``
+    passed by the simulation (the founders' allele frequencies by default,
+    so each allele's effect is fixed across generations); without it, the
+    current haplotypes' frequencies are used.
 
     Parameters
     ----------
@@ -87,7 +90,8 @@ class GeneticComponent(ArchComponent):
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
                 phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
         if self.effects.standardized:
-            return haplotypes.standardized_matvec(self.effects.effects)
+            return haplotypes.standardized_matvec(
+                self.effects.effects, af=kwargs.get('reference_af'))
         else:
             return haplotypes.matvec(self.effects.effects)
 

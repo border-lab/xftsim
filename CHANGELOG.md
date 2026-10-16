@@ -272,6 +272,29 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Changed
 
+- **Allele effects are now fixed across generations
+  (`Simulation(standardize_with='founders')`, the new default).** Effects
+  on the standardized scale were applied with genotypes standardized by each
+  generation's own allele frequencies, so every allele's effect
+  `beta / sqrt(2 p_t q_t)` was rescaled as it drifted. Variants that drifted
+  to loss removed their share of var(G) while variants that rose were scaled
+  back down, so var(G) ratcheted down, fastest with rare variants (on a
+  stdpopsim chr22 window, var(G) fell from 0.46 to about 0.38 over 8
+  generations, versus staying near 0.5 now). Genotypes are now standardized
+  with the founders' generation-0 empirical frequencies in every
+  generation, as in xftsim 0.3 and as the v0.9 design intended ("effects are
+  fixed and cannot change across generations"); the per-generation
+  rescaling came in with the March fix that made `standardized_matvec`
+  scale as well as center. Generation 0 is unchanged, and so are genotypes
+  under phenotype-independent mating; genetic values (and anything that
+  depends on them, such as assortative mating) differ from generation 1 on,
+  and mean(G) is no longer zero after generation 0. The old behavior is
+  `standardize_with='current'`. The founders' frequencies are stored as
+  `sim.founder_af` and saved in checkpoints; checkpoints written before
+  this change resume with `'current'` (with a warning). Estimators (HE,
+  GWAS) still standardize with the current sample. Also available as
+  `simulation.standardize_with` in CLI configs.
+
 - **Meiosis samples crossover events instead of per-locus coin flips**
   (`reproduce._crossover_model`, `_draw_switches`). Each locus with
   `p < 0.5` gets a Poisson rate `-log(1 - 2p) / 2` and switches when an odd

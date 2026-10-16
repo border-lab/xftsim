@@ -4,6 +4,21 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### Demo script: `--restandardize` replaces `--fixed-effects` (2026-10-16)
+
+- Fixed allele effects are now the simulator's default
+  (`standardize_with='founders'`), so `scripts/demo_stdpopsim_grg.py`
+  drops `--fixed-effects` (which built per-allele effects by hand) and adds
+  `--restandardize` to show the previous per-generation re-standardization.
+- `tests/numerical/test_founder_standardization.py`: genetic values in both
+  modes checked against the spec formula computed directly from genotypes,
+  the var(G) ratchet under `'current'` versus heterozygosity decay under
+  `'founders'`, and checkpoint resume (including pre-change checkpoints).
+- `tests/pipeline/test_grg_stdpopsim_sim.py`: GRG/dense parity now runs in
+  both modes, each with freshly simulated founders (GRG meiosis mutates the
+  founders' graph in place, so a shared fixture cannot be reused across
+  runs).
+
 ### stdpopsim + GRG Demo Script (2026-10-06)
 
 - Added `scripts/demo_stdpopsim_grg.py` — command-line walkthrough of
