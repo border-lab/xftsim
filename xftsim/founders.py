@@ -165,6 +165,8 @@ def _tree_sequence_to_mutable_grg(ts: tskit.TreeSequence,
                                   maintain_topo: bool = False,
                                   ts_coals: bool = False):
     """Convert a TreeSequence to a ``pygrgl.MutableGRG`` via ``grg convert``."""
+    import pygrgl
+
     with tempfile.TemporaryDirectory() as tmpdir:
         trees_path = os.path.join(tmpdir, "founders.trees")
         grg_path = os.path.join(tmpdir, "founders.grg")
@@ -426,7 +428,6 @@ def founder_haplotypes_from_stdpopsim_grg(
     ``"{chromosome}:{pos_bp}:{ref}:{alt}"``.
     """
     import stdpopsim
-    import pygrgl
 
     # Step 1: Build the stdpopsim simulation specification
     species = stdpopsim.get_species(species_id)
