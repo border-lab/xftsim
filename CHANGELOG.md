@@ -146,6 +146,54 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   Hexaly-only keys (`nb_threads`, `time_limit`, ...) raise rather than
   being silently ignored by the native path.
 
+- **Named GCTA / LDAK heritability-model constructors**: `AdditiveEffects`
+  and `MultivariateEffects` gain `from_gcta_model(...)` and
+  `from_ldak_model(...)`, exposing the two standard per-SNP heritability
+  models (Speed et al. 2020, *Nat Commun*, Eq.
+  `sigma_m^2 ∝ w_m^b [2 f_m (1 - f_m)]^a`) under the paper's own `(a, b)`
+  parametrization. GCTA is `a = b = 0` (flat per-SNP heritability —
+  equivalent to the existing `from_h2` / `from_h2_rg`, but now explicit);
+  LDAK defaults to `a = 0.75, b = 1`. The LDAK constructor takes an LDAK
+  weight `w_m` (from `compute_ldak_weights`, **not** an LD score) and
+  delegates to `from_frequency_dependent` via the mapping
+  `alpha = a - 1, s = b`, so the realized design heritability is recovered
+  (`sum_j Var(beta_j) == h2`) and, for the multivariate case, `.realized_rg`
+  / `.design_h2` are populated as usual. `a = b = 0` reproduces the GCTA
+  draw exactly.
+
+- **`effect.compute_ldak_weights`**: helper that computes per-SNP minor
+  allele frequency and **LDAK weights** from a diploid genotype matrix,
+  following the LDAK weighting of Speed et al. (2012; 2020). Within each
+  chromosome block the weights are the non-negative least-squares solution
+  of `R2 @ w = 1` (squared genotype-correlation matrix, diagonal 1), so
+  redundantly-tagged SNPs are downweighted and isolated (low-LD) SNPs keep
+  weight ~1. This is a distinct annotation from `compute_maf_ldscore`'s LD
+  score (which is *high* in high LD); the LDAK weight is *high* in low LD,
+  matching the direction the LDAK model expects. Independent founder SNPs
+  give weights ~1 (so GCTA and LDAK coincide); a set of perfectly
+  correlated SNPs shares a total weight of 1; monomorphic SNPs get 0.
+
+- **`MultivariateEffects.from_frequency_dependent`**: new constructor for
+  multivariate effect sizes whose per-SNP variances depend on MAF and LD
+  score, following the LDAK / RHE-mc frequency- and LD-dependent
+  architecture (Speed et al. 2017; Pazokitoroudi et al. 2020, Eq. 12). For
+  trait `t` and SNP `j` the variance weight is
+  `[2 f_j (1 - f_j)] ** (1 + alpha_t) * ldscore_j ** s_t`, normalized per
+  trait so `sum_j Var(beta_tj) == h2_t`. The exponent uses `1 + alpha`
+  (not `alpha`) because effects are on the standardized-genotype scale, so
+  `alpha = -1, s = 0` recovers the flat GCTA model and reproduces
+  `from_h2_rg`. Cross-trait correlation `R` is interpreted per-SNP; the
+  realized aggregate genetic correlation (attenuated when `alpha`/`s`
+  differ across traits, per Cauchy-Schwarz) is exposed as `.realized_rg`.
+
+- **`effect.compute_maf_ldscore`**: helper that computes per-SNP minor
+  allele frequency and in-sample LD score (`ell_j = sum_k r_jk^2` within
+  chromosome blocks, with the Bulik-Sullivan 2015
+  `r2 -> r2 - (1 - r2)/(n - 2)` bias correction) from a diploid genotype
+  matrix, producing the `maf` / `ldscore` annotations consumed by
+  `from_frequency_dependent`. Independent SNPs get LD score ~1; SNPs on
+  different chromosomes are treated as unlinked; monomorphic SNPs get 0.
+
 - **Meiosis crossover sampling is now tied to `sim.rng`**: Previously the
   meiosis kernels in `xftsim/reproduce.py` drew per-locus crossover
   indicators via `np.random.binomial` against numba's internal RNG, with
