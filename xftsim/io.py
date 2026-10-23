@@ -571,6 +571,7 @@ def save_architecture(arch: "xft.arch.Architecture", dir_path: str) -> None:
             spec['phenotype_name'] = comp.phenotype_name
         elif isinstance(comp, _SiblingComponent):
             spec['source_name'] = comp.source_name
+            spec['exclude_self'] = comp.exclude_self
         else:
             # Previously this fell through and wrote a stub spec with only
             # `component_type`, silently dropping all the component's
@@ -644,7 +645,10 @@ def load_architecture(dir_path: str) -> "xft.arch.Architecture":
     # Add sibling component constructors
     for sib_name, sib_cls in _SIBLING_COMPONENTS.items():
         cls_name = sib_cls.__name__
-        comp_map[cls_name] = lambda s, c=sib_cls: c(source_name=s['source_name'])
+        comp_map[cls_name] = lambda s, c=sib_cls: c(
+            source_name=s['source_name'],
+            exclude_self=s.get('exclude_self', False),
+        )
 
     for spec in node_specs:
         comp_type = spec['component_type']

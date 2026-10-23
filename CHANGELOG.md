@@ -173,6 +173,19 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   give weights ~1 (so GCTA and LDAK coincide); a set of perfectly
   correlated SNPs shares a total weight of 1; monomorphic SNPs get 0.
 
+- **Sibling indirect genetic effects via `exclude_self`**: `sibling_sum` and
+  `sibling_mean` now accept `exclude_self=True` (constructor arg, or
+  `sibling_sum(g, exclude_self=True)` in a formula), which leaves the focal
+  individual out of its own aggregate — turning a within-sibship aggregate
+  into a sibling **indirect genetic effect** (social genetic effect): the
+  influence of an individual's siblings, not itself. Sum gives
+  `sum_group - v_i`; mean gives `(sum_group - v_i) / (n_group - 1)` with
+  singletons (no siblings) mapped to 0. Implemented on the existing
+  `_SiblingComponent` (no new classes); the other sibling components reject
+  `exclude_self=True` via a `supports_exclude_self` guard. The flag
+  round-trips through `save_architecture`/`load_architecture` (older saved
+  architectures without the key load as `exclude_self=False`).
+
 - **`MultivariateEffects.from_frequency_dependent`**: new constructor for
   multivariate effect sizes whose per-SNP variances depend on MAF and LD
   score, following the LDAK / RHE-mc frequency- and LD-dependent
@@ -526,6 +539,13 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
   aggressive `p=0.5` stress case** (previously 5 mismatches at one
   seed even after the matmul fix), and **0/150 across the full
   rate × seed sweep** (5 rates × 30 seeds).
+
+- **`import xftsim` no longer requires the GRG-only optional dependencies**:
+  `xftsim/founders.py` imported `msprime`, `tskit`, `pygrgl`, and
+  `stdpopsim` at module top, so a missing GRG dependency made the entire
+  package (and anything importing it, e.g. `xftsim.effect`) fail to import.
+  These are now imported lazily inside the GRG founder functions that use
+  them, so core functionality and the test suite no longer depend on them.
 
 - **save_architecture silently dropping unsupported component parameters**:
   Same silent-data-loss shape as the mating regime fix. Previously,

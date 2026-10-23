@@ -8,10 +8,10 @@ import xarray as xr
 from nptyping import NDArray, Int8, Int64, Float64, Bool, Shape, Float, Int
 from typing import Any, Hashable, List, Iterable, Callable, Union, Dict
 from functools import cached_property
-import msprime
-import tskit
-import pygrgl
-import stdpopsim
+# msprime / tskit / pygrgl / stdpopsim are heavy, GRG-only optional
+# dependencies. Importing them at module top makes the whole package (and
+# anything that does `import xftsim`) fail when they are absent. They are
+# imported lazily inside the GRG founder functions that actually need them.
 import tempfile
 import subprocess
 from shutil import which
@@ -425,6 +425,9 @@ def founder_haplotypes_from_stdpopsim_grg(
     the matching recombination map. ``vid`` is formatted as
     ``"{chromosome}:{pos_bp}:{ref}:{alt}"``.
     """
+    import stdpopsim
+    import pygrgl
+
     # Step 1: Build the stdpopsim simulation specification
     species = stdpopsim.get_species(species_id)
     model = species.get_demographic_model(model_id)

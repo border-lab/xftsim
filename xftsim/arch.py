@@ -697,12 +697,28 @@ class _SiblingComponent(ArchComponent):
     source_name : str
         Name of the source phenotype to aggregate (must already be
         computed by the time this node executes).
+    exclude_self : bool
+        If True, the focal individual is left out of its own aggregate
+        (leave-one-out). This turns a sibling aggregate into a sibling
+        **indirect genetic effect** (social genetic effect): the influence
+        of an individual's siblings, not itself. Only supported by
+        components that set ``supports_exclude_self = True`` (currently
+        ``sibling_sum`` and ``sibling_mean``); a ValueError is raised
+        otherwise. Individuals with no siblings receive 0. Default False.
     """
     kind = "aggregating"
     accepts_grouping = True
+    supports_exclude_self = False  # overridden by leave-one-out-capable subclasses
 
-    def __init__(self, source_name: str):
+    def __init__(self, source_name: str, exclude_self: bool = False):
         self.source_name = source_name
+        if exclude_self and not self.supports_exclude_self:
+            raise ValueError(
+                f"{type(self).__name__} does not support exclude_self=True; "
+                f"only sibling_sum and sibling_mean implement leave-one-out "
+                f"(sibling indirect genetic effects)."
+            )
+        self.exclude_self = exclude_self
 
     def compute(self, node: ArchNode, haplotypes: HaplotypeOperator,
                 phenotypes: PhenotypeArray, **kwargs: object) -> np.ndarray:
@@ -714,7 +730,11 @@ class _SiblingComponent(ArchComponent):
         values = phenotypes[self.source_name]
         labels = _resolve_grouping(node.grouping or 'FID', haplotypes, **kwargs)
         if labels is None:
-            # Per-individual: aggregation is trivially itself
+            # Per-individual grouping: each individual is its own group. With
+            # exclude_self there are no other members, so the indirect effect
+            # is 0; otherwise the aggregate is trivially the individual itself.
+            if self.exclude_self:
+                return np.zeros(len(values), dtype=np.float64)
             return values.copy()
         return self._aggregate_groups(values, labels)
 
@@ -723,28 +743,51 @@ class _SiblingComponent(ArchComponent):
         ...
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}('{self.source_name}')"
+        extra = ", exclude_self=True" if self.exclude_self else ""
+        return f"{type(self).__name__}('{self.source_name}'{extra})"
 
 
 class SiblingMeanComponent(_SiblingComponent):
-    """Sibling mean: average of source phenotype within group."""
+    """Sibling mean: average of source phenotype within group.
+
+    With ``exclude_self=True`` the focal individual is left out, giving the
+    sibling indirect genetic effect under a size-normalized (mean) social
+    model: ``out_i = (sum_group - v_i) / (n_group - 1)``. Singletons (no
+    siblings) receive 0.
+    """
     name = "sibling_mean"
+    supports_exclude_self = True
 
     def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         unique, inverse = np.unique(labels, return_inverse=True)
         sums = np.bincount(inverse, weights=values, minlength=len(unique))
         counts = np.bincount(inverse, minlength=len(unique)).astype(np.float64)
+        if self.exclude_self:
+            n_others = counts[inverse] - 1.0
+            loo_sum = sums[inverse] - values
+            out = np.zeros(len(values), dtype=np.float64)
+            nz = n_others > 0
+            out[nz] = loo_sum[nz] / n_others[nz]
+            return out
         means = sums / np.maximum(counts, 1)
         return means[inverse]
 
 
 class SiblingSumComponent(_SiblingComponent):
-    """Sibling sum: sum of source phenotype within group."""
+    """Sibling sum: sum of source phenotype within group.
+
+    With ``exclude_self=True`` the focal individual is left out, giving the
+    sibling indirect genetic effect under a summed social model:
+    ``out_i = sum_group - v_i``.
+    """
     name = "sibling_sum"
+    supports_exclude_self = True
 
     def _aggregate_groups(self, values: np.ndarray, labels: np.ndarray) -> np.ndarray:
         unique, inverse = np.unique(labels, return_inverse=True)
         sums = np.bincount(inverse, weights=values, minlength=len(unique))
+        if self.exclude_self:
+            return sums[inverse] - values
         return sums[inverse]
 
 

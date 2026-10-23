@@ -436,14 +436,34 @@ def _parse_founder_component(founder_str: str, lineno: int) -> ArchComponent:
 
 def _parse_sibling(func_name: str, outputs: list[str], args_str: str,
                    lineno: int, grouping: str | None = None) -> ArchNode:
-    """Parse sibling_mean(source_name), etc."""
-    source_name = args_str.strip()
+    """Parse sibling_mean(source_name[, exclude_self=True]), etc."""
+    parts = [p.strip() for p in args_str.split(',')]
+    source_name = parts[0]
     if not source_name:
         raise ValueError(
             f"Line {lineno}: {func_name}() requires a source component name"
         )
+    exclude_self = False
+    for extra in parts[1:]:
+        if not extra:
+            continue
+        key, sep, val = extra.partition('=')
+        if not sep or key.strip() != 'exclude_self':
+            raise ValueError(
+                f"Line {lineno}: {func_name}() got unexpected argument '{extra}' "
+                f"(only 'exclude_self=True/False' is supported)"
+            )
+        v = val.strip().lower()
+        if v not in ('true', 'false'):
+            raise ValueError(
+                f"Line {lineno}: exclude_self must be True or False, got '{val.strip()}'"
+            )
+        exclude_self = (v == 'true')
     cls = _SIBLING_COMPONENTS[func_name]
-    component = cls(source_name)
+    try:
+        component = cls(source_name, exclude_self=exclude_self)
+    except ValueError as e:
+        raise ValueError(f"Line {lineno}: {e}")
     return ArchNode(
         outputs=outputs, component=component,
         inputs=[source_name], grouping=grouping,
