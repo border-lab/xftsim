@@ -1395,7 +1395,7 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         parent_sample_nodes = list(self._grg.get_sample_nodes())
         genome_length = int(self._grg.bp_range[1])
 
-        new_offspring_grg_ids = []
+        offspring_neg_ids = []
         n_off = assignment.offspring_samples.n
         maternal_idx = assignment.maternal_idx
         paternal_idx = assignment.paternal_idx
@@ -1424,9 +1424,13 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             for parent_haps, switches in ((mat_haps, mat_switches),
                                           (pat_haps, pat_switches)):
                 segments = _switches_to_segments(switches, pos_bp, parent_haps, genome_length)
-                neg_id = recomb.recombine_multi(segments)
-                raw_id = recomb.NEGATIVE_NODE_IDS[abs(neg_id) - 1]
-                new_offspring_grg_ids.append(raw_id)
+                offspring_neg_ids.append(recomb.recombine_multi(segments))
+
+        # Resolve external ids to raw node ids once, after the loop: the native
+        # backend's NEGATIVE_NODE_IDS copies the whole table on every access,
+        # so reading it per offspring is quadratic in population size.
+        neg_to_raw = recomb.NEGATIVE_NODE_IDS
+        new_offspring_grg_ids = [neg_to_raw[abs(neg_id) - 1] for neg_id in offspring_neg_ids]
 
         # One wholesale sample swap (parents -> offspring), then compact.
         # make_node() hands out increasing IDs, so the list is already in

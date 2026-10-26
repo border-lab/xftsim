@@ -417,6 +417,13 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Fixed
 
+- **GRG meiosis took time quadratic in population size.** It looked up each
+  offspring's node ID through the native recombiner's `NEGATIVE_NODE_IDS`,
+  which copies the whole lookup table into a new Python list on every access,
+  once per offspring haplotype. IDs are now resolved once after all offspring
+  are built. 100,000 people on a 5 Mb window: 142 s -> 2.0 s per generation;
+  500,000 people now take 8-9 s per generation instead of an extrapolated
+  ~1 h. Graphs and seeded results are unchanged.
 - **`BatchedMating` assumed 2 offspring per pair when merging batches.** The
   merged family IDs and sexes came from `getattr(regime,
   'offspring_per_pair', 2)`, which is wrong for wrapped regimes without that
