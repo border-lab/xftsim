@@ -4,6 +4,21 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### GRG Edge-Growth Instrumentation and Option B Prototype (2026-11-12)
+
+- Added `scripts/scaling/optionb/`: scripts that explain why GRG edges grow
+  quadratically over generations, and a prototype of the fix (option B).
+  - **Explanation:** recombinant offspring re-list their parents' pieces, at about
+    13-18 edges per ancestry tract, and dead lineages are never removed.
+  - **Option B:** a per-offspring position hierarchy of mutation-free group
+    nodes, plus dead-node removal.
+  - `exp_scale.py` runs option B at 100k-500k, with an exactness twin of the
+    current code. `README.md` summarizes the scripts, findings and limits.
+- Compaction options:
+  - `--rebuild-every` works with stock pygrgl.
+  - `--save-drop-every` needs the `drop_unreachable` save option from the local
+    grgl branch `drop-unreachable`.
+
 ### GRG Scaling Sweep Harness (2026-11-01)
 
 - Added `scripts/scaling/` — time and memory of xftsim + GRG simulations on
