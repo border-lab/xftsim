@@ -4,6 +4,20 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### GRG Scaling Sweep Harness (2026-11-01)
+
+- Added `scripts/scaling/` — time and memory of xftsim + GRG simulations on
+  stdpopsim founders (OutOfAfrica_3G09, CEU, HapMapII_GRCh38 map).
+  `scaling_run.py` runs one setting and appends a CSV row per stage and per
+  generation (time, meiosis time, GRG nodes and edges, var(G)/var(Y),
+  current and peak memory), so a run killed for memory or time still records
+  how far it got. `grid.tsv` lists the sweep (population size, region length,
+  time horizon); `setup_lane.sh` builds the environment on the Lane cluster
+  from the bundled grgl source (branch `grg_modify_improve`, commit
+  `8e716cb`) and checks GRG against dense; `submit_sweep.sh` submits the grid
+  to Slurm; `run_local.sh` runs it on a workstation; `summarize.py` and
+  `plot_scaling.py` build the summary table and figures.
+
 ### Demo script: `--restandardize` replaces `--fixed-effects` (2026-10-16)
 
 - Fixed allele effects are now the simulator's default

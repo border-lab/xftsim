@@ -1,0 +1,19 @@
+# name	people	chrom	left_mb	length_mb	gens	mem	time
+# Founders: stdpopsim HomSap OutOfAfrica_3G09, CEU, HapMapII_GRCh38 map; random mating.
+# length_mb 0 = whole chromosome. mem/time are Slurm requests; a run that dies
+# for memory or time still records the stages it finished.
+# -- population size, 20 Mb of chr22, 10 generations
+n050k_L20	50000	chr22	17	20	10	8G	01:00:00
+n100k_L20	100000	chr22	17	20	10	12G	01:00:00
+n250k_L20	250000	chr22	17	20	10	24G	02:00:00
+n500k_L20	500000	chr22	17	20	10	32G	03:00:00
+n1M_L20	1000000	chr22	17	20	10	64G	06:00:00
+n2M_L20	2000000	chr22	17	20	10	128G	12:00:00
+# -- genome length at 500k people
+n500k_L5	500000	chr22	20	5	10	16G	02:00:00
+n500k_chr22	500000	chr22	0	0	10	64G	06:00:00
+n1M_chr22	1000000	chr22	0	0	10	128G	12:00:00
+n500k_chr1	500000	chr1	0	0	10	128G	12:00:00
+# -- time horizon: graph growth over many generations
+n100k_L20_g50	100000	chr22	17	20	50	32G	04:00:00
+n500k_L20_g30	500000	chr22	17	20	30	64G	08:00:00
