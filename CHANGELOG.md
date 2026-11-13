@@ -11,6 +11,57 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Added
 
+- **GRG position hierarchy and compaction ("option B",
+  `GraphMeiosisOptions`)**. GRG edges grew quadratically over generations:
+  a GRG edge carries no genomic interval, so a recombinant offspring attaches
+  to every piece that tiles its parent's ancestry (about 13-18 edges per
+  ancestry tract, and tracts accumulate every generation), and dead lineages
+  were never removed. Two opt-in steps, both leaving genotypes unchanged,
+  now address this.
+  - `group_fanin=B` (try 4): after each meiosis, an offspring haplotype with
+    more than `group_min_parents` (default 8) parents gets them organized
+    into a B-ary tree of mutation-free group nodes ordered by genomic
+    position. A later recombinant inheriting part of it attaches to the few
+    groups covering that part. Edges added per generation then stay flat.
+    Implemented natively as `NonDuplicationRecombiner::buildGroups`
+    (`build_groups` in Python; pure-Python reference in
+    `grg_recombination.py`). It reproduces the prototype in
+    `scripts/scaling/optionb/exp_scale.py` graph for graph.
+  - `compact_every=K`: every K generations the graph is saved without
+    simplification while dropping every node that cannot reach a current
+    sample, then reloaded. This frees dead ancestry, keeps the groups and
+    restores node ordering. `compact_dir` sets the temporary-file location.
+    It needs pygrgl built from the grgl `drop-unreachable` branch.
+    - Before doing any work, meiosis raises a clear error if pygrgl lacks
+      `drop_unreachable` or `compact_dir` is not a writable directory.
+    - If the save fails (e.g. a full disk), it warns and keeps the
+      uncompacted graph.
+    - If the reload fails, the saved file is kept and named in the error.
+  - Set the options on the founder operator
+    (`GraphHaplotypeOperator(..., meiosis_options=...)` or
+    `founders.meiosis_options = ...`); each meiosis passes them to its
+    offspring. Defaults (`group_fanin=0`, `compact_every=0`) keep the old
+    behaviour exactly.
+  - Meiosis now marks the parent operator `stale` (its graph holds the
+    offspring). A compacting meiosis also releases the parent's graph once
+    the save succeeds, so the old graph is freed before the compacted copy
+    loads: `graph_released` becomes True and its graph methods raise a
+    clear error. `n` and `m` now come from the sample and variant
+    metadata, so they stay available (`Simulation` reads `prev_hap.n`
+    after meiosis).
+  - The offspring operator's `last_meiosis_stats` reports per-meiosis graph
+    statistics: crossovers, nodes and edges added by meiosis and by
+    groups, bubbles, recombiner visits, timings, and, after compaction,
+    the live node and edge counts. Edge totals are not counted otherwise:
+    `num_edges` is an O(nodes) scan, and the native audit already gives the
+    edges meiosis added.
+  - GRG checkpoints with option B on are saved without simplification
+    (simplifying splices out most groups, which silently undoes the
+    hierarchy), dropping unreachable nodes when pygrgl supports it and
+    warning otherwise. The checkpoint sidecar stores the options (except
+    `compact_dir`), so a resumed run keeps them; older sidecars load with
+    the defaults. Retained generations whose graph was released are left
+    out of the checkpoint.
 - **Per-individual metadata carried across generations (`xftsim.inherit`,
   `Simulation(metadata_rules=...)`)**. Metadata in `SampleMeta.extra` (e.g.
   stdpopsim's `population` label) used to vanish at generation 1, because
@@ -417,6 +468,12 @@ For development workflow changes (testing, CI/CD, tooling), see [devtools/CHANGE
 
 ### Fixed
 
+- **GRG simulations with a shrinking population crashed after meiosis.**
+  `GraphHaplotypeOperator.n` read the graph, which after meiosis holds the
+  offspring, so `Simulation` built the pedigree with the offspring count as
+  `parent_n` and raised "maternal_idx out of bounds" (e.g.
+  `RandomMating(offspring_per_pair=1)`). `n` and `m` now come from the
+  operator's metadata.
 - **GRG meiosis took time quadratic in population size.** It looked up each
   offspring's node ID through the native recombiner's `NEGATIVE_NODE_IDS`,
   which copies the whole lookup table into a new Python list on every access,

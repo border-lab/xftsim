@@ -679,15 +679,39 @@ def _save_graph_haplotypes_to_checkpoint(
     The sidecar is needed because the GRG format only carries iid (not fid /
     sex) and may not preserve all variant fields, while ``GraphHaplotypeOperator``
     wraps richer metadata. Without it, fid/sex assigned during simulation
-    would be lost on round-trip.
+    would be lost on round-trip. It also carries the operator's
+    ``GraphMeiosisOptions`` (except ``compact_dir``, which is machine-specific).
+
+    With the position hierarchy on, the GRG is saved without simplification:
+    simplifying splices out most group nodes (they have a single child), which
+    silently undoes the hierarchy. Unreachable nodes are still dropped when
+    pygrgl supports it.
     """
     import pygrgl
-    pygrgl.save_grg(hap._grg, os.path.join(hap_dir, f'gen_{gen}.grg'))
+    from xftsim.struct import _save_grg_supports_drop_unreachable
+    grg_path = os.path.join(hap_dir, f'gen_{gen}.grg')
+    opts = hap.meiosis_options
+    if opts.group_fanin:
+        if _save_grg_supports_drop_unreachable():
+            pygrgl.save_grg(hap._grg, grg_path, allow_simplify=False,
+                            drop_unreachable=True)
+        else:
+            warnings.warn(
+                "pygrgl.save_grg lacks drop_unreachable; saving the GRG "
+                "checkpoint without simplification keeps dead nodes. Install "
+                "pygrgl from the grgl 'drop-unreachable' branch to drop them."
+            )
+            pygrgl.save_grg(hap._grg, grg_path, allow_simplify=False)
+    else:
+        pygrgl.save_grg(hap._grg, grg_path)
 
     meta_dict = {
         'generation': np.array([hap.generation]),
         **_samples_to_npz(hap.samples),
         'variant_vid': hap.variants.vid,
+        'meiosis_group_fanin': np.array([opts.group_fanin]),
+        'meiosis_group_min_parents': np.array([opts.group_min_parents]),
+        'meiosis_compact_every': np.array([opts.compact_every]),
     }
     if hap.variants.chrom is not None:
         meta_dict['variant_chrom'] = hap.variants.chrom
@@ -728,8 +752,16 @@ def _load_graph_haplotypes_from_checkpoint(
         zero_allele=data['variant_zero_allele'] if 'variant_zero_allele' in data else None,
         one_allele=data['variant_one_allele'] if 'variant_one_allele' in data else None,
     )
+    meiosis_options = None
+    if 'meiosis_group_fanin' in data:  # absent in older checkpoints
+        meiosis_options = xft.struct.GraphMeiosisOptions(
+            group_fanin=int(data['meiosis_group_fanin'][0]),
+            group_min_parents=int(data['meiosis_group_min_parents'][0]),
+            compact_every=int(data['meiosis_compact_every'][0]),
+        )
     return xft.struct.GraphHaplotypeOperator(
         grg=grg, generation=generation, samples=samples, variants=variants,
+        meiosis_options=meiosis_options,
     )
 
 
@@ -955,10 +987,15 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
     # a .grg file plus a metadata sidecar — materializing to dense would
     # explode disk usage for whole-genome GRGs (e.g. ~64 GB raw at n=8000,
     # m=4M) for no information gain.
+    # A retained GRG generation whose graph a compacting meiosis released
+    # has no genotypes left to save, so it is left out of the checkpoint.
     hap_dir = os.path.join(dir_path, 'haplotypes')
     os.makedirs(hap_dir, exist_ok=True)
+    saved_hap_gens = []
     for gen, hap in sim.haplotype_history.items():
         if isinstance(hap, xft.struct.GraphHaplotypeOperator):
+            if hap.graph_released:
+                continue
             _save_graph_haplotypes_to_checkpoint(hap, hap_dir, gen)
         elif isinstance(hap, xft.struct.DenseHaplotypeArray):
             save_haplotypes_npz(hap, os.path.join(hap_dir, f'gen_{gen}.npz'))
@@ -968,6 +1005,7 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
                 f"at generation {gen}; only DenseHaplotypeArray and "
                 "GraphHaplotypeOperator are supported."
             )
+        saved_hap_gens.append(gen)
 
     # Save phenotype history
     pheno_dir = os.path.join(dir_path, 'phenotypes')
@@ -989,7 +1027,7 @@ def save_simulation_checkpoint(sim: "xft.sim.Simulation",
 
     # Save generation keys for each history
     np.savez(os.path.join(dir_path, 'history_keys.npz'),
-             haplotype_gens=np.array(list(sim.haplotype_history.keys())),
+             haplotype_gens=np.array(saved_hap_gens, dtype=np.int64),
              phenotype_gens=np.array(list(sim.phenotype_history.keys())),
              pedigree_gens=np.array(list(sim.pedigree_history.keys())))
 

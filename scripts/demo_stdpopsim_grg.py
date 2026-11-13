@@ -10,6 +10,7 @@ Run from the repository root with the project environment, e.g.
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --causal-min-maf 0.05
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --restandardize
     .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --pops YRI=200,CEU=200 --track-ancestry
+    .venv-xftsim/bin/python scripts/demo_stdpopsim_grg.py --option-b --compact-every 1 --check-dense
 
 Steps: (1) simulate founders with a published stdpopsim demographic model and
 convert the tree sequence to a GRG; (2) build the forward recombination map
@@ -23,7 +24,11 @@ founders' (standardize_with='current'), which rescales allele effects as they
 drift and makes var(G) ratchet down as rare variants are lost; compare it with
 the default to see the difference; --track-ancestry carries each
 person's stdpopsim population forward as ancestry proportions (mean of the
-parents') and reports how the admixed population homogenizes.
+parents') and reports how the admixed population homogenizes; --option-b
+builds the position hierarchy after each meiosis (--fanin, --min-parents) and
+--compact-every K compacts the graph every K generations (needs pygrgl from
+the grgl drop-unreachable branch); combine them with --check-dense to confirm
+genotypes are unchanged.
 """
 import argparse
 import contextlib
@@ -46,7 +51,7 @@ from xftsim.mate import RandomMating
 from xftsim.reproduce import RecombinationMap, _crossover_model, _meiosis_pair_switches_seeded
 from xftsim.sim import Simulation
 from xftsim.stats import MetadataSummary
-from xftsim.struct import DenseHaplotypeArray
+from xftsim.struct import DenseHaplotypeArray, GraphMeiosisOptions
 
 
 @contextlib.contextmanager
@@ -192,6 +197,13 @@ def main():
     ap.add_argument("--track-ancestry", action="store_true",
                     help="carry population labels forward as ancestry proportions "
                          "and report them per generation")
+    ap.add_argument("--option-b", action="store_true",
+                    help="build the position hierarchy (option B) after each meiosis")
+    ap.add_argument("--fanin", type=int, default=4, help="option B group fan-in")
+    ap.add_argument("--min-parents", type=int, default=8,
+                    help="option B: offspring with at most this many parents are left alone")
+    ap.add_argument("--compact-every", type=int, default=0,
+                    help="compact the GRG every K generations (0 = never)")
     args = ap.parse_args()
 
     # Compile the meiosis kernels up front so generation timings are honest.
@@ -205,6 +217,9 @@ def main():
           + (f", map {args.genetic_map}" if args.genetic_map else ", uniform map"))
     t0 = time.perf_counter()
     founders = make_founders(args)
+    founders.meiosis_options = GraphMeiosisOptions(
+        group_fanin=args.fanin if args.option_b else 0,
+        group_min_parents=args.min_parents, compact_every=args.compact_every)
     grg = founders._grg
     af = founders.recompute_af()
     maf = np.minimum(af, 1 - af)
@@ -213,6 +228,8 @@ def main():
           f"{founders.m:,} variants, {grg.num_nodes:,} nodes, {grg.num_edges:,} edges")
     print(f"      variants: {np.mean(maf < 0.01):.0%} with MAF < 1%, "
           f"{int(np.sum(np.round(af * 2 * founders.n) == 1)):,} singletons")
+    start_size = (grg.num_nodes, grg.num_edges)
+    del grg  # so a compacting meiosis can free the founders' graph
 
     # ---- 2. recombination map ---------------------------------------------
     rmap = RecombinationMap.from_haplotypes_with_cM(founders)
@@ -238,12 +255,14 @@ def main():
             variants=founders.variants)
 
     # ---- 4. forward simulation --------------------------------------------
-    print(f"[4/4] forward simulation, {args.gens} generations (GRG-native meiosis)")
+    extras = ([f"option B fan-in {args.fanin}"] if args.option_b else []) + (
+        [f"compact every {args.compact_every}"] if args.compact_every else [])
+    print(f"[4/4] forward simulation, {args.gens} generations (GRG-native meiosis"
+          + "".join(f"; {e}" for e in extras) + ")")
     print(f"      {'gen':>3} {'seconds':>8} {'nodes':>11} {'nodes +%':>9} "
           f"{'edges':>12} {'edges +%':>9} {'var(G)':>8} {'var(Y)':>8}")
     print("      (+% = growth since the previous generation)")
     clock = [time.perf_counter()]
-    start_size = (grg.num_nodes, grg.num_edges)
     prev_size = [start_size]
 
     def growth(new, old):

@@ -76,6 +76,14 @@ py::dict toStatsDict(const grgl::RecombinerStats& s) {
     return d;
 }
 
+py::dict toGroupStatsDict(const grgl::GroupStats& g) {
+    py::dict d;
+    d["samples_regrouped"] = g.samplesRegrouped;
+    d["groups_made"] = g.groupsMade;
+    d["edges_added"] = g.edgesAdded;
+    return d;
+}
+
 size_t numNodesOf(grgl::MutableGRGPtr grg) { return grg->numNodes(); }
 
 } // namespace
@@ -119,6 +127,26 @@ PYBIND11_MODULE(_grg_recomb_native, m) {
              &grgl::NonDuplicationRecombiner::clearPendingSampleRemovals,
              "Drop accumulated pending-sample-removals. Called after a wholesale\n"
              "grg.set_samples(...) makes the accumulated removals moot.")
+        .def(
+            "build_groups",
+            [](grgl::NonDuplicationRecombiner& self,
+               const std::vector<grgl::NodeID>& samples,
+               size_t fanin,
+               size_t minParents) {
+                grgl::GroupStats stats;
+                {
+                    py::gil_scoped_release release;
+                    stats = self.buildGroups(samples, fanin, minParents);
+                }
+                return toGroupStatsDict(stats);
+            },
+            py::arg("samples"),
+            py::arg("fanin"),
+            py::arg("min_parents"),
+            "Option B position hierarchy: give every sample in `samples` (raw\n"
+            "positive NodeIDs) with more than max(min_parents, fanin) parents a\n"
+            "fanin-ary tree of mutation-free group nodes ordered by genomic\n"
+            "position. Returns {samples_regrouped, groups_made, edges_added}.")
         .def("reset_audit", &grgl::NonDuplicationRecombiner::resetAudit)
         .def("reset_stats", &grgl::NonDuplicationRecombiner::resetStats)
         .def_property("defer_sample_updates",

@@ -1102,12 +1102,87 @@ def _check_unique_mutations(pos_bp, mutations) -> None:
         )
 
 
+@dataclass
+class GraphMeiosisOptions:
+    """Graph-maintenance options for ``GraphHaplotypeOperator.meiosis``.
+
+    The defaults reproduce plain GRG meiosis. Set them on the founder operator
+    (``meiosis_options=``); each meiosis passes them on to its offspring, so
+    they configure a whole ``Simulation``.
+
+    Parameters
+    ----------
+    group_fanin : int
+        Fan-in B of the position hierarchy ("option B"). After each meiosis,
+        an offspring haplotype with more than ``group_min_parents`` parents
+        gets them organized into a B-ary tree of mutation-free group nodes
+        ordered by genomic position, so later recombinants attach to a few
+        groups instead of re-listing every parent piece. This keeps the edges
+        added per generation flat instead of growing linearly. 0 (default)
+        disables it.
+    group_min_parents : int
+        K: offspring with at most ``max(group_min_parents, group_fanin)``
+        parents are left alone (a list of at most B parents has nothing to
+        group).
+    compact_every : int
+        Compact the graph when the offspring generation is a multiple of
+        ``compact_every``: save it without simplification while dropping every
+        node that cannot reach a current sample, then reload it. This frees
+        dead ancestry, keeps the groups, and restores node ordering. 0
+        (default) never compacts. Needs pygrgl built from the grgl
+        ``drop-unreachable`` branch.
+    compact_dir : str, optional
+        Directory for the temporary compaction file; defaults to the system
+        temporary directory (``$TMPDIR``). Use node-local scratch on clusters.
+    """
+    group_fanin: int = 0
+    group_min_parents: int = 8
+    compact_every: int = 0
+    compact_dir: Optional[str] = None
+
+    def __post_init__(self):
+        if self.group_fanin != 0 and self.group_fanin < 2:
+            raise ValueError(
+                f"group_fanin must be 0 (off) or at least 2, got {self.group_fanin}"
+            )
+        if self.group_min_parents < 0:
+            raise ValueError(
+                f"group_min_parents must be non-negative, got {self.group_min_parents}"
+            )
+        if self.compact_every < 0:
+            raise ValueError(
+                f"compact_every must be non-negative, got {self.compact_every}"
+            )
+
+
+def _save_grg_supports_drop_unreachable() -> bool:
+    """Whether the installed pygrgl's ``save_grg`` takes ``drop_unreachable``."""
+    import pygrgl
+    return 'drop_unreachable' in (pygrgl.save_grg.__doc__ or '')
+
+
+def _require_compaction_ready(directory: Optional[str]) -> None:
+    """Raise if compacting into ``directory`` cannot work, before any meiosis."""
+    import os
+    if not _save_grg_supports_drop_unreachable():
+        raise RuntimeError(
+            "GRG compaction needs pygrgl.save_grg(..., drop_unreachable=True), "
+            "which this pygrgl lacks. Install pygrgl built from the grgl "
+            "'drop-unreachable' branch, or set compact_every=0."
+        )
+    if directory is not None and not (os.path.isdir(directory)
+                                      and os.access(directory, os.W_OK)):
+        raise RuntimeError(
+            f"GRG compaction directory {directory!r} does not exist or is not "
+            "writable (GraphMeiosisOptions.compact_dir)."
+        )
+
+
 class GraphHaplotypeOperator(HaplotypeOperator):
     """GRG-backed haplotype operator using pygrgl graph traversal.
 
     Provides O(nodes)-per-variant matvec without materializing the full
-    genotype matrix.  After meiosis, offspring revert to DenseHaplotypeArray
-    since GRG has no native recombination support.
+    genotype matrix. ``meiosis`` runs natively on the graph (see there).
 
     Parameters
     ----------
@@ -1119,14 +1194,26 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         Sample metadata.  If None, extracted from GRG individual IDs.
     variants : VariantMeta, optional
         Variant metadata.  If None, extracted from GRG mutation data.
+    meiosis_options : GraphMeiosisOptions, optional
+        Graph-maintenance options for ``meiosis``, inherited by offspring.
+        Defaults to ``GraphMeiosisOptions()`` (plain meiosis).
     """
 
     def __init__(self, grg, generation: int = 0,
                  samples: Optional[SampleMeta] = None,
-                 variants: Optional[VariantMeta] = None):
+                 variants: Optional[VariantMeta] = None,
+                 meiosis_options: Optional[GraphMeiosisOptions] = None):
         self._grg = grg
         self._generation = generation
         self._cached_af = None
+        self.meiosis_options = (meiosis_options if meiosis_options is not None
+                                else GraphMeiosisOptions())
+        # Per-meiosis graph statistics, set on the offspring operator by
+        # meiosis(); None for operators that no meiosis produced.
+        self.last_meiosis_stats: Optional[Dict[str, Any]] = None
+        # Set once meiosis has run on this operator: the graph it wraps now
+        # holds the offspring generation (or was released by compaction).
+        self._stale = False
         # When meiosis mutates the GRG, pygrgl.matmul DOWN starts returning
         # inflated values because of stale per-node "was-a-sample" flags
         # (see meiosis() docstring). Saving + reloading the GRG regenerates
@@ -1166,12 +1253,44 @@ class GraphHaplotypeOperator(HaplotypeOperator):
     # --- properties ---
 
     @property
+    def _grg(self):
+        if self._graph is None:
+            raise RuntimeError(
+                "This GraphHaplotypeOperator no longer holds a graph: a "
+                "compacting meiosis replaced the shared GRG with a compacted "
+                "copy owned by the offspring operator. Its genotypes are gone; "
+                "use the offspring operator."
+            )
+        return self._graph
+
+    @_grg.setter
+    def _grg(self, grg):
+        self._graph = grg
+
+    @property
+    def graph_released(self) -> bool:
+        """True once a compacting meiosis has released this operator's graph."""
+        return self._graph is None
+
+    @property
+    def stale(self) -> bool:
+        """True once meiosis has run on this operator.
+
+        Meiosis mutates the shared graph in place, so a stale operator's
+        graph (if not released) holds the offspring generation, not the
+        generation its metadata describes. Its genotypes are no longer valid.
+        """
+        return self._stale
+
+    # n and m come from the metadata (validated against the graph in
+    # __init__) so they stay available after the graph is released.
+    @property
     def n(self) -> int:
-        return self._grg.num_individuals
+        return self.samples.n
 
     @property
     def m(self) -> int:
-        return self._grg.num_mutations
+        return self.variants.m
 
     @property
     def generation(self) -> int:
@@ -1321,6 +1440,16 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         recurrent mutations in finite-sites coalescent simulations; the GRG
         founder helpers drop such sites by default.
 
+        ``self.meiosis_options`` (see ``GraphMeiosisOptions``) adds two
+        optional graph-maintenance steps that leave genotypes unchanged:
+        building the position hierarchy over the offspring's parents, and
+        compacting the graph. Either way this operator becomes ``stale``: its
+        graph now holds the offspring. A compacting meiosis also releases
+        that graph (``graph_released`` becomes True) so the old graph is freed
+        before the compacted copy loads. Only the returned operator remains
+        usable. Graph statistics for the step are in the returned operator's
+        ``last_meiosis_stats``.
+
         Parameters
         ----------
         assignment : MateAssignment
@@ -1348,7 +1477,30 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             If mutation positions are out of order, the recombination map
             length differs from ``m``, or two mutations share (position,
             ref, alt).
+        RuntimeError
+            If this generation compacts and pygrgl lacks ``drop_unreachable``
+            or ``compact_dir`` is not a writable directory (checked before any
+            work), or if the compacted graph fails to reload (the saved file
+            is kept and named in the error).
         """
+        opts = self.meiosis_options
+        offspring_generation = assignment.offspring_samples.generation
+        compact = (opts.compact_every > 0
+                   and offspring_generation % opts.compact_every == 0)
+        if compact:
+            _require_compaction_ready(opts.compact_dir)  # before the expensive part
+        offspring_op = self._meiosis_in_place(assignment, recombination_map, rng)
+        self._stale = True
+        if compact:
+            # The parent wraps the same, now mutated, graph; _compact releases
+            # it once the save succeeds, so the old graph is freed before the
+            # compacted copy loads.
+            offspring_op._compact(opts.compact_dir, release=self)
+        return offspring_op
+
+    def _meiosis_in_place(self, assignment, recombination_map, rng):
+        """Meiosis on the shared GRG, plus the optional position hierarchy."""
+        import time
         from xftsim.grg_recombination import _switches_to_segments
         try:
             from xftsim.grg_recombination_native import NonDuplicationRecombination
@@ -1385,8 +1537,17 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             )
         cumlam, special_idx, special_p = _crossover_model(recomb_p)
 
+        opts = self.meiosis_options
+        nodes_before = self._grg.num_nodes
+        t_start = time.perf_counter()
+
         recomb = NonDuplicationRecombination(self._grg)
         recomb.defer_sample_updates = True
+        # Edges added by meiosis: the native audit counts every connect, and
+        # meiosis never disconnects. The Python reference has no audit, so
+        # count edges instead (num_edges is an O(nodes) scan).
+        native = hasattr(recomb, 'audit')
+        edges_before = None if native else self._grg.num_edges
 
         # Convention: get_sample_nodes() returns 2*n_ind haploid IDs in
         # individual-interleaved order -- samples[2i] = ind i maternal,
@@ -1406,6 +1567,8 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         # genotypes both paths sample the same crossovers.
         seeds = _spawn_meiosis_seeds(rng, n_off)
 
+        n_crossovers = 0
+        n_recombinant = 0
         for i in range(n_off):
             mat_i = int(maternal_idx[i])
             pat_i = int(paternal_idx[i])
@@ -1424,6 +1587,8 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             for parent_haps, switches in ((mat_haps, mat_switches),
                                           (pat_haps, pat_switches)):
                 segments = _switches_to_segments(switches, pos_bp, parent_haps, genome_length)
+                n_crossovers += len(segments) - 1
+                n_recombinant += len(segments) > 1
                 offspring_neg_ids.append(recomb.recombine_multi(segments))
 
         # Resolve external ids to raw node ids once, after the loop: the native
@@ -1446,6 +1611,24 @@ class GraphHaplotypeOperator(HaplotypeOperator):
         new_offspring_grg_ids.sort()
         self._grg.set_samples(new_offspring_grg_ids)
         recomb._pending_sample_removals.clear()
+        t_meiosis = time.perf_counter() - t_start
+        meiosis_nodes = self._grg.num_nodes - nodes_before
+        audit = recomb.audit if native else None
+        if native:
+            meiosis_edges = audit['connect_calls_in_attach'] + audit['connect_calls_in_extract']
+        else:
+            meiosis_edges = self._grg.num_edges - edges_before
+
+        # Option B: regroup the new samples' parents under position-ordered
+        # group nodes. Runs before sort_mutations so the recombiner's cached
+        # mutation ids are still current while it reads spans.
+        group_stats = {'samples_regrouped': 0, 'groups_made': 0, 'edges_added': 0}
+        t_groups = 0.0
+        if opts.group_fanin:
+            t = time.perf_counter()
+            group_stats = recomb.build_groups(
+                new_offspring_grg_ids, opts.group_fanin, opts.group_min_parents)
+            t_groups = time.perf_counter() - t
         self._grg.sort_mutations()
 
         # The GRG is now in a state where pygrgl.matmul DOWN returns inflated
@@ -1459,9 +1642,103 @@ class GraphHaplotypeOperator(HaplotypeOperator):
             generation=assignment.offspring_samples.generation,
             samples=assignment.offspring_samples,
             variants=self.variants,
+            meiosis_options=opts,
         )
         offspring_op._grg_dirty = True
+        offspring_op.last_meiosis_stats = {
+            'generation': offspring_op.generation,
+            'offspring_haplotypes': len(new_offspring_grg_ids),
+            'recombinant_haplotypes': n_recombinant,
+            'crossovers': n_crossovers,
+            'meiosis_nodes': meiosis_nodes,
+            'meiosis_edges': meiosis_edges,
+            'bubbles': meiosis_nodes - len(new_offspring_grg_ids),
+            'visits': None if audit is None else audit['visits'],
+            'samples_regrouped': group_stats['samples_regrouped'],
+            'groups_made': group_stats['groups_made'],
+            'group_edges': group_stats['edges_added'],
+            't_meiosis': t_meiosis,
+            't_groups': t_groups,
+            'compacted': False,
+            't_compact': 0.0,
+            # Total edges are only reported after compaction, where the save
+            # returns them; counting them here would cost an O(nodes) scan.
+            'nodes': self._grg.num_nodes,
+            'edges': None,
+        }
         return offspring_op
+
+    def _compact(self, directory: Optional[str] = None,
+                 release: Optional["GraphHaplotypeOperator"] = None) -> None:
+        """Replace this operator's graph with a compacted copy.
+
+        Saves without simplification while dropping every node that cannot
+        reach a current sample, then reloads. The reload keeps sample order,
+        mutation ids and every live node (position-hierarchy groups
+        included), and numbers nodes in topological order. Needs the patched
+        pygrgl (see ``GraphMeiosisOptions.compact_every``).
+
+        Once the save succeeds, ``release`` (another operator sharing this
+        graph, i.e. the parent) gives up its reference so the old graph is
+        freed before the copy loads; other references keep it alive. If the
+        save fails, nothing is released and the uncompacted graph is kept,
+        with a warning. If the reload fails, the saved file is kept and named
+        in the error.
+        """
+        import gc
+        import os
+        import tempfile
+        import time
+        import pygrgl
+        t = time.perf_counter()
+        old = self._grg
+        bp_range = tuple(old.bp_range)
+        n_samples, m = old.num_samples, old.num_mutations
+        nodes_before = old.num_nodes
+        fd, path = tempfile.mkstemp(prefix='xftsim_compact_', suffix='.grg',
+                                    dir=directory)
+        os.close(fd)
+        try:
+            live_nodes, live_edges = pygrgl.save_grg(
+                old, path, allow_simplify=False, drop_unreachable=True)
+        except Exception as exc:
+            os.remove(path)
+            warnings.warn(f"GRG compaction failed while saving ({exc}); "
+                          "continuing with the uncompacted graph.")
+            return
+        del old
+        if release is not None:
+            release._grg = None
+        self._grg = None
+        gc.collect()
+        try:
+            grg = pygrgl.load_mutable_grg(path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"GRG compaction saved the graph to {path} but could not reload "
+                f"it ({exc}); the file is kept for recovery."
+            ) from exc
+        os.remove(path)
+        # The recombiner takes the genome length from bp_range, and genotypes
+        # are read by mutation id; both must survive the round trip.
+        if (tuple(grg.bp_range) != bp_range or grg.num_samples != n_samples
+                or grg.num_mutations != m or grg.num_nodes != live_nodes):
+            raise RuntimeError(
+                f"GRG compaction changed the graph's shape: bp_range "
+                f"{bp_range} -> {tuple(grg.bp_range)}, samples {n_samples} -> "
+                f"{grg.num_samples}, mutations {m} -> {grg.num_mutations}, "
+                f"nodes saved {live_nodes} -> loaded {grg.num_nodes}."
+            )
+        self._grg = grg
+        self._cached_af = None
+        if self.last_meiosis_stats is not None:
+            self.last_meiosis_stats.update({
+                'compacted': True,
+                't_compact': time.perf_counter() - t,
+                'nodes': live_nodes,
+                'edges': live_edges,
+                'nodes_dropped': nodes_before - live_nodes,
+            })
 
     def __getitem__(self, key) -> DenseHaplotypeArray:
         """Materialize to dense and subset."""

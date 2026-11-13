@@ -511,6 +511,77 @@ class NonDuplicationRecombination:
         self._modified_nodes.clear()
 
     # ------------------------------------------------------------------
+    # Option B position hierarchy
+    # ------------------------------------------------------------------
+
+    def build_groups(self, samples, fanin, min_parents):
+        """Organize each long parent list into a position-ordered group tree.
+
+        For every sample in ``samples`` (raw positive node IDs) with more than
+        ``max(min_parents, fanin)`` parents: sort its parents by ancestral span
+        ``(lo, hi, node_id)`` (empty spans last), chunk them into consecutive
+        mutation-free group nodes of ``fanin``, repeat on the groups until at
+        most ``fanin`` remain, and make those the sample's only parents. A
+        chunk of one passes up unchanged, so every group has 2..``fanin``
+        parents. Each original parent stays reachable through exactly one chain
+        of groups, so genotypes and path counts are unchanged.
+
+        Reference implementation for the native ``buildGroups``; returns the
+        same ``{samples_regrouped, groups_made, edges_added}`` dict.
+        """
+        if fanin < 2:
+            raise ValueError("build_groups: fanin must be at least 2")
+        self._sync_to_grg()
+        threshold = max(min_parents, fanin)
+        inf = float('inf')
+        stats = {"samples_regrouped": 0, "groups_made": 0, "edges_added": 0}
+        connects = disconnects = 0
+        for s in samples:
+            parents = list(self.grg.get_up_edges(s))
+            if len(parents) <= threshold:
+                continue
+            level = []
+            for p in parents:
+                span = self._get_node_and_ancestor_span(p)
+                level.append((span[0], span[1], p) if span else (inf, inf, p))
+            level.sort()
+            while len(level) > fanin:
+                nxt = []
+                for k in range(0, len(level), fanin):
+                    chunk = level[k:k + fanin]
+                    if len(chunk) == 1:
+                        nxt.append(chunk[0])
+                        continue
+                    g = self.grg.make_node()
+                    self._grow_node_arrays(g)
+                    for _, _, p in chunk:
+                        self.grg.connect(p, g)
+                    connects += len(chunk)
+                    spans = [(lo, hi) for lo, hi, _ in chunk if lo != inf]
+                    if spans:
+                        lo = min(sp[0] for sp in spans)
+                        hi = max(sp[1] for sp in spans)
+                        self.span_cache[g] = (lo, hi)
+                        self.anc_cov_cache[g] = (lo, hi + 1)
+                        nxt.append((lo, hi, g))
+                    else:
+                        self.span_cache[g] = None
+                        self.anc_cov_cache[g] = None
+                        nxt.append((inf, inf, g))
+                    stats["groups_made"] += 1
+                level = nxt
+            for p in parents:
+                if self.grg.disconnect(p, s):
+                    disconnects += 1
+            for _, _, top in level:
+                self.grg.connect(top, -s)
+            connects += len(level)
+            self._up_edges_cache.pop(s, None)
+            stats["samples_regrouped"] += 1
+        stats["edges_added"] = connects - disconnects
+        return stats
+
+    # ------------------------------------------------------------------
     # Public entry points
     # ------------------------------------------------------------------
 

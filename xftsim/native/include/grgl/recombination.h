@@ -236,6 +236,29 @@ struct RecombinerStats {
 };
 
 /**
+ * Counters returned by NonDuplicationRecombiner::buildGroups().
+ *
+ *   samplesRegrouped: samples whose parent list was replaced by a hierarchy
+ *   groupsMade:       group nodes created
+ *   edgesAdded:       net change in the GRG's edge count. Each group turns k
+ *                     edges (members -> sample) into k + 1 (members -> group,
+ *                     group -> next level), so this equals groupsMade.
+ *
+ * Kept separate from AuditCounters: groups are not recombination events, and
+ * counting their makeNode() calls there would break audit identity (3).
+ */
+struct GroupStats {
+    uint64_t samplesRegrouped;
+    uint64_t groupsMade;
+    uint64_t edgesAdded;
+
+    GroupStats()
+        : samplesRegrouped(0),
+          groupsMade(0),
+          edgesAdded(0) {}
+};
+
+/**
  * Non-duplication GRG recombination algorithm. Owns a MutableGRG plus all
  * per-node caches required by the iterative DFS over its parents. Constructing
  * the recombiner runs a one-pass O(V + E) topological initialization of every
@@ -351,6 +374,33 @@ public:
      * accumulated removal queue moot.
      */
     void clearPendingSampleRemovals();
+
+    /**
+     * Option B position hierarchy. For each sample with more than
+     * max(minParents, fanin) parents, sort its parents by ancestral span
+     * (lo, hi, NodeID; parents with an Empty span last), chunk them into
+     * consecutive groups of `fanin`, and repeat on the groups until at most
+     * `fanin` nodes remain; those become the sample's only parents. A chunk of
+     * one is passed up unchanged, so every group has 2..fanin parents and no
+     * mutations. Later recombinants that inherit a sub-interval of the sample
+     * can then attach to the few groups covering it (path-compression attach)
+     * instead of to every piece.
+     *
+     * Each original parent stays reachable from the sample through exactly one
+     * chain of groups, so genotypes and matmul path counts are unchanged.
+     * Groups get larger NodeIDs than their child sample, so the GRG stops
+     * being NodeID-ordered (matmul falls back to a DFS) until it is saved and
+     * reloaded.
+     *
+     * Call after the last recombine()/recombineMulti() of the generation, with
+     * the raw (positive) NodeIDs of the new samples. The recombiner's caches
+     * stay consistent, so further recombine calls remain valid.
+     *
+     * @param samples    Raw NodeIDs of the samples to regroup, in order.
+     * @param fanin      Maximum parents per group and per sample (>= 2).
+     * @param minParents Samples with at most this many parents are untouched.
+     */
+    GroupStats buildGroups(const std::vector<NodeID>& samples, size_t fanin, size_t minParents);
 
     void setDeferSampleUpdates(bool defer) { m_deferSampleUpdates = defer; }
     bool getDeferSampleUpdates() const { return m_deferSampleUpdates; }

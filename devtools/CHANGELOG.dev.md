@@ -4,6 +4,54 @@ Changes to development tooling, CI/CD, testing infrastructure, and documentation
 
 ## [Unreleased]
 
+### Option B Native Port: Tests and Demo Flags (2026-11-12)
+
+- Added `tests/unit/test_grg_groups.py` (35 tests), covering both the Python
+  and native backends.
+  - **`build_groups` invariants:** same reachable mutations per haplotype;
+    single paths (matmul dosages never reach 2); groups are mutation-free
+    with 2..B parents and one child; samples at or below the threshold are
+    untouched; leaves are ordered by independently computed spans; stats
+    match graph deltas.
+  - **Empty spans:** a hand-built graph covers a group whose members all have
+    empty spans.
+  - **Python/native parity:** identical graphs over three generations.
+  - **Cache consistency:** recombination after grouping stays exact,
+    including dosages.
+  - **Stats:** checked against the graph (edge and node deltas, how new nodes
+    split into samples, bubbles and groups), not against their formulas.
+  - **Failure paths:** a bad `compact_dir` fails before meiosis; a failed
+    save keeps the uncompacted graph; a failed reload keeps the file.
+  - **Stale parents:** a shrinking population keeps the parent's `n`.
+  - **Exactness:** GRG genotypes equal dense every generation with option B
+    on, with and without compaction.
+  - **Compaction:** the compacted graph equals the live part of the
+    uncompacted one; groups survive; `bp_range` is kept; the parent graph is
+    released.
+  - **Checkpoints:** round trip; a compacting simulation resumed from a
+    checkpoint matches an uninterrupted run.
+  - The 7 compaction tests skip unless pygrgl has `drop_unreachable`.
+- Ran the adversarial review (`devtools/adversarial_review.md`) with a fresh
+  agent. It found no genotype or dosage violation: dense comparisons were exact
+  in 13 (B, K, `compact_every`) configurations. Its findings are fixed:
+  - compaction failure handling;
+  - the `group_min_parents` docstring;
+  - the demo holding the founders' graph;
+  - a comment on the node-ordering flag;
+  - weak or tautological tests.
+- Not fixed, because it predates option B and existing tests rely on it
+  (`test_checkpoint_grg.py::test_grg_founder_persisted_natively`): a retained
+  GRG generation that meiosis ran on still wraps the offspring's graph, so the
+  checkpoint saves it as `gen_{t-1}.grg` with generation t's genotypes.
+  `GraphHaplotypeOperator.stale` now flags such operators.
+- `scripts/demo_stdpopsim_grg.py`: added `--option-b`, `--fanin`,
+  `--min-parents` and `--compact-every`, so `--check-dense` can confirm
+  option B. It prints `EXACT MATCH` with and without compaction.
+- `xftsim/native/test_parity.py` was not extended: it imports
+  `simulate_grg_recombination` from the old `benchmark/` tree, which xftsim
+  does not have, so it cannot run here. The parity checks are in the pytest
+  file above instead.
+
 ### GRG Edge-Growth Instrumentation and Option B Prototype (2026-11-12)
 
 - Added `scripts/scaling/optionb/`: scripts that explain why GRG edges grow

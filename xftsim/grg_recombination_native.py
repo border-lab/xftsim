@@ -81,6 +81,9 @@ class NonDuplicationRecombination:
     def end_generation(self):
         self._impl.end_generation()
 
+    def build_groups(self, samples, fanin, min_parents):
+        return self._impl.build_groups(samples, fanin, min_parents)
+
     # -- audit / stats (used by tests and diagnostics) -----------------------
 
     @property

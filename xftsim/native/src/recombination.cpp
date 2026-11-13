@@ -857,6 +857,128 @@ void NonDuplicationRecombiner::endGeneration() {
 void NonDuplicationRecombiner::clearPendingSampleRemovals() { m_pendingSampleRemovals.clear(); }
 
 // ------------------------------------------------------------------
+// Option B position hierarchy -- port of the prototype build_hierarchy in
+// scripts/scaling/optionb/exp_scale.py. See the header for the contract.
+// ------------------------------------------------------------------
+
+GroupStats NonDuplicationRecombiner::buildGroups(const std::vector<NodeID>& samples, size_t fanin, size_t minParents) {
+    if (fanin < 2) {
+        throw std::invalid_argument("buildGroups: fanin must be at least 2");
+    }
+    GroupStats result;
+    syncToGrg();
+
+    // Sort key (lo, hi, NodeID). A parent with an Empty span gets the
+    // sentinel for both bounds so it sorts last; no real position reaches it.
+    struct Item {
+        BpPosition lo;
+        BpPosition hi;
+        NodeID node;
+        bool operator<(const Item& other) const {
+            if (lo != other.lo) {
+                return lo < other.lo;
+            }
+            if (hi != other.hi) {
+                return hi < other.hi;
+            }
+            return node < other.node;
+        }
+    };
+
+    const size_t threshold = (minParents > fanin) ? minParents : fanin;
+    uint64_t connects = 0;
+    uint64_t disconnects = 0;
+    std::vector<Item> level;
+    std::vector<Item> next;
+    for (const NodeID sample : samples) {
+        const NodeIDList parents = m_grg->getUpEdges(sample);
+        if (parents.size() <= threshold) {
+            continue;
+        }
+        level.clear();
+        for (const NodeID parent : parents) {
+            // Spans are immutable once computed (a bubble moves mutations onto a
+            // new parent of the node, leaving own-plus-ancestors unchanged), so
+            // the cached value is current for input nodes, bubbles and offspring.
+            const IntervalOpt span = getNodeAndAncestorSpan(parent);
+            if (span.isSet()) {
+                level.push_back({span.lo, span.hi, parent});
+            } else {
+                level.push_back({NO_POS_SENTINEL, NO_POS_SENTINEL, parent});
+            }
+        }
+        std::sort(level.begin(), level.end());
+
+        // Levels are never re-sorted: chunking a sorted list keeps it sorted by
+        // position, and matching the prototype keeps counts reproducible.
+        while (level.size() > fanin) {
+            next.clear();
+            for (size_t start = 0; start < level.size(); start += fanin) {
+                const size_t end = std::min(start + fanin, level.size());
+                if (end - start == 1) {
+                    // A lone leftover passes up unchanged: a one-parent group
+                    // would only add a node and an edge.
+                    next.push_back(level[start]);
+                    continue;
+                }
+                const NodeID group = m_grg->makeNode();
+                growNodeArrays(group);
+                BpPosition lo = NO_POS_SENTINEL;
+                BpPosition hi = 0;
+                bool anySet = false;
+                // connect(member, group) has source < target, which clears
+                // MutableGRG's node-ordering flag for good. That is required:
+                // getOrderedNodes() would place a group (a large positive id)
+                // before the negative-node samples it feeds, so matmul must fall
+                // back to a graph traversal until compaction renumbers the graph.
+                for (size_t i = start; i < end; i++) {
+                    m_grg->connect(static_cast<SignedNodeID>(level[i].node), static_cast<SignedNodeID>(group));
+                    connects++;
+                    if (level[i].lo != NO_POS_SENTINEL) {
+                        lo = std::min(lo, level[i].lo);
+                        hi = anySet ? std::max(hi, level[i].hi) : level[i].hi;
+                        anySet = true;
+                    }
+                }
+                // Same values getNodeAndAncestorSpan / getAncestralCoverage would
+                // compute: a group has no mutations of its own.
+                if (anySet) {
+                    m_spanCache[group] = IntervalOpt::makeSet(lo, hi);
+                    m_ancCovCache[group] = IntervalOpt::makeSet(lo, hi + 1);
+                    next.push_back({lo, hi, group});
+                } else {
+                    m_spanCache[group] = IntervalOpt::makeEmpty();
+                    m_ancCovCache[group] = IntervalOpt::makeEmpty();
+                    next.push_back({NO_POS_SENTINEL, NO_POS_SENTINEL, group});
+                }
+                result.groupsMade++;
+            }
+            level.swap(next);
+        }
+
+        for (const NodeID parent : parents) {
+            if (m_grg->disconnect(parent, sample)) {
+                disconnects++;
+            }
+        }
+        for (const Item& top : level) {
+            m_grg->connect(static_cast<SignedNodeID>(top.node), -static_cast<SignedNodeID>(sample));
+            connects++;
+        }
+        // The sample's up-edges changed. Its span and ancestral coverage did not
+        // (same ancestors), so only the up-edge cache needs refreshing.
+        if (static_cast<size_t>(sample) < m_inputGraphNodeCount) {
+            populateUpEdgesOverride(sample);
+        } else {
+            m_overrideUpEdges.erase(sample);
+        }
+        result.samplesRegrouped++;
+    }
+    result.edgesAdded = connects - disconnects;
+    return result;
+}
+
+// ------------------------------------------------------------------
 // Iterative recurseAttach (hot path) -- direct port of Python _recurse_attach.
 //
 // Every visit past both skip guards lands in exactly one of 13 audit buckets
